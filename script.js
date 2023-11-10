@@ -4,7 +4,7 @@ async function sendToChatGPT() {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer YOUR_OPENAI_API_KEY'
+            'Authorization': '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'
         },
         body: JSON.stringify({
             prompt: userInput,

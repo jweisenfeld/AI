@@ -1,2 +1,2 @@
 # AI
-Try a static ChatGPT AI page
+Try a static AI page

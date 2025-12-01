@@ -21,4 +21,3 @@ jobs:
         password: ${{ secrets.FTP_PASSWORD }}
         # This prevents the action from deleting other files in your folder
         # (Useful since you might have other stuff in public_html)
-        clean: false

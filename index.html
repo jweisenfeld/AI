@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Smart Chat</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Marked library for rendering Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Custom scrollbar for chat area */
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .markdown-body ul { list-style-type: disc; margin-left: 1.5rem; }
+        .markdown-body ol { list-style-type: decimal; margin-left: 1.5rem; }
+        .markdown-body pre { background-color: #f3f4f6; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin-top: 0.5rem; margin-bottom: 0.5rem; }
+        .markdown-body code { font-family: monospace; background-color: #f3f4f6; padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-size: 0.875rem; }
+        .markdown-body pre code { background-color: transparent; padding: 0; }
+        .markdown-body p { margin-bottom: 0.75rem; }
+        .markdown-body p:last-child { margin-bottom: 0; }
+        
+        /* Loading dots animation */
+        .typing-dot {
+            animation: typing 1.4s infinite ease-in-out both;
+        }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        /* Tooltip animation */
+        .tool-btn:active { transform: scale(0.95); }
+    </style>
+    <!-- Import map for Gemini SDK -->
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/generative-ai": "https://esm.run/@google/generative-ai"
+        }
+      }
+    </script>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col items-center justify-center p-4 sm:p-6">
+
+    <!-- API Key Modal (Overlay) -->
+    <div id="apiKeyModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Welcome to Gemini Chat</h2>
+            <p class="text-gray-600 mb-6 text-sm">
+                To use this chat, you need a Google Gemini API Key. Your key is stored locally in your browser and never sent to any other server.
+            </p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+                    <input type="password" id="apiKeyInput" placeholder="Paste your API key here" 
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
+                </div>
+                <button id="saveKeyBtn" 
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition-colors duration-200">
+                    Start Chatting
+                </button>
+                <div class="text-center">
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-xs text-blue-500 hover:underline">
+                        Get a free API key here &rarr;
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Chat Interface -->
+    <div class="bg-white w-full max-w-4xl h-[85vh] rounded-2xl shadow-xl flex flex-col overflow-hidden ring-1 ring-gray-900/5">
+        
+        <!-- Header -->
+        <header class="bg-white border-b border-gray-100 p-4 flex items-center justify-between shrink-0 z-10">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm">
+                    AI
+                </div>
+                <div>
+                    <h1 class="font-semibold text-gray-800">Gemini 2.5 Flash Preview</h1>
+                    <p class="text-xs text-green-500 flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Online
+                    </p>
+                </div>
+            </div>
+            <button id="settingsBtn" class="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 transition-colors" title="Settings">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+            </button>
+        </header>
+
+        <!-- Chat History -->
+        <div id="chatHistory" class="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide bg-gray-50/50">
+            <!-- Welcome Message -->
+            <div class="flex gap-4 max-w-3xl mx-auto opacity-0 animate-fade-in" style="animation-fill-mode: forwards; animation-duration: 0.5s;">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex-shrink-0 flex items-center justify-center text-white text-xs">AI</div>
+                <div class="flex-1 bg-white p-4 rounded-2xl rounded-tl-none shadow-sm border border-gray-100 text-gray-800 text-sm leading-relaxed">
+                    Hello! I'm ready to chat. I can also use my API tools to summarize, explain, or code for you. What can I help you with today?
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="bg-white p-4 border-t border-gray-100 shrink-0">
+            <div class="max-w-3xl mx-auto relative">
+                
+                <!-- Smart Tools Bar -->
+                <div class="flex gap-2 mb-3 overflow-x-auto pb-1 scrollbar-hide">
+                    <button id="toolSummarize" class="tool-btn whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-medium hover:bg-indigo-100 transition-colors">
+                        ✨ Summarize
+                    </button>
+                    <button id="toolEli5" class="tool-btn whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 bg-pink-50 text-pink-600 rounded-lg text-xs font-medium hover:bg-pink-100 transition-colors">
+                        ✨ ELI5
+                    </button>
+                    <button id="toolBrainstorm" class="tool-btn whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-600 rounded-lg text-xs font-medium hover:bg-amber-100 transition-colors">
+                        ✨ Brainstorm
+                    </button>
+                    <button id="toolCode" class="tool-btn whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-medium hover:bg-emerald-100 transition-colors">
+                        ✨ Code This
+                    </button>
+                </div>
+
+                <!-- Input Form -->
+                <form id="chatForm" class="relative flex items-end gap-2 bg-gray-50 border border-gray-200 rounded-xl p-2 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-400 transition-all">
+                    <textarea 
+                        id="userInput"
+                        rows="1"
+                        placeholder="Type a message or use a tool..."
+                        class="w-full bg-transparent border-none focus:ring-0 text-gray-700 placeholder-gray-400 resize-none py-3 px-3 max-h-32 text-sm"
+                        style="min-height: 44px;"
+                    ></textarea>
+                    <button type="submit" id="sendBtn" class="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mb-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transform rotate-90" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                        </svg>
+                    </button>
+                </form>
+                <div class="text-center mt-2">
+                    <p class="text-xs text-gray-400">Powered by Google Gemini • Stored locally in browser</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { GoogleGenerativeAI } from "@google/generative-ai";
+
+        // State Management
+        let apiKey = localStorage.getItem('gemini_api_key');
+        let chat = null;
+        let genAI = null;
+        let model = null;
+
+        // DOM Elements
+        const modal = document.getElementById('apiKeyModal');
+        const keyInput = document.getElementById('apiKeyInput');
+        const saveKeyBtn = document.getElementById('saveKeyBtn');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const chatForm = document.getElementById('chatForm');
+        const userInput = document.getElementById('userInput');
+        const chatHistory = document.getElementById('chatHistory');
+        const sendBtn = document.getElementById('sendBtn');
+
+        // Tool Buttons
+        const btnSummarize = document.getElementById('toolSummarize');
+        const btnEli5 = document.getElementById('toolEli5');
+        const btnBrainstorm = document.getElementById('toolBrainstorm');
+        const btnCode = document.getElementById('toolCode');
+
+        // Initialize
+        function init() {
+            if (!apiKey) {
+                showModal();
+            } else {
+                initializeGemini(apiKey);
+            }
+        }
+
+        function showModal() {
+            modal.classList.remove('hidden');
+            if(apiKey) keyInput.value = apiKey;
+        }
+
+        function hideModal() {
+            modal.classList.add('hidden');
+        }
+
+        function initializeGemini(key) {
+            try {
+                genAI = new GoogleGenerativeAI(key);
+                model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-09-2025" });
+                
+                chat = model.startChat({
+                    history: [
+                        {
+                            role: "user",
+                            parts: [{ text: "Hello, who are you?" }],
+                        },
+                        {
+                            role: "model",
+                            parts: [{ text: "I am a helpful AI assistant powered by Google's Gemini model." }],
+                        },
+                    ],
+                });
+                
+                hideModal();
+            } catch (error) {
+                alert("Error initializing Gemini: " + error.message);
+                showModal();
+            }
+        }
+
+        // --- Core Chat Logic ---
+
+        async function handleChat(message) {
+             if (!message || !chat) return;
+
+            // Clear input
+            userInput.value = '';
+            userInput.style.height = '44px';
+            
+            // Add User Message
+            appendMessage('user', message);
+
+            // Show Loading State
+            const loadingId = appendLoading();
+
+            try {
+                const result = await chat.sendMessage(message);
+                const response = await result.response;
+                const text = response.text();
+
+                removeLoading(loadingId);
+                appendMessage('model', text);
+
+            } catch (error) {
+                removeLoading(loadingId);
+                appendMessage('error', 'Error: ' + error.message + ' (Check your API Key)');
+                console.error(error);
+            }
+        }
+
+        // --- Event Listeners ---
+
+        saveKeyBtn.addEventListener('click', () => {
+            const key = keyInput.value.trim();
+            if (key) {
+                apiKey = key;
+                localStorage.setItem('gemini_api_key', key);
+                initializeGemini(key);
+            } else {
+                alert('Please enter a valid API key');
+            }
+        });
+
+        settingsBtn.addEventListener('click', showModal);
+
+        // Auto-resize textarea
+        userInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+            if (this.value === '') this.style.height = '44px';
+        });
+
+        // Handle Enter key
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                chatForm.dispatchEvent(new Event('submit'));
+            }
+        });
+
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            handleChat(userInput.value.trim());
+        });
+
+        // --- Tool Logic ---
+
+        btnSummarize.addEventListener('click', () => {
+            handleChat("Please provide a concise summary of our conversation so far, highlighting the key points in a bulleted list.");
+        });
+
+        btnEli5.addEventListener('click', () => {
+            handleChat("Can you explain the last concept or response simply, like I'm 5 years old? Use an analogy if possible.");
+        });
+
+        btnBrainstorm.addEventListener('click', () => {
+            const currentText = userInput.value.trim();
+            if (currentText) {
+                handleChat(`Brainstorm 5 creative ideas or variations based on this topic: "${currentText}"`);
+            } else {
+                handleChat("Please brainstorm 5 random, creative ideas for a software project or helpful tool.");
+            }
+        });
+
+        btnCode.addEventListener('click', () => {
+            handleChat("Please provide a code example (in Python or JavaScript) that demonstrates the concept we are currently discussing.");
+        });
+
+        // --- UI Helpers ---
+
+        function appendMessage(role, text) {
+            const div = document.createElement('div');
+            div.className = `flex gap-4 max-w-3xl mx-auto opacity-0 animate-fade-in ${role === 'user' ? 'flex-row-reverse' : ''}`;
+            div.style.animation = 'fadeIn 0.3s forwards';
+            
+            const avatar = document.createElement('div');
+            avatar.className = `w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs ${
+                role === 'user' ? 'bg-gray-700' : 
+                role === 'error' ? 'bg-red-500' : 
+                'bg-gradient-to-tr from-blue-500 to-purple-500'
+            }`;
+            avatar.textContent = role === 'user' ? 'You' : 'AI';
+
+            const bubble = document.createElement('div');
+            bubble.className = `flex-1 p-4 rounded-2xl shadow-sm text-sm leading-relaxed ${
+                role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 
+                role === 'error' ? 'bg-red-50 text-red-600 border border-red-100' :
+                'bg-white text-gray-800 border border-gray-100 rounded-tl-none markdown-body'
+            }`;
+
+            if (role === 'model' || role === 'error') {
+                bubble.innerHTML = marked.parse(text);
+            } else {
+                bubble.textContent = text;
+            }
+
+            div.appendChild(avatar);
+            div.appendChild(bubble);
+            chatHistory.appendChild(div);
+            scrollToBottom();
+        }
+
+        function appendLoading() {
+            const id = 'loading-' + Date.now();
+            const div = document.createElement('div');
+            div.id = id;
+            div.className = "flex gap-4 max-w-3xl mx-auto opacity-0 animate-fade-in";
+            div.style.animation = 'fadeIn 0.3s forwards';
+            
+            div.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex-shrink-0 flex items-center justify-center text-white text-xs">AI</div>
+                <div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm border border-gray-100 flex items-center gap-1 h-12">
+                    <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+                    <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+                    <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+                </div>
+            `;
+            
+            chatHistory.appendChild(div);
+            scrollToBottom();
+            return id;
+        }
+
+        function removeLoading(id) {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        }
+
+        function scrollToBottom() {
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        // Add Keyframes for animations
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Start
+        init();
+    </script>
+</body>
+</html>

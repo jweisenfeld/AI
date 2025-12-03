@@ -3,64 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>About Erik</title>
-    <!-- Load Tailwind CSS (Only once) -->
+    <title>About Erik - Dark Mode</title>
+    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
+        /* Configure Tailwind to use the Inter font family */
         :root {
             --font-inter: 'Inter', sans-serif;
         }
-        /* WARNING FIX: Added generic fallback 'sans-serif' */
         body {
             font-family: var(--font-inter), sans-serif;
-            transition: background-color 0.3s;
-        }
-
-        /* Custom styles for the theme toggle control */
-        /* WARNING FIX: Use existing IDs and classes to avoid 'unused selector' warnings */
-        #theme-toggle:checked + .block {
-            /* Change track color when checked (dark mode active) */
-            background-color: #dc2626; /* red-600 */
-        }
-
-        #theme-toggle:checked ~ .dot {
-            /* Move dot to the right */
-            transform: translateX(100%);
-        }
-
-        .toggle-label:hover .dot {
-            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.3); /* Red ring on hover */
         }
     </style>
 </head>
-<body class="min-h-screen p-4 sm:p-8 flex items-center justify-center bg-gray-900" id="body-container">
+<!-- Permanent Dark Mode classes applied directly -->
+<body class="min-h-screen p-4 sm:p-8 flex items-center justify-center bg-gray-900">
 
 <!-- Main Content Card -->
-<div class="w-full max-w-4xl shadow-2xl rounded-2xl overflow-hidden transform transition duration-500 hover:shadow-3xl border bg-gray-800 text-gray-200 border-gray-700" id="main-card">
+<div class="w-full max-w-4xl shadow-2xl rounded-2xl overflow-hidden transform transition duration-500 hover:shadow-3xl border bg-gray-800 text-gray-200 border-gray-700">
 
-    <!-- Header Section -->
+    <!-- Header Section (Dark Mode Red) -->
     <header class="bg-red-700 p-6 sm:p-8 text-white text-center relative">
-        <!-- Theme Toggle Switch -->
-        <div class="absolute top-4 right-4 flex items-center space-x-2">
-            <!-- Sun Icon (Light Mode) -->
-            <svg id="sun-icon" class="w-5 h-5 text-yellow-300 transition-opacity duration-300 opacity-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-
-            <label for="theme-toggle" class="toggle-label cursor-pointer relative">
-                <!-- Checkbox handles the state, hidden from view -->
-                <input type="checkbox" id="theme-toggle" class="sr-only" checked>
-                <!-- Track -->
-                <div class="block bg-gray-600 w-10 h-6 rounded-full transition-colors duration-300"></div>
-                <!-- Dot/Circle -->
-                <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-300 shadow-md"></div>
-            </label>
-
-            <!-- Moon Icon (Dark Mode) -->
-            <svg id="moon-icon" class="w-5 h-5 text-gray-300 transition-opacity duration-300 opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
-        </div>
-
         <div class="flex flex-col items-center">
-            <!-- Profile Image Placeholder (Kept onerror for robustness, often flagged as obsolete but useful) -->
+            <!-- Profile Image Placeholder -->
             <img
                     src="https://i.pinimg.com/736x/99/d5/e9/99d5e9c6022927ebee8cec32af07da31.jpg"
                     alt="Profile Picture of Erik"
@@ -77,38 +43,77 @@
 
         <!-- About Me Section -->
         <section class="mb-10">
-            <h2 class="text-2xl font-bold border-b-2 border-red-500 pb-2 mb-4 flex items-center" id="about-heading">
+            <h2 class="text-2xl font-bold border-b-2 border-red-500 pb-2 mb-4 flex items-center text-gray-100">
                 <svg class="w-6 h-6 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-5m-7-3v5m-5-5h5"></path></svg>
                 A Little About Me
             </h2>
-            <p class="leading-relaxed text-gray-300" id="about-text">
+            <p class="leading-relaxed text-gray-300">
                 Hello! I'm Erik, a developer with a passion for building things that matter. My current focus is on crafting clean, efficient, and user-friendly web applications. I believe technology should be both powerful and accessible, and I spend a lot of my time exploring new frameworks and architectural patterns to make that happen. When I'm not coding, i'll just be playing lots of videos games out their.
             </p>
         </section>
 
         <!-- Skills Section -->
         <section class="mb-10">
-            <h2 class="text-2xl font-bold border-b-2 border-red-500 pb-2 mb-4 flex items-center" id="skills-heading">
+            <h2 class="text-2xl font-bold border-b-2 border-red-500 pb-2 mb-4 flex items-center text-gray-100">
                 <svg class="w-6 h-6 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 4.04A12.007 12.007 0 002 12c0 2.83.69 5.518 1.902 7.857 1.354 2.537 3.99 4.34 7.674 4.34s6.32-1.803 7.674-4.34C21.31 17.518 22 14.83 22 12A12.007 12.007 0 0017.618 7.984z"></path></svg>
                 Core Skills
             </h2>
-            <div class="flex flex-wrap gap-3" id="skills-container">
-                <!-- Skills updated dynamically by JS -->
-                <span class="skill-tag bg-red-900 text-red-300 text-sm font-medium px-4 py-1.5 rounded-full shadow-md hover:bg-red-800 transition duration-300">HTML & CSS (Tailwind)</span>
-                <span class="skill-tag bg-red-900 text-red-300 text-sm font-medium px-4 py-1.5 rounded-full shadow-md hover:bg-red-800 transition duration-300">JavaScript (React/Vue)</span>
-                <span class="skill-tag bg-red-900 text-red-300 text-sm font-medium px-4 py-1.5 rounded-full shadow-md hover:bg-red-800 transition duration-300">Node.js / Express</span>
-                <span class="skill-tag bg-red-900 text-red-300 text-sm font-medium px-4 py-1.5 rounded-full shadow-md hover:bg-red-800 transition duration-300">Git & Version Control</span>
-                <span class="skill-tag bg-red-900 text-red-300 text-sm font-medium px-4 py-1.5 rounded-full shadow-md hover:bg-red-800 transition duration-300">Database Management (SQL/NoSQL)</span>
+            <div class="flex flex-wrap gap-3">
+                <!-- Skills Tags in Dark Mode style -->
+                <span class="bg-red-900 text-red-300 text-sm font-medium px-4 py-1.5 rounded-full shadow-md hover:bg-red-800 transition duration-300">HTML & CSS (Tailwind)</span>
+                <span class="bg-red-900 text-red-300 text-sm font-medium px-4 py-1.5 rounded-full shadow-md hover:bg-red-800 transition duration-300">JavaScript (React/Vue)</span>
+                <span class="bg-red-900 text-red-300 text-sm font-medium px-4 py-1.5 rounded-full shadow-md hover:bg-red-800 transition duration-300">Node.js / Express</span>
+                <span class="bg-red-900 text-red-300 text-sm font-medium px-4 py-1.5 rounded-full shadow-md hover:bg-red-800 transition duration-300">Git & Version Control</span>
+                <span class="bg-red-900 text-red-300 text-sm font-medium px-4 py-1.5 rounded-full shadow-md hover:bg-red-800 transition duration-300">Database Management (SQL/NoSQL)</span>
             </div>
         </section>
 
-        <!-- Interests Section -->
+        <!-- NEW PROJECT SHOWCASE SECTION -->
+        <section class="mb-10">
+            <h2 class="text-2xl font-bold border-b-2 border-red-500 pb-2 mb-4 flex items-center text-gray-100">
+                <svg class="w-6 h-6 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l-4 4m0 0l-4 4m4-4V4"></path></svg>
+                Featured Projects
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                <!-- Project 1: Collaborative Code Editor -->
+                <div class="bg-gray-700 p-4 rounded-lg shadow-xl hover:shadow-red-900/50 transition duration-300 transform hover:scale-[1.02]">
+                    <h3 class="text-xl font-semibold text-red-400 mb-2">Admin panel</h3>
+                    <p class="text-gray-300 text-sm mb-3">
+                        Just a admin panel that i'm working on for fun
+                    </p>
+                    <div class="flex flex-wrap gap-2 text-xs">
+                        <span class="bg-gray-600 text-gray-100 px-3 py-1 rounded">Node.js</span>
+                        <span class="bg-gray-600 text-gray-100 px-3 py-1 rounded">Socket.io</span>
+                        <span class="bg-gray-600 text-gray-100 px-3 py-1 rounded">MongoDB</span>
+                    </div>
+                    <a href="#" class="mt-3 inline-block text-red-500 hover:text-red-400 font-medium text-sm transition duration-300">View Project &rarr;</a>
+                </div>
+
+                <!-- Project 2: Data Visualization Dashboard -->
+                <div class="bg-gray-700 p-4 rounded-lg shadow-xl hover:shadow-red-900/50 transition duration-300 transform hover:scale-[1.02]">
+                    <h3 class="text-xl font-semibold text-red-400 mb-2">Personal Expense Tracker</h3>
+                    <p class="text-gray-300 text-sm mb-3">
+                        A responsive front-end dashboard built with React and D3.js to visualize spending trends and budget adherence with interactive charts.
+                    </p>
+                    <div class="flex flex-wrap gap-2 text-xs">
+                        <span class="bg-gray-600 text-gray-100 px-3 py-1 rounded">React</span>
+                        <span class="bg-gray-600 text-gray-100 px-3 py-1 rounded">D3.js</span>
+                        <span class="bg-gray-600 text-gray-100 px-3 py-1 rounded">Tailwind CSS</span>
+                    </div>
+                    <a href="#" class="mt-3 inline-block text-red-500 hover:text-red-400 font-medium text-sm transition duration-300">View Project &rarr;</a>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Interests Section (Moved down) -->
         <section>
-            <h2 class="text-2xl font-bold border-b-2 border-red-500 pb-2 mb-4 flex items-center" id="interests-heading">
+            <h2 class="text-2xl font-bold border-b-2 border-red-500 pb-2 mb-4 flex items-center text-gray-100">
                 <svg class="w-6 h-6 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
                 Interests
             </h2>
-            <ul class="space-y-2 list-disc list-inside text-gray-300" id="interests-list">
+            <ul class="space-y-2 list-disc list-inside text-gray-300">
                 <li class="pl-2">Automating everything (if it takes more than 5 minutes, it should be scripted).</li>
                 <li class="pl-2">Exploring new ways about coding.</li>
                 <li class="pl-2">Playing video games.</li>
@@ -118,15 +123,15 @@
 
     </main>
 
-    <!-- Footer / Contact Section -->
-    <footer class="p-6 sm:p-8 border-t bg-gray-900 border-gray-700 text-center" id="page-footer">
+    <!-- Footer / Contact Section (Dark Mode style) -->
+    <footer class="p-6 sm:p-8 border-t bg-gray-900 border-gray-700 text-center">
         <h3 class="text-xl font-semibold text-gray-200 mb-3">Let's Connect!</h3>
         <div class="flex justify-center space-x-4 text-sm font-medium">
-            <a href="mailto:erik230@students.psd1.org" class="contact-link text-red-500 hover:text-red-400 transition duration-300 hover:underline">
+            <a href="mailto:erik230@students.psd1.org" class="text-red-500 hover:text-red-400 transition duration-300 hover:underline">
                 erik230@students.psd1.org
             </a>
-            <span class="contact-divider text-gray-600">|</span>
-            <a href="https://github.com/JogmansonReal" class="contact-link text-red-500 hover:text-red-400 transition duration-300 hover:underline">
+            <span class="text-gray-600">|</span>
+            <a href="https://github.com/JogmansonReal" class="text-red-500 hover:text-red-400 transition duration-300 hover:underline">
                 GitHub: JogmansonReal
             </a>
         </div>
@@ -134,205 +139,6 @@
     </footer>
 
 </div>
-
-<script type="module">
-    // Firebase imports using the full version path to prevent IDE warnings about symbol resolution
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-    // --- Firebase Global Variables and Initialization ---
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-    const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-    let db;
-    let auth;
-    let userId;
-
-    const THEME_PATH = (uid) => `/artifacts/${appId}/users/${uid}/settings/theme`;
-
-    // Theme utility functions
-    const removeClasses = (element, prefixes) => {
-        if (!element) return;
-        element.className = element.className.split(' ').filter(c =>
-            !prefixes.some(p => c.startsWith(p))
-        ).join(' ');
-    };
-
-    const applyThemeClasses = (theme) => {
-        const body = document.getElementById('body-container');
-        const card = document.getElementById('main-card');
-        const footer = document.getElementById('page-footer');
-        const headings = [
-            document.getElementById('about-heading'),
-            document.getElementById('skills-heading'),
-            document.getElementById('interests-heading')
-        ];
-        const textElements = [
-            document.getElementById('about-text'),
-            document.getElementById('interests-list')
-        ];
-        const skillTags = document.querySelectorAll('.skill-tag');
-        const contactLinks = document.querySelectorAll('.contact-link');
-        const contactDividers = document.querySelectorAll('.contact-divider');
-        const toggleCheckbox = document.getElementById('theme-toggle');
-        const sunIcon = document.getElementById('sun-icon');
-        const moonIcon = document.getElementById('moon-icon');
-
-        // Define class sets
-        const DARK_THEME = {
-            body: ['bg-gray-900'],
-            card: ['bg-gray-800', 'text-gray-200', 'border-gray-700'],
-            footer: ['bg-gray-900', 'border-gray-700'],
-            heading: ['text-gray-100'],
-            text: ['text-gray-300'],
-            tagBg: ['bg-red-900', 'hover:bg-red-800'],
-            tagText: ['text-red-300'],
-            link: ['text-red-500', 'hover:text-red-400'],
-            divider: ['text-gray-600']
-        };
-
-        const LIGHT_THEME = {
-            body: ['bg-gray-50'],
-            card: ['bg-white', 'text-gray-800', 'border-gray-200'],
-            footer: ['bg-gray-100', 'border-gray-200'],
-            heading: ['text-gray-800'],
-            text: ['text-gray-600'],
-            tagBg: ['bg-red-100', 'hover:bg-red-200'],
-            tagText: ['text-red-800'],
-            link: ['text-red-600', 'hover:text-red-800'],
-            divider: ['text-gray-400']
-        };
-
-        const classes = theme === 'dark' ? DARK_THEME : LIGHT_THEME;
-        const tagClassesToRemove = ['bg-', 'text-', 'hover:bg-', 'hover:text-', 'border-'];
-
-        // 1. Body and Card
-        removeClasses(body, ['bg-']);
-        body.classList.add(...classes.body);
-
-        removeClasses(card, tagClassesToRemove);
-        card.classList.add(...classes.card);
-
-        // 2. Headings and Text
-        headings.forEach(h => {
-            if (h) {
-                removeClasses(h, ['text-']);
-                h.classList.add(...classes.heading);
-            }
-        });
-        textElements.forEach(p => {
-            if (p) {
-                removeClasses(p, ['text-']);
-                p.classList.add(...classes.text);
-            }
-        });
-
-        // 3. Skills Tags
-        skillTags.forEach(tag => {
-            removeClasses(tag, tagClassesToRemove);
-            tag.classList.add(...classes.tagBg, ...classes.tagText);
-        });
-
-        // 4. Footer
-        removeClasses(footer, tagClassesToRemove);
-        footer.classList.add(...classes.footer);
-
-        // 5. Contact Links
-        contactLinks.forEach(link => {
-            removeClasses(link, tagClassesToRemove);
-            link.classList.add(...classes.link);
-        });
-
-        // 6. Contact Dividers
-        contactDividers.forEach(divider => {
-            removeClasses(divider, ['text-']);
-            divider.classList.add(...classes.divider);
-        });
-
-        // 7. Toggle State and Icons
-        if (toggleCheckbox) {
-            // Set the checked state of the hidden input
-            toggleCheckbox.checked = theme === 'dark';
-
-            // Update Icon Opacity
-            sunIcon.classList.toggle('opacity-0', theme === 'dark');
-            sunIcon.classList.toggle('opacity-100', theme === 'light');
-            moonIcon.classList.toggle('opacity-0', theme === 'light');
-            moonIcon.classList.toggle('opacity-100', theme === 'dark');
-        }
-    };
-
-    const saveThemePreference = async (theme) => {
-        if (!db || !userId) {
-            // console.error("Firestore not initialized or user not logged in. Cannot save theme.");
-            return;
-        }
-        try {
-            const themeRef = doc(db, THEME_PATH(userId));
-            await setDoc(themeRef, { theme: theme }, { merge: true });
-        } catch (e) {
-            console.error("Error saving theme preference:", e);
-        }
-    };
-
-    const handleThemeChange = (newTheme) => {
-        applyThemeClasses(newTheme);
-        saveThemePreference(newTheme);
-    };
-
-    const initFirebase = async () => {
-        try {
-            const app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
-
-            // 1. Authenticate user
-            if (initialAuthToken) {
-                await signInWithCustomToken(auth, initialAuthToken);
-            } else {
-                await signInAnonymously(auth);
-            }
-
-            userId = auth.currentUser?.uid || crypto.randomUUID();
-            // console.log("Authenticated with user ID:", userId);
-
-            // 2. Set up real-time theme listener
-            const themeRef = doc(db, THEME_PATH(userId));
-
-            onSnapshot(themeRef, (docSnap) => {
-                let savedTheme = 'dark'; // Default to dark mode
-                if (docSnap.exists() && docSnap.data().theme) {
-                    savedTheme = docSnap.data().theme;
-                }
-                // console.log("Applying theme from Firestore:", savedTheme);
-                applyThemeClasses(savedTheme);
-            }, (error) => {
-                console.error("Error fetching theme:", error);
-                // Fallback: apply default dark theme if connection fails
-                applyThemeClasses('dark');
-            });
-
-            // 3. Attach toggle listener
-            const toggle = document.getElementById('theme-toggle');
-            if (toggle) {
-                toggle.addEventListener('change', (e) => {
-                    // Checkbox is checked when theme is dark
-                    const newTheme = e.target.checked ? 'dark' : 'light';
-                    handleThemeChange(newTheme);
-                });
-            }
-
-        } catch (e) {
-            console.error("Firebase Initialization Failed:", e);
-            // Fallback: Apply default dark theme without persistence
-            applyThemeClasses('dark');
-        }
-    };
-
-    window.onload = initFirebase;
-</script>
 
 </body>
 </html>

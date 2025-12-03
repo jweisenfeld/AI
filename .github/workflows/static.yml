@@ -4,7 +4,8 @@ on:
   push:
     branches:
       - main  # Or 'master' if your branch is named that
-
+  workflow_dispatch: #<--adds the manual trigger button
+  
 jobs:
   web-deploy:
     name: 🎉 Deploy

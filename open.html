@@ -2,8 +2,8 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Team Chat | OpenRouter Free Tier</title>
 
     <!-- Tailwind CSS for styling -->
@@ -13,7 +13,7 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
 
     <style>
         body {
@@ -171,9 +171,13 @@
             </div>
             <h2 class="text-2xl font-bold text-gray-300">Ready to assist</h2>
             <p class="max-w-md">Select a model from the dropdown above and type a message to start chatting. All models
-                are currently free-tier via OpenRouter.</p>
-            <p class="max-w-md text-sm text-gray-500">You must provide an OpenRouter API key (via <code>?key=</code> or
-                the Settings button) before sending messages.</p>
+                are
+                currently free-tier via OpenRouter.</p>
+            <p class="max-w-md text-sm text-gray-500">
+                Provide an OpenRouter API key via <code>?key=...</code> (or safer <code>#key=...</code>) or the Settings
+                button
+                before sending messages.
+            </p>
         </div>
         <!-- Messages will be inserted here via JS -->
     </main>
@@ -216,11 +220,11 @@
             <label class="block text-sm font-medium text-gray-400 mb-2">OpenRouter API Key</label>
             <input type="password" id="api-key-input"
                 class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white mb-1 focus:border-blue-500 focus:outline-none"
-                placeholder="sk-or-v1-...">
+                placeholder="sk-or-v1-..." />
             <p class="text-xs text-gray-500 mb-4">
                 This key is kept <span class="text-gray-300">in memory only</span> (not saved to localStorage).
-                <br>
-                You can also pass it via the URL like: <code>?key=sk-or-v1-...</code>
+                <br />
+                You can pass it via URL as <code>?key=...</code> or (safer) <code>#key=...</code>.
             </p>
             <div class="flex justify-end gap-2">
                 <button id="close-config-btn" class="text-gray-400 hover:text-white px-3 py-2 text-sm">Cancel</button>
@@ -232,23 +236,49 @@
     </div>
 
     <script>
-        // --- Configuration ---
-        // IMPORTANT: No hard-coded key. Key comes from ?key= or user input.
-        let apiKey = null;
-
+        // =========================
+        //   NO HARD-CODED API KEY
+        // =========================
+        let apiKey = null;       // in-memory only
         let chatHistory = [];
         let modelSelect;
 
-        // --- Key Handling ---
+        // If the selected model hits provider throttling, OpenRouter can try these automatically.
+        const FALLBACK_MODELS = [
+            "meta-llama/llama-3.2-3b-instruct:free",
+            "qwen/qwen-2-7b-instruct:free",
+            "microsoft/phi-3-mini-128k-instruct:free",
+            "mistralai/mistral-7b-instruct:free"
+        ];
 
-        function getApiKeyFromUrlOnce() {
+        // -------- Key Handling --------
+
+        function scrubUrlKeyParamAndReturnKey() {
             const url = new URL(window.location.href);
             const key = (url.searchParams.get('key') || '').trim();
             if (!key) return null;
 
-            // Remove the key from the address bar ASAP to reduce accidental leakage.
+            // Remove ?key from URL (history + address bar) ASAP
             url.searchParams.delete('key');
             const newUrl = url.pathname + (url.searchParams.toString() ? `?${url.searchParams.toString()}` : '') + url.hash;
+            window.history.replaceState({}, document.title, newUrl);
+
+            return key;
+        }
+
+        function scrubHashKeyAndReturnKey() {
+            // Supports: https://site/page.html#key=sk-...
+            const hash = (window.location.hash || '').replace(/^#/, '');
+            if (!hash) return null;
+
+            const params = new URLSearchParams(hash);
+            const key = (params.get('key') || '').trim();
+            if (!key) return null;
+
+            // Remove key from hash
+            params.delete('key');
+            const newHash = params.toString();
+            const newUrl = window.location.pathname + window.location.search + (newHash ? `#${newHash}` : '');
             window.history.replaceState({}, document.title, newUrl);
 
             return key;
@@ -269,117 +299,130 @@
         function ensureApiKeyOrPrompt() {
             if (apiKey && typeof apiKey === 'string' && apiKey.trim().length > 0) return true;
 
-            addMessageToUI('system', `**API Key Required:** Please enter your OpenRouter API Key. <button onclick="window.openSettings(true)" class="text-blue-400 underline hover:text-blue-300">Open Settings</button>.`);
+            addMessageToUI('system',
+                `**API Key Required:** Please enter your OpenRouter API Key. ` +
+                `<button onclick="window.openSettings(true)" class="text-blue-400 underline hover:text-blue-300">Open Settings</button>.`
+            );
             window.openSettings(true);
             setInputEnabled(false);
             return false;
         }
 
-        // --- Core Functions (Global Scope) ---
+        // -------- Modal Controls (Global) --------
 
-        // Defined globally so it can be called by onclick events in generated HTML
         window.openSettings = function (force = false) {
             const configModal = document.getElementById('config-modal');
             const apiKeyInput = document.getElementById('api-key-input');
             const closeBtn = document.getElementById('close-config-btn');
 
             if (configModal && apiKeyInput) {
-                apiKeyInput.value = '';
-                apiKeyInput.focus();
+                apiKeyInput.value = ''; // do not reveal any existing key
                 configModal.classList.remove('hidden');
+                apiKeyInput.focus();
             }
 
-            // If we're forcing key entry, make Cancel less useful (but still visible).
-            if (closeBtn) {
-                closeBtn.classList.toggle('opacity-50', force);
-            }
+            if (closeBtn) closeBtn.classList.toggle('opacity-50', force);
         };
 
         function saveConfig() {
             const apiKeyInput = document.getElementById('api-key-input');
             const configModal = document.getElementById('config-modal');
-
             if (!apiKeyInput) return;
 
             const newKey = apiKeyInput.value.trim();
             if (newKey) {
-                apiKey = newKey; // In-memory only
+                apiKey = newKey; // in-memory only
                 if (configModal) configModal.classList.add('hidden');
                 setInputEnabled(true);
                 alert("API Key set for this tab/session (not saved).");
             } else {
-                // If a key already exists, allow closing without changing it.
-                if (apiKey && apiKey.trim().length > 0) {
-                    if (configModal) configModal.classList.add('hidden');
-                    return;
-                }
-                alert("Please enter a valid API Key.");
+                // If no key is set yet, keep nudging the user.
+                if (!apiKey) alert("Please enter a valid API Key.");
+                if (apiKey && configModal) configModal.classList.add('hidden');
             }
         }
+
+        // -------- Chat Send --------
 
         async function handleSendMessage() {
             if (!ensureApiKeyOrPrompt()) return;
 
             const userInput = document.getElementById('user-input');
             const welcomeScreen = document.getElementById('welcome-screen');
-            const modelSelect = document.getElementById('model-select');
-
+            const modelEl = document.getElementById('model-select');
             if (!userInput) return;
 
             const text = userInput.value.trim();
             if (!text) return;
 
-            // Remove welcome screen on first message
             if (welcomeScreen) welcomeScreen.style.display = 'none';
 
-            // 1. Add User Message to UI
             addMessageToUI('user', text);
             userInput.value = '';
-            userInput.style.height = 'auto'; // Reset height
+            userInput.style.height = 'auto';
 
-            // 2. Add to History
             chatHistory.push({ role: 'user', content: text });
 
-            // 3. Show Loading Indicator
             const loadingId = addLoadingIndicator();
 
-            // 4. API Call
             try {
-                const model = modelSelect ? modelSelect.value : "google/gemini-2.0-flash-exp:free";
+                const primaryModel = modelEl ? modelEl.value : "google/gemini-2.0-flash-exp:free";
+                const models = [primaryModel, ...FALLBACK_MODELS.filter(m => m !== primaryModel)];
+
                 const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                     method: "POST",
+                    // Prevent browser from sending full URL (query/path) as Referer to OpenRouter.
+                    referrerPolicy: "origin",
                     headers: {
                         "Authorization": `Bearer ${apiKey}`,
-                        // Avoid echoing a URL that might have had ?key= in it.
-                        "HTTP-Referer": window.location.origin + window.location.pathname,
+                        // Optional OpenRouter attribution header (keep it key-safe):
+                        "HTTP-Referer": window.location.origin,
                         "X-Title": "Team Chat",
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        "model": model,
-                        "messages": chatHistory
+                        // Use OpenRouter model routing with fallbacks
+                        models,
+                        messages: chatHistory
                     })
                 });
 
                 if (!response.ok) {
-                    const errText = await response.text();
-
-                    // Specific handling for Auth errors
-                    if (response.status === 401) {
+                    // 429: rate limited
+                    if (response.status === 429) {
                         removeMessage(loadingId);
-                        addMessageToUI('system', `**Authentication Error (401):** The API Key is invalid or user not found. <button onclick="window.openSettings(true)" class="text-blue-400 underline hover:text-blue-300">Click here to update your API Key</button>.`);
-                        window.openSettings(true); // Auto-open settings
-                        setInputEnabled(false);
-                        apiKey = null; // Force re-entry
+
+                        let detail = "";
+                        try {
+                            const err = await response.json();
+                            detail = err?.error?.metadata?.raw || err?.error?.message || "";
+                        } catch { /* ignore */ }
+
+                        addMessageToUI('system',
+                            `**Rate limited (429):** ${detail || "Too many requests right now."}\n\n` +
+                            `Try again in a moment, switch models in the dropdown, or add a BYOK provider key in OpenRouter Integrations.`
+                        );
                         return;
                     }
 
+                    // 401: invalid key
+                    if (response.status === 401) {
+                        removeMessage(loadingId);
+                        addMessageToUI('system',
+                            `**Authentication Error (401):** The API Key is invalid or user not found. ` +
+                            `<button onclick="window.openSettings(true)" class="text-blue-400 underline hover:text-blue-300">Click here to update your API Key</button>.`
+                        );
+                        apiKey = null;
+                        setInputEnabled(false);
+                        window.openSettings(true);
+                        return;
+                    }
+
+                    const errText = await response.text();
                     throw new Error(`API Error: ${response.status} - ${errText}`);
                 }
 
                 const data = await response.json();
-
-                // Remove loading indicator
                 removeMessage(loadingId);
 
                 if (data.choices && data.choices.length > 0) {
@@ -393,40 +436,46 @@
             } catch (error) {
                 console.error(error);
                 removeMessage(loadingId);
-                // Don't duplicate error if it was handled above
-                if (!document.querySelector('.text-blue-400')) {
-                    addMessageToUI('system', `**Error:** ${error.message}. Please check your connection.`);
-                }
+                addMessageToUI('system', `**Error:** ${error.message}`);
             }
         }
 
-        // --- Initialization & Event Listeners ---
+        // -------- Init --------
 
         document.addEventListener('DOMContentLoaded', () => {
-            // 1) Load key from URL if present (one-time, then removed from URL)
-            const fromUrl = getApiKeyFromUrlOnce();
-            if (fromUrl) apiKey = fromUrl;
+            // 1) Try key from query param (?key=...) then remove it from URL
+            const fromQuery = scrubUrlKeyParamAndReturnKey();
+            if (fromQuery) apiKey = fromQuery;
 
-            // 2) Disable input until key exists
+            // 2) Try key from hash (#key=...) then remove it from URL
+            if (!apiKey) {
+                const fromHash = scrubHashKeyAndReturnKey();
+                if (fromHash) apiKey = fromHash;
+            }
+
+            // 3) Disable input until key exists; if missing, prompt immediately.
             setInputEnabled(!!apiKey);
-
-            // 3) If no key, force the modal immediately
             if (!apiKey) window.openSettings(true);
 
             const userInput = document.getElementById('user-input');
             const sendBtn = document.getElementById('send-btn');
             modelSelect = document.getElementById('model-select');
 
-            // Settings Modal Elements
+            // Modal elements
             const settingsBtn = document.getElementById('settings-btn');
             const configModal = document.getElementById('config-modal');
             const saveConfigBtn = document.getElementById('save-config-btn');
             const closeConfigBtn = document.getElementById('close-config-btn');
 
-            // Add Listeners with null checks
             if (settingsBtn) settingsBtn.addEventListener('click', () => window.openSettings(false));
-            if (closeConfigBtn && configModal) closeConfigBtn.addEventListener('click', () => configModal.classList.add('hidden'));
             if (saveConfigBtn) saveConfigBtn.addEventListener('click', saveConfig);
+
+            if (closeConfigBtn && configModal) {
+                closeConfigBtn.addEventListener('click', () => {
+                    configModal.classList.add('hidden');
+                    setInputEnabled(!!apiKey);
+                });
+            }
 
             if (userInput) {
                 userInput.addEventListener('keydown', (e) => {
@@ -440,7 +489,7 @@
             if (sendBtn) sendBtn.addEventListener('click', handleSendMessage);
         });
 
-        // --- UI Helper Functions ---
+        // -------- UI helpers --------
 
         function addMessageToUI(role, content) {
             const chatContainer = document.getElementById('chat-container');
@@ -452,27 +501,28 @@
 
             div.className = `flex w-full ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`;
 
-            // Avatar (Simple Initials)
             const avatar = isUser
                 ? `<div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold shrink-0 ml-3">YOU</div>`
                 : `<div class="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-xs font-bold shrink-0 mr-3">AI</div>`;
 
-            // Message Bubble
-            const bubbleColor = isUser ? 'bg-blue-600 text-white' : (isSystem ? 'bg-red-900/50 border border-red-700 text-red-200' : 'bg-gray-700 text-gray-100');
+            const bubbleColor = isUser
+                ? 'bg-blue-600 text-white'
+                : (isSystem ? 'bg-red-900/50 border border-red-700 text-red-200' : 'bg-gray-700 text-gray-100');
 
-            // Parse Markdown if it's the assistant/system
-            const parsedContent = role === 'assistant' || role === 'system' ? marked.parse(content) : escapeHtml(content);
+            const parsedContent = (role === 'assistant' || role === 'system')
+                ? marked.parse(content)
+                : escapeHtml(content);
 
             const html = `
-                <div class="flex max-w-[85%] md:max-w-[75%] ${isUser ? 'flex-row-reverse' : 'flex-row'} items-start">
-                    ${!isSystem ? avatar : ''}
-                    <div class="relative px-4 py-3 rounded-2xl ${bubbleColor} ${isUser ? 'rounded-tr-none' : 'rounded-tl-none'} shadow-sm">
-                        <div class="prose text-sm md:text-base leading-relaxed break-words">
-                            ${parsedContent}
-                        </div>
-                    </div>
-                </div>
-            `;
+        <div class="flex max-w-[85%] md:max-w-[75%] ${isUser ? 'flex-row-reverse' : 'flex-row'} items-start">
+          ${!isSystem ? avatar : ''}
+          <div class="relative px-4 py-3 rounded-2xl ${bubbleColor} ${isUser ? 'rounded-tr-none' : 'rounded-tl-none'} shadow-sm">
+            <div class="prose text-sm md:text-base leading-relaxed break-words">
+              ${parsedContent}
+            </div>
+          </div>
+        </div>
+      `;
 
             div.innerHTML = html;
             chatContainer.appendChild(div);
@@ -489,15 +539,15 @@
             div.id = id;
             div.className = 'flex w-full justify-start animate-fade-in';
             div.innerHTML = `
-                <div class="flex max-w-[75%] flex-row items-start">
-                    <div class="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-xs font-bold shrink-0 mr-3">AI</div>
-                    <div class="px-4 py-4 rounded-2xl bg-gray-700 rounded-tl-none shadow-sm flex items-center gap-1">
-                        <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
-                        <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
-                        <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
-                    </div>
-                </div>
-            `;
+        <div class="flex max-w-[75%] flex-row items-start">
+          <div class="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-xs font-bold shrink-0 mr-3">AI</div>
+          <div class="px-4 py-4 rounded-2xl bg-gray-700 rounded-tl-none shadow-sm flex items-center gap-1">
+            <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+            <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+            <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+          </div>
+        </div>
+      `;
             chatContainer.appendChild(div);
             scrollToBottom();
             return id;
@@ -521,17 +571,16 @@
                 '"': '&quot;',
                 "'": '&#039;'
             };
-            return text.replace(/[&<>"']/g, function (m) { return map[m]; }).replace(/\n/g, '<br>');
+            return text.replace(/[&<>"']/g, (m) => map[m]).replace(/\n/g, '<br>');
         }
 
         // Simple animation CSS injection
         const style = document.createElement('style');
         style.textContent = `
-            @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-            .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
-        `;
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+    `;
         document.head.appendChild(style);
-
     </script>
 </body>
 

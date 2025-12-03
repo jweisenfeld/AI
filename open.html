@@ -172,6 +172,8 @@
             <h2 class="text-2xl font-bold text-gray-300">Ready to assist</h2>
             <p class="max-w-md">Select a model from the dropdown above and type a message to start chatting. All models
                 are currently free-tier via OpenRouter.</p>
+            <p class="max-w-md text-sm text-gray-500">You must provide an OpenRouter API key (via <code>?key=</code> or
+                the Settings button) before sending messages.</p>
         </div>
         <!-- Messages will be inserted here via JS -->
     </main>
@@ -215,11 +217,15 @@
             <input type="password" id="api-key-input"
                 class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white mb-1 focus:border-blue-500 focus:outline-none"
                 placeholder="sk-or-v1-...">
-            <p class="text-xs text-gray-500 mb-4">The key is stored in your browser's local storage.</p>
+            <p class="text-xs text-gray-500 mb-4">
+                This key is kept <span class="text-gray-300">in memory only</span> (not saved to localStorage).
+                <br>
+                You can also pass it via the URL like: <code>?key=sk-or-v1-...</code>
+            </p>
             <div class="flex justify-end gap-2">
                 <button id="close-config-btn" class="text-gray-400 hover:text-white px-3 py-2 text-sm">Cancel</button>
                 <button id="save-config-btn"
-                    class="bg-blue-600 px-4 py-2 rounded text-sm hover:bg-blue-500 text-white font-medium">Save API
+                    class="bg-blue-600 px-4 py-2 rounded text-sm hover:bg-blue-500 text-white font-medium">Use API
                     Key</button>
             </div>
         </div>
@@ -227,26 +233,65 @@
 
     <script>
         // --- Configuration ---
-        const DEFAULT_API_KEY = "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";
-
-        // Priority: LocalStorage > Default Key
-        let apiKey = localStorage.getItem('openrouter_api_key');
-        if (!apiKey || apiKey === "null" || apiKey === "undefined") {
-            apiKey = DEFAULT_API_KEY;
-        }
+        // IMPORTANT: No hard-coded key. Key comes from ?key= or user input.
+        let apiKey = null;
 
         let chatHistory = [];
         let modelSelect;
 
+        // --- Key Handling ---
+
+        function getApiKeyFromUrlOnce() {
+            const url = new URL(window.location.href);
+            const key = (url.searchParams.get('key') || '').trim();
+            if (!key) return null;
+
+            // Remove the key from the address bar ASAP to reduce accidental leakage.
+            url.searchParams.delete('key');
+            const newUrl = url.pathname + (url.searchParams.toString() ? `?${url.searchParams.toString()}` : '') + url.hash;
+            window.history.replaceState({}, document.title, newUrl);
+
+            return key;
+        }
+
+        function setInputEnabled(enabled) {
+            const userInput = document.getElementById('user-input');
+            const sendBtn = document.getElementById('send-btn');
+
+            if (userInput) userInput.disabled = !enabled;
+            if (sendBtn) sendBtn.disabled = !enabled;
+
+            if (userInput) {
+                userInput.placeholder = enabled ? "Type a message..." : "Enter an API key via Settings first...";
+            }
+        }
+
+        function ensureApiKeyOrPrompt() {
+            if (apiKey && typeof apiKey === 'string' && apiKey.trim().length > 0) return true;
+
+            addMessageToUI('system', `**API Key Required:** Please enter your OpenRouter API Key. <button onclick="window.openSettings(true)" class="text-blue-400 underline hover:text-blue-300">Open Settings</button>.`);
+            window.openSettings(true);
+            setInputEnabled(false);
+            return false;
+        }
+
         // --- Core Functions (Global Scope) ---
 
         // Defined globally so it can be called by onclick events in generated HTML
-        window.openSettings = function () {
+        window.openSettings = function (force = false) {
             const configModal = document.getElementById('config-modal');
             const apiKeyInput = document.getElementById('api-key-input');
+            const closeBtn = document.getElementById('close-config-btn');
+
             if (configModal && apiKeyInput) {
-                apiKeyInput.value = apiKey;
+                apiKeyInput.value = '';
+                apiKeyInput.focus();
                 configModal.classList.remove('hidden');
+            }
+
+            // If we're forcing key entry, make Cancel less useful (but still visible).
+            if (closeBtn) {
+                closeBtn.classList.toggle('opacity-50', force);
             }
         };
 
@@ -258,16 +303,23 @@
 
             const newKey = apiKeyInput.value.trim();
             if (newKey) {
-                apiKey = newKey;
-                localStorage.setItem('openrouter_api_key', apiKey);
+                apiKey = newKey; // In-memory only
                 if (configModal) configModal.classList.add('hidden');
-                alert("API Key saved!");
+                setInputEnabled(true);
+                alert("API Key set for this tab/session (not saved).");
             } else {
+                // If a key already exists, allow closing without changing it.
+                if (apiKey && apiKey.trim().length > 0) {
+                    if (configModal) configModal.classList.add('hidden');
+                    return;
+                }
                 alert("Please enter a valid API Key.");
             }
         }
 
         async function handleSendMessage() {
+            if (!ensureApiKeyOrPrompt()) return;
+
             const userInput = document.getElementById('user-input');
             const welcomeScreen = document.getElementById('welcome-screen');
             const modelSelect = document.getElementById('model-select');
@@ -298,8 +350,9 @@
                     method: "POST",
                     headers: {
                         "Authorization": `Bearer ${apiKey}`,
-                        "HTTP-Referer": window.location.href, // Optional
-                        "X-Title": "Team Chat", // Optional
+                        // Avoid echoing a URL that might have had ?key= in it.
+                        "HTTP-Referer": window.location.origin + window.location.pathname,
+                        "X-Title": "Team Chat",
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
@@ -314,8 +367,10 @@
                     // Specific handling for Auth errors
                     if (response.status === 401) {
                         removeMessage(loadingId);
-                        addMessageToUI('system', `**Authentication Error (401):** The API Key is invalid or user not found. <button onclick="window.openSettings()" class="text-blue-400 underline hover:text-blue-300">Click here to update your API Key</button>.`);
-                        window.openSettings(); // Auto-open settings
+                        addMessageToUI('system', `**Authentication Error (401):** The API Key is invalid or user not found. <button onclick="window.openSettings(true)" class="text-blue-400 underline hover:text-blue-300">Click here to update your API Key</button>.`);
+                        window.openSettings(true); // Auto-open settings
+                        setInputEnabled(false);
+                        apiKey = null; // Force re-entry
                         return;
                     }
 
@@ -348,7 +403,16 @@
         // --- Initialization & Event Listeners ---
 
         document.addEventListener('DOMContentLoaded', () => {
-            const chatContainer = document.getElementById('chat-container');
+            // 1) Load key from URL if present (one-time, then removed from URL)
+            const fromUrl = getApiKeyFromUrlOnce();
+            if (fromUrl) apiKey = fromUrl;
+
+            // 2) Disable input until key exists
+            setInputEnabled(!!apiKey);
+
+            // 3) If no key, force the modal immediately
+            if (!apiKey) window.openSettings(true);
+
             const userInput = document.getElementById('user-input');
             const sendBtn = document.getElementById('send-btn');
             modelSelect = document.getElementById('model-select');
@@ -360,7 +424,7 @@
             const closeConfigBtn = document.getElementById('close-config-btn');
 
             // Add Listeners with null checks
-            if (settingsBtn) settingsBtn.addEventListener('click', window.openSettings);
+            if (settingsBtn) settingsBtn.addEventListener('click', () => window.openSettings(false));
             if (closeConfigBtn && configModal) closeConfigBtn.addEventListener('click', () => configModal.classList.add('hidden'));
             if (saveConfigBtn) saveConfigBtn.addEventListener('click', saveConfig);
 
@@ -396,7 +460,7 @@
             // Message Bubble
             const bubbleColor = isUser ? 'bg-blue-600 text-white' : (isSystem ? 'bg-red-900/50 border border-red-700 text-red-200' : 'bg-gray-700 text-gray-100');
 
-            // Parse Markdown if it's the assistant
+            // Parse Markdown if it's the assistant/system
             const parsedContent = role === 'assistant' || role === 'system' ? marked.parse(content) : escapeHtml(content);
 
             const html = `

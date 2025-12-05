@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Smart Chat v202512040732</title>
+    <title>Gemini Smart Chat v202512042338</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -142,7 +142,7 @@
                     AI
                 </div>
                 <div>
-                    <h1 class="font-semibold text-gray-800">Gemini 2.5 Flash Preview</h1>
+                    <h1 class="font-semibold text-gray-800">Gemini 2.5 Flash v202512042338</h1>
                     <p class="text-xs text-green-500 flex items-center gap-1">
                         <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Online
                     </p>
@@ -276,7 +276,7 @@
         function initializeGemini(key) {
             try {
                 genAI = new GoogleGenerativeAI(key);
-                model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" }); // Updated to latest flash
+                model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); // Updated to gemini-2.5-flash
 
                 chat = model.startChat({
                     history: []

@@ -11,7 +11,6 @@
 // CONFIGURATION - EDIT THIS SECTION
 // ============================================
 
-<?php
 // Account root is one level ABOVE public_html
 $accountRoot = dirname($_SERVER['DOCUMENT_ROOT']);   // e.g. /home2/fikrttmy
 

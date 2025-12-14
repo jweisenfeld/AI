@@ -4,6 +4,9 @@
  * Pasco School District
  */
 
+// Increase PHP's execution time to 5 minutes
+set_time_limit(300);
+
 // 1. Force CORS to allow requests from your frontend
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
@@ -128,7 +131,7 @@ curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_POSTFIELDS => json_encode($payload),
     CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-    CURLOPT_TIMEOUT => 120
+    CURLOPT_TIMEOUT => 280 // Wait 4 minutes and 40 seconds
 ]);
 
 $response = curl_exec($ch);

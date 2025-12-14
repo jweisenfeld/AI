@@ -219,11 +219,35 @@
         }
 
         /* --- MARKDOWN STYLES --- */
-        .bubble h1, .bubble h2 { font-size: 1.1em; margin-top: 10px; }
-        .bubble ul { margin-left: 20px; }
-        .bubble code { background: rgba(0,0,0,0.1); padding: 2px 4px; border-radius: 4px; }
+        .bubble h1, .bubble h2 { font-size: 1.1em; margin-top: 10px; font-weight: 600; }
+        .bubble ul, .bubble ol { margin-left: 25px; margin-bottom: 10px; }
+        .bubble p { margin-bottom: 10px; }
+
+        /* INLINE CODE (like "this") */
+        .bubble code { 
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background: rgba(0,0,0,0.06); 
+            padding: 2px 4px; 
+            border-radius: 4px; 
+            color: #c0392b; /* distinct color for code words */
+        }
+
+        /* BLOCK CODE (The ASCII Diagrams) */
+        .bubble pre {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background: #2d2d2d; /* Dark background like a terminal */
+            color: #f8f8f2;      /* Light text */
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;    /* Allow scrolling if diagram is wide */
+            white-space: pre;    /* FORCE preservation of spaces/alignment */
+            margin: 10px 0;
+            line-height: 1.4;
+            border: 1px solid #444;
+        }    
     </style>
 </head>
+
 <body>
 
     <div id="login-modal" class="login-overlay">

@@ -321,6 +321,48 @@
     let PENDING_IMAGES = [];
     let TOKEN_COUNT = 0;
 
+    // NEW: Save to browser memory
+    function saveChat() {
+        const data = {
+            team: TEAM_ID,
+            history: CONVERSATION
+        };
+        localStorage.setItem('gemini_chat_history', JSON.stringify(data));
+    }
+
+    // NEW: Load from browser memory
+    function loadChat() {
+        const saved = localStorage.getItem('gemini_chat_history');
+        if (saved) {
+            const data = JSON.parse(saved);
+            // Only restore if it's the same team (optional safety)
+            if (data.team) {
+                TEAM_ID = data.team;
+                document.getElementById('team-input').value = TEAM_ID;
+                document.getElementById('team-display').textContent = "👤 " + TEAM_ID;
+                
+                // Restore messages
+                CONVERSATION = data.history;
+                // Clear default welcome message
+                document.getElementById('messages').innerHTML = '';
+                
+                // Re-render all bubbles
+                CONVERSATION.forEach(msg => {
+                    // Handle image arrays vs simple strings
+                    let textContent = "";
+                    if (Array.isArray(msg.content)) {
+                         // Find the text part
+                         const txt = msg.content.find(p => p.type === 'text');
+                         textContent = txt ? txt.text : "(Image)";
+                    } else {
+                        textContent = msg.content;
+                    }
+                    appendBubble(msg.role, textContent);
+                });
+            }
+        }
+    }
+
     // --- UTILITY: HTML ESCAPE ---
     function escapeHtml(text) {
         if (!text) return text;
@@ -390,18 +432,13 @@
         localStorage.setItem('gemini_team_id', TEAM_ID);
     }
 
-    // Check for previous login on load
     window.onload = () => {
-        const savedTeam = localStorage.getItem('gemini_team_id');
-        if (savedTeam) {
-            document.getElementById('team-input').value = savedTeam;
-        }
-        
-        // Update Version Footer
+        // Load version footer
         const vSpan = document.getElementById('version-id');
-        if (vSpan) {
-            vSpan.textContent = 'Build: ' + document.lastModified;
-        }
+        if (vSpan) vSpan.textContent = 'Build: ' + document.lastModified;
+
+        // NEW: Try to restore chat
+        loadChat();
     };
 
     // --- FILE HANDLING ---
@@ -508,6 +545,8 @@
                 appendBubble('assistant', reply);
                 CONVERSATION.push({ role: "assistant", content: reply });
                 
+                saveChat();
+
                 if (data.usage) {
                     TOKEN_COUNT += (data.usage.input_tokens + data.usage.output_tokens);
                     document.getElementById('token-display').textContent = TOKEN_COUNT + " tokens used";

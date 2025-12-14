@@ -155,7 +155,21 @@ $usage = $responseData['usageMetadata'] ?? ['input_tokens' => 0, 'output_tokens'
 
 // Log usage
 $teamId = preg_replace('/[^a-zA-Z0-9_-]/', '', $data['team_id'] ?? 'unknown');
-$logLine = date('Y-m-d H:i:s') . " | $teamId | $model | In:{$usage['promptTokenCount']} | Out:{$usage['candidatesTokenCount']}\n";
+// Extract user prompt for logging (simplified)
+$lastUserMsg = end($data['messages']);
+$promptSnippet = "";
+if (is_string($lastUserMsg['content'])) {
+    $promptSnippet = $lastUserMsg['content'];
+} elseif (is_array($lastUserMsg['content'])) {
+    foreach ($lastUserMsg['content'] as $p) {
+        if (isset($p['text'])) $promptSnippet .= $p['text'] . " ";
+    }
+}
+// Clean newline characters so the log stays on one line
+$cleanPrompt = str_replace(["\r", "\n"], " ", substr($promptSnippet, 0, 100)); // First 100 chars
+
+$logLine = date('Y-m-d H:i:s') . " | $teamId | In:{$usage['promptTokenCount']} | PROMPT: $cleanPrompt...\n";
+
 file_put_contents(__DIR__ . '/gemini_usage.log', $logLine, FILE_APPEND);
 
 echo json_encode([

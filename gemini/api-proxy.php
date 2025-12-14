@@ -49,6 +49,13 @@ if (!$GEMINI_API_KEY) send_error("Server Config Error: API Key is null.");
 $input = file_get_contents('php://input');
 $data = json_decode($input, true);
 
+// --- NEW SAFETY CHECK ---
+// Prevent massive payloads (Limit to ~30,000 chars, roughly 10 pages of text)
+if (strlen($input) > 100000) {
+    send_error("Request too large. Please shorten your text or reduce image size.", 413);
+}
+// ------------------------
+
 if (!$data) send_error("Invalid JSON received by server.");
 if (!isset($data['messages'])) send_error("Missing 'messages' in request.");
 
@@ -156,21 +163,33 @@ $usage = $responseData['usageMetadata'] ?? ['input_tokens' => 0, 'output_tokens'
 // Log usage
 $teamId = preg_replace('/[^a-zA-Z0-9_-]/', '', $data['team_id'] ?? 'unknown');
 // Extract user prompt for logging (simplified)
+
+// --- ROBUST LOGGING SECTION ---
 $lastUserMsg = end($data['messages']);
 $promptSnippet = "";
+
 if (is_string($lastUserMsg['content'])) {
     $promptSnippet = $lastUserMsg['content'];
 } elseif (is_array($lastUserMsg['content'])) {
     foreach ($lastUserMsg['content'] as $p) {
-        if (isset($p['text'])) $promptSnippet .= $p['text'] . " ";
+        // Capture Text
+        if (isset($p['text'])) {
+            $promptSnippet .= $p['text'] . " ";
+        }
+        // Capture Image Presence (BUT NOT THE DATA)
+        if (isset($p['source']) || isset($p['inlineData']) || isset($p['image_url'])) {
+            $promptSnippet .= "[IMAGE UPLOADED] ";
+        }
     }
 }
-// Clean newline characters so the log stays on one line
-$cleanPrompt = str_replace(["\r", "\n"], " ", substr($promptSnippet, 0, 100)); // First 100 chars
 
-$logLine = date('Y-m-d H:i:s') . " | $teamId | In:{$usage['promptTokenCount']} | PROMPT: $cleanPrompt...\n";
+// Clean and truncate (keep the log file readable)
+$cleanPrompt = str_replace(["\r", "\n"], " ", substr($promptSnippet, 0, 150)); 
 
-file_put_contents(__DIR__ . '/gemini_usage.log', $logLine, FILE_APPEND);
+$logLine = date('Y-m-d H:i:s') . " | $teamId | $model | In:{$usage['promptTokenCount']} | Out:{$usage['candidatesTokenCount']} | PROMPT: $cleanPrompt...\n";
+
+// Added LOCK_EX to prevent write collisions
+file_put_contents(__DIR__ . '/gemini_usage.log', $logLine, FILE_APPEND | LOCK_EX);
 
 echo json_encode([
     'content' => [['type' => 'text', 'text' => $text]],

@@ -183,6 +183,41 @@
             background: #fff;
         }
 
+        /* Typing Indicator Bubble */
+        .typing-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 12px 18px;
+            background: #f1f3f4;
+            border-radius: 18px;
+            border-bottom-left-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background: #9aa0a6;
+            border-radius: 50%;
+            animation: typing-bounce 1.4s infinite ease-in-out both;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing-bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        /* Gray out inputs when disabled */
+        textarea:disabled, button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background-color: #eee;
+        }
+
         /* --- MARKDOWN STYLES --- */
         .bubble h1, .bubble h2 { font-size: 1.1em; margin-top: 10px; }
         .bubble ul { margin-left: 20px; }
@@ -304,36 +339,58 @@
         if (!TEAM_ID) { alert("Please refresh and log in."); return; }
         
         const txtInput = document.getElementById('user-input');
+        const sendBtn = document.querySelector('button.send'); // Grab the button
+        const fileInput = document.getElementById('file-input'); // Grab file input
         const text = txtInput.value.trim();
         const previewArea = document.getElementById('image-previews');
         
+        // Prevent sending empty messages
         if (!text && PENDING_IMAGES.length === 0) return;
 
-        // 1. Build Message
+        // --- STEP 1: LOCK INTERFACE ---
+        txtInput.disabled = true;
+        sendBtn.disabled = true;
+        fileInput.disabled = true; // No adding files while thinking
+        sendBtn.textContent = "Thinking..."; // Visual cue on button
+
+        // Build User Message
         const userContent = [];
         if (text) userContent.push({ type: "text", text: text });
         PENDING_IMAGES.forEach(img => userContent.push(img));
 
-        // 2. UI Updates
+        // Show User Bubble
         appendBubble('user', text || "(Image Upload)");
         txtInput.value = '';
         previewArea.innerHTML = '';
-
         CONVERSATION.push({ role: "user", content: userContent });
-        PENDING_IMAGES = []; // Clear buffer
+        PENDING_IMAGES = [];
 
-        // 3. Send to API
-        const statusDiv = appendBubble('assistant', 'Thinking...'); 
+        // --- STEP 2: SHOW "TYPING" INDICATOR ---
+        // We create a unique ID for this bubble so we can remove it later
+        const loadingBubbleId = 'loading-' + Date.now();
+        const loadingHTML = `
+            <div class="typing-indicator" id="${loadingBubbleId}">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>`;
         
+        // Append raw HTML directly to chat area
+        const messagesDiv = document.getElementById('messages');
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'message assistant';
+        loadingDiv.innerHTML = loadingHTML;
+        messagesDiv.appendChild(loadingDiv);
+        loadingDiv.scrollIntoView({ behavior: 'smooth' });
+
         try {
-            // Read from dropdown (ensure you added the <select> back!)
             const modelSelect = document.getElementById('model-select');
             const selectedModel = modelSelect ? modelSelect.value : 'gemini-1.5-pro-002';
 
             const payload = {
                 team_id: TEAM_ID,
                 model: selectedModel,
-                system: "You are a civil engineering consultant. Be precise.",
+                system: "You are a helpful civil engineering assistant. Be concise.",
                 messages: CONVERSATION
             };
 
@@ -343,20 +400,15 @@
                 body: JSON.stringify(payload)
             });
 
-            // 4. Handle Errors Gracefully
             const data = await response.json();
 
-            statusDiv.remove(); // Remove "Thinking..."
-
+            // --- STEP 3: REMOVE INDICATOR & UNLOCK ---
+            loadingDiv.remove(); // Poof! It's gone
+            
             if (!response.ok || data.error) {
-                // Display the DETAILED error from the PHP script
                 const errMsg = data.details || data.error || "Unknown Error";
-                const errTitle = data.error || "Error";
-                
-                appendBubble('assistant', `⚠️ <b>${errTitle}</b><br><code style="font-size:0.8em; color: #c00;">${errMsg}</code>`);
-                console.error("Full Error:", data);
+                appendBubble('assistant', `⚠️ <b>Error</b><br><code>${errMsg}</code>`);
             } else {
-                // Success
                 const reply = data.content[0].text;
                 appendBubble('assistant', reply);
                 CONVERSATION.push({ role: "assistant", content: reply });
@@ -368,9 +420,16 @@
             }
 
         } catch (e) {
-            statusDiv.remove();
+            loadingDiv.remove();
             console.error(e);
-            appendBubble('assistant', `⚠️ <b>Network Error</b><br>The server could not be reached. Check console for details.`);
+            appendBubble('assistant', `⚠️ <b>Network Error</b><br>Please try again.`);
+        } finally {
+            // --- STEP 4: ALWAYS UNLOCK (Even if error) ---
+            txtInput.disabled = false;
+            sendBtn.disabled = false;
+            fileInput.disabled = false;
+            sendBtn.textContent = "Send";
+            txtInput.focus(); // Put cursor back in box for next question
         }
     }
 
@@ -388,8 +447,13 @@
         div.scrollIntoView({ behavior: 'smooth' });
         return div;
     }
-    // Automatically show when this file was last uploaded/saved
-    document.getElementById('version-id').textContent = 'Build: ' + document.lastModified;
+    // Add this at the very bottom of your <script> tag
+    window.addEventListener('DOMContentLoaded', (event) => {
+        const vSpan = document.getElementById('version-id');
+        if (vSpan) {
+            vSpan.textContent = 'Build: ' + document.lastModified;
+        }
+    });
 </script>
 <footer class="footer">
     Pasco School District • <span id="version-id">Loading version...</span>

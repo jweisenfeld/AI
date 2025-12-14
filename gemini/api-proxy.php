@@ -117,7 +117,7 @@ $payload = [
     'contents' => $contents,
     'generationConfig' => [
         'temperature' => 0.7,
-        'maxOutputTokens' => 4096
+        'maxOutputTokens' => 8192 // Doubled from 4096 for longer responses
     ]
 ];
 

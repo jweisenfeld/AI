@@ -23,7 +23,7 @@
 <body>
 
 <div class="card">
-    <a href="dashboard.php" class="refresh-btn">🔄 Refresh</a>
+    <a href="<?php echo basename($_SERVER['PHP_SELF']); ?>" class="refresh-btn">🔄 Refresh</a>
     <h1>📊 Engineering Grant Dashboard</h1>
     
     <?php

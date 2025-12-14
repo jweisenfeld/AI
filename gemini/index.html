@@ -174,6 +174,15 @@
             cursor: pointer;
         }
 
+        .footer {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #9aa0a6;
+            padding: 10px;
+            border-top: 1px solid var(--border);
+            background: #fff;
+        }
+
         /* --- MARKDOWN STYLES --- */
         .bubble h1, .bubble h2 { font-size: 1.1em; margin-top: 10px; }
         .bubble ul { margin-left: 20px; }
@@ -300,64 +309,68 @@
         
         if (!text && PENDING_IMAGES.length === 0) return;
 
-        // 1. Build Message Object
+        // 1. Build Message
         const userContent = [];
         if (text) userContent.push({ type: "text", text: text });
         PENDING_IMAGES.forEach(img => userContent.push(img));
 
-        // 2. Update UI
+        // 2. UI Updates
         appendBubble('user', text || "(Image Upload)");
         txtInput.value = '';
         previewArea.innerHTML = '';
 
-        // 3. Add to History
         CONVERSATION.push({ role: "user", content: userContent });
+        PENDING_IMAGES = []; // Clear buffer
+
+        // 3. Send to API
+        const statusDiv = appendBubble('assistant', 'Thinking...'); 
         
-        // Reset Pending Images
-        PENDING_IMAGES = [];
-
-        // 4. Send to API
         try {
-            const statusDiv = appendBubble('assistant', '...'); // Loading state
-            
-            // OLD CODE (Delete or overwrite this)
-            /* const payload = {
-                team_id: TEAM_ID,
-                model: 'gemini-1.5-pro',  <-- This was hardcoded
-                ...
-            */
-
-            // NEW CODE (Use this)
-            const selectedModel = document.getElementById('model-select').value;
+            // Read from dropdown (ensure you added the <select> back!)
+            const modelSelect = document.getElementById('model-select');
+            const selectedModel = modelSelect ? modelSelect.value : 'gemini-1.5-pro-002';
 
             const payload = {
                 team_id: TEAM_ID,
-                model: selectedModel, // Now it reads from the dropdown!
-                system: "You are a helpful civil engineering assistant for high school students. Be concise, safety-conscious, and accurate about math.",
+                model: selectedModel,
+                system: "You are a civil engineering consultant. Be precise.",
                 messages: CONVERSATION
             };
 
-            const data = await response.json();
-            
-            // Remove loading bubble
-            statusDiv.remove();
+            const response = await fetch('api-proxy.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 
-            if (data.error) {
-                appendBubble('assistant', '⚠️ Error: ' + data.error);
+            // 4. Handle Errors Gracefully
+            const data = await response.json();
+
+            statusDiv.remove(); // Remove "Thinking..."
+
+            if (!response.ok || data.error) {
+                // Display the DETAILED error from the PHP script
+                const errMsg = data.details || data.error || "Unknown Error";
+                const errTitle = data.error || "Error";
+                
+                appendBubble('assistant', `⚠️ <b>${errTitle}</b><br><code style="font-size:0.8em; color: #c00;">${errMsg}</code>`);
+                console.error("Full Error:", data);
             } else {
+                // Success
                 const reply = data.content[0].text;
                 appendBubble('assistant', reply);
                 CONVERSATION.push({ role: "assistant", content: reply });
                 
-                // Update Tokens
                 if (data.usage) {
                     TOKEN_COUNT += (data.usage.input_tokens + data.usage.output_tokens);
                     document.getElementById('token-display').textContent = TOKEN_COUNT + " tokens used";
                 }
             }
+
         } catch (e) {
+            statusDiv.remove();
             console.error(e);
-            appendBubble('assistant', '⚠️ Network Error');
+            appendBubble('assistant', `⚠️ <b>Network Error</b><br>The server could not be reached. Check console for details.`);
         }
     }
 
@@ -375,6 +388,11 @@
         div.scrollIntoView({ behavior: 'smooth' });
         return div;
     }
+    // Automatically show when this file was last uploaded/saved
+    document.getElementById('version-id').textContent = 'Build: ' + document.lastModified;
 </script>
+<footer class="footer">
+    Pasco School District • <span id="version-id">Loading version...</span>
+</footer>
 </body>
 </html>

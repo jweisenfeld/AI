@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Bus Shelter Project v20251213:2225</title>
+    <title>Gemini Bus Shelter Project</title>
     <style>
         :root {
             --primary: #4285f4; /* Google Blue */
@@ -70,7 +70,7 @@
             font-weight: bold;
         }
 
-        /* --- EXISTING STYLES (Tweaked) --- */
+        /* --- HEADER & LAYOUT --- */
         .header {
             background: white;
             padding: 15px 20px;
@@ -128,7 +128,7 @@
             display: inline-block;
             padding: 12px 18px;
             border-radius: 18px;
-            max-width: 80%;
+            max-width: 85%;
             text-align: left;
         }
         
@@ -144,6 +144,7 @@
             border-bottom-left-radius: 4px;
         }
 
+        /* --- INPUT AREA --- */
         .input-area {
             padding: 20px;
             border-top: 1px solid var(--border);
@@ -174,6 +175,7 @@
             cursor: pointer;
         }
 
+        /* --- FOOTER --- */
         .footer {
             text-align: center;
             font-size: 0.75rem;
@@ -183,7 +185,7 @@
             background: #fff;
         }
 
-        /* Typing Indicator Bubble */
+        /* --- TYPING INDICATOR --- */
         .typing-indicator {
             display: inline-flex;
             align-items: center;
@@ -218,7 +220,7 @@
             background-color: #eee;
         }
 
-        /* --- MARKDOWN STYLES --- */
+        /* --- MARKDOWN & CODE STYLES --- */
         .bubble h1, .bubble h2 { font-size: 1.1em; margin-top: 10px; font-weight: 600; }
         .bubble ul, .bubble ol { margin-left: 25px; margin-bottom: 10px; }
         .bubble p { margin-bottom: 10px; }
@@ -229,7 +231,7 @@
             background: rgba(0,0,0,0.06); 
             padding: 2px 4px; 
             border-radius: 4px; 
-            color: #c0392b; /* distinct color for code words */
+            color: #c0392b;
         }
 
         /* BLOCK CODE (The ASCII Diagrams) */
@@ -244,7 +246,14 @@
             margin: 10px 0;
             line-height: 1.4;
             border: 1px solid #444;
-        }    
+        }
+        
+        .bubble pre code {
+            background: none;
+            color: inherit;
+            padding: 0;
+            border: none;
+        }
     </style>
 </head>
 
@@ -302,11 +311,71 @@
         </div>
     </div>
 
+    <footer class="footer">
+        Pasco School District • <span id="version-id">Loading version...</span>
+    </footer>
+
 <script>
     let TEAM_ID = null;
     let CONVERSATION = [];
     let PENDING_IMAGES = [];
     let TOKEN_COUNT = 0;
+
+    // --- UTILITY: HTML ESCAPE ---
+    function escapeHtml(text) {
+        if (!text) return text;
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    // --- MARKDOWN PARSER (THE FIX) ---
+    function formatMessage(text) {
+        if (!text) return '';
+        
+        // 1. Escape HTML first for security
+        let formatted = escapeHtml(text);
+        
+        // 2. Code Block Parser (Robust)
+        // Catches ``` followed by optional language name, then content, then ```
+        formatted = formatted.replace(/```[^\n]*\n([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+        
+        // 3. Inline code
+        formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
+        
+        // 4. Bold
+        formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        
+        // 5. Italic
+        formatted = formatted.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+        
+        // 6. Headers
+        formatted = formatted.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+        formatted = formatted.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+        
+        // 7. Lists
+        formatted = formatted.replace(/^\s*[\-\*]\s+(.+)$/gm, '<li>$1</li>');
+        formatted = formatted.replace(/(<li>[\s\S]+?<\/li>)/gm, '<ul>$1</ul>');
+        formatted = formatted.replace(/<\/ul>\s*<ul>/g, ''); // Merge adjacent lists
+        
+        // 8. Paragraphs (Handle newlines outside of pre blocks)
+        // Split by pre blocks so we don't mess up the diagrams
+        let parts = formatted.split(/(<pre>[\s\S]*?<\/pre>)/g);
+        
+        formatted = parts.map(part => {
+            if (part.startsWith('<pre>')) {
+                return part; // Don't touch code blocks
+            } else {
+                // Convert newlines to breaks in regular text
+                return part.replace(/\n/g, '<br>');
+            }
+        }).join('');
+
+        return formatted;
+    }
 
     // --- LOGIN LOGIC ---
     function handleLogin() {
@@ -321,11 +390,17 @@
         localStorage.setItem('gemini_team_id', TEAM_ID);
     }
 
-    // Check for previous login
+    // Check for previous login on load
     window.onload = () => {
         const savedTeam = localStorage.getItem('gemini_team_id');
         if (savedTeam) {
             document.getElementById('team-input').value = savedTeam;
+        }
+        
+        // Update Version Footer
+        const vSpan = document.getElementById('version-id');
+        if (vSpan) {
+            vSpan.textContent = 'Build: ' + document.lastModified;
         }
     };
 
@@ -337,16 +412,14 @@
         for (let file of files) {
             const reader = new FileReader();
             reader.onload = function(e) {
-                // Add to logic array
                 PENDING_IMAGES.push({
                     type: "image",
                     source: {
                         media_type: file.type,
-                        data: e.target.result.split(',')[1] // remove data:image/png;base64, prefix
+                        data: e.target.result.split(',')[1]
                     }
                 });
                 
-                // Add to visual preview
                 const img = document.createElement('img');
                 img.src = e.target.result;
                 img.style.height = '60px';
@@ -363,34 +436,33 @@
         if (!TEAM_ID) { alert("Please refresh and log in."); return; }
         
         const txtInput = document.getElementById('user-input');
-        const sendBtn = document.querySelector('button.send'); // Grab the button
-        const fileInput = document.getElementById('file-input'); // Grab file input
+        const sendBtn = document.querySelector('button.send');
+        const fileInput = document.getElementById('file-input');
         const text = txtInput.value.trim();
         const previewArea = document.getElementById('image-previews');
         
-        // Prevent sending empty messages
         if (!text && PENDING_IMAGES.length === 0) return;
 
-        // --- STEP 1: LOCK INTERFACE ---
+        // 1. LOCK UI
         txtInput.disabled = true;
         sendBtn.disabled = true;
-        fileInput.disabled = true; // No adding files while thinking
-        sendBtn.textContent = "Thinking..."; // Visual cue on button
+        fileInput.disabled = true;
+        sendBtn.textContent = "Thinking...";
 
         // Build User Message
         const userContent = [];
         if (text) userContent.push({ type: "text", text: text });
         PENDING_IMAGES.forEach(img => userContent.push(img));
 
-        // Show User Bubble
+        // Display User Bubble
         appendBubble('user', text || "(Image Upload)");
         txtInput.value = '';
         previewArea.innerHTML = '';
+        
         CONVERSATION.push({ role: "user", content: userContent });
         PENDING_IMAGES = [];
 
-        // --- STEP 2: SHOW "TYPING" INDICATOR ---
-        // We create a unique ID for this bubble so we can remove it later
+        // 2. SHOW TYPING INDICATOR
         const loadingBubbleId = 'loading-' + Date.now();
         const loadingHTML = `
             <div class="typing-indicator" id="${loadingBubbleId}">
@@ -399,7 +471,6 @@
                 <div class="typing-dot"></div>
             </div>`;
         
-        // Append raw HTML directly to chat area
         const messagesDiv = document.getElementById('messages');
         const loadingDiv = document.createElement('div');
         loadingDiv.className = 'message assistant';
@@ -426,12 +497,12 @@
 
             const data = await response.json();
 
-            // --- STEP 3: REMOVE INDICATOR & UNLOCK ---
-            loadingDiv.remove(); // Poof! It's gone
+            // 3. REMOVE INDICATOR
+            loadingDiv.remove();
             
             if (!response.ok || data.error) {
                 const errMsg = data.details || data.error || "Unknown Error";
-                appendBubble('assistant', `⚠️ <b>Error</b><br><code>${errMsg}</code>`);
+                appendBubble('assistant', `⚠️ <b>Error</b><br><code style="color:red">${errMsg}</code>`);
             } else {
                 const reply = data.content[0].text;
                 appendBubble('assistant', reply);
@@ -448,12 +519,12 @@
             console.error(e);
             appendBubble('assistant', `⚠️ <b>Network Error</b><br>Please try again.`);
         } finally {
-            // --- STEP 4: ALWAYS UNLOCK (Even if error) ---
+            // 4. UNLOCK UI
             txtInput.disabled = false;
             sendBtn.disabled = false;
             fileInput.disabled = false;
             sendBtn.textContent = "Send";
-            txtInput.focus(); // Put cursor back in box for next question
+            txtInput.focus();
         }
     }
 
@@ -461,26 +532,14 @@
         const div = document.createElement('div');
         div.className = `message ${role}`;
         
-        // Simple Markdown parsing
-        let html = text
-            .replace(/\n/g, '<br>')
-            .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+        // CALL THE PARSER HERE!
+        let html = formatMessage(text);
             
         div.innerHTML = `<div class="bubble">${html}</div>`;
         document.getElementById('messages').appendChild(div);
         div.scrollIntoView({ behavior: 'smooth' });
         return div;
     }
-    // Add this at the very bottom of your <script> tag
-    window.addEventListener('DOMContentLoaded', (event) => {
-        const vSpan = document.getElementById('version-id');
-        if (vSpan) {
-            vSpan.textContent = 'Build: ' + document.lastModified;
-        }
-    });
 </script>
-<footer class="footer">
-    Pasco School District • <span id="version-id">Loading version...</span>
-</footer>
 </body>
 </html>

@@ -74,9 +74,9 @@ $teamId = preg_replace('/[^a-zA-Z0-9_-]/', '', substr($requestData['team_id'], 0
 $model = $requestData['model'] ?? 'gemini-1.5-pro';
 
 // Allowed Gemini Models
-$allowedModels = ['gemini-1.5-pro', 'gemini-1.5-flash'];
+$allowedModels = ['gemini-1.5-pro', 'gemini-1.5-pro-002', 'gemini-2.5-pro'];
 if (!in_array($model, $allowedModels)) {
-    $model = 'gemini-1.5-pro';
+    $model = 'gemini-2.5-pro';
 }
 
 // --- FORMATTING FOR GEMINI ---

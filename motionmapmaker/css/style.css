@@ -27,7 +27,7 @@ blockquote h3 {
 /* === Grid and Content === */
 .grid {
   display: grid;
-  grid-template-columns: 1fr 300px;
+  grid-template-columns: 1fr 350px;
   gap: 20px;
   padding: 20px;
 }
@@ -36,6 +36,12 @@ header {
   grid-column: span 2;
   font-size: 1.2em;
   margin-bottom: 10px;
+}
+
+.graphs-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 /* === Plot Containers === */
@@ -80,6 +86,21 @@ header {
   background-color: #218838;
 }
 
+.ui-button-small {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  margin: 3px 5px;
+  cursor: pointer;
+  font-size: 12px;
+  border-radius: 3px;
+}
+
+.ui-button-small:hover {
+  background-color: #5a6268;
+}
+
 .user-interface {
   text-align: center;
 }
@@ -121,7 +142,16 @@ footer input[type="submit"]:hover {
     grid-template-columns: 1fr;
   }
 
+  header {
+    grid-column: span 1;
+  }
+
+  .graphs-column {
+    order: 2;
+  }
+
   .user-interface {
-    margin-top: 20px;
+    order: 1;
+    margin-bottom: 20px;
   }
 }

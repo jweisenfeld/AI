@@ -51,7 +51,7 @@ function verify_data(hot){
 
 function update_graphs(hot){
   d3.selectAll("svg").remove(); //Delete out the graphs before addint new graphs
-  data = verify_data(hot); 
+  data = verify_data(hot);
   func_data = [];
   for (i=0;i<data.length;i++){
     func_data.push({
@@ -61,6 +61,8 @@ function update_graphs(hot){
     }
   draw_motion_map(func_data,document.getElementById("half-arrows").checked);
   draw_position_time(func_data,"hello");
+  draw_velocity_time(func_data,"hello");
+  draw_acceleration_time(func_data,"hello");
 }
 
 window.onload = update_graphs(hot);
@@ -111,7 +113,7 @@ d3.select('#savePositionTimeButton').on('click', function(){
   }
 });
 
-// Set-up the export button for position time
+// Set-up the export button for motion map
 d3.select('#saveMotionMapButton').on('click', function(){
   console.log(d3.select('#motion_map svg').node().width.baseVal.value);
   var width = d3.select('#motion_map svg').node().width.baseVal.value;
@@ -121,6 +123,30 @@ d3.select('#saveMotionMapButton').on('click', function(){
 
   function save( dataBlob, filesize ){
     saveAs( dataBlob, 'motion-map.png' ); // FileSaver.js function
+  }
+});
+
+// Set-up the export button for velocity time
+d3.select('#saveVelocityTimeButton').on('click', function(){
+  var width = d3.select('#velocity_time svg').node().width.baseVal.value;
+  var height = d3.select('#velocity_time svg').node().height.baseVal.value;
+  var svgString = getSVGString(d3.select('#velocity_time svg').node());
+  svgString2Image( svgString, 2*width, 2*height, 'png', save ); // passes Blob and filesize String to the callback
+
+  function save( dataBlob, filesize ){
+    saveAs( dataBlob, 'velocity-time.png' ); // FileSaver.js function
+  }
+});
+
+// Set-up the export button for acceleration time
+d3.select('#saveAccelerationTimeButton').on('click', function(){
+  var width = d3.select('#acceleration_time svg').node().width.baseVal.value;
+  var height = d3.select('#acceleration_time svg').node().height.baseVal.value;
+  var svgString = getSVGString(d3.select('#acceleration_time svg').node());
+  svgString2Image( svgString, 2*width, 2*height, 'png', save ); // passes Blob and filesize String to the callback
+
+  function save( dataBlob, filesize ){
+    saveAs( dataBlob, 'acceleration-time.png' ); // FileSaver.js function
   }
 });
 

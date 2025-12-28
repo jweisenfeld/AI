@@ -13,6 +13,8 @@
   <script src="js/lib/download/canvas-toBlob.js"></script>
   <script src="js/lib/download/file-saver.js"></script>
   <script src="js/position_time.js"></script>
+  <script src="js/velocity_time.js"></script>
+  <script src="js/acceleration_time.js"></script>
   <script src="js/motion_map.js"></script>
 </head>
 <body onresize="update_graphs(hot)">
@@ -29,11 +31,15 @@
   <!-- Grid Interface-->
   <div class="grid">
     <header>
-        Edit the data table and update the plots!
+        (version 202512280916) Edit the data table and update the plots!
     </header>
 
-    <div id="position_time"></div>
-    <div id="motion_map"></div>
+    <div class="graphs-column">
+      <div id="motion_map"></div>
+      <div id="position_time"></div>
+      <div id="velocity_time"></div>
+      <div id="acceleration_time"></div>
+    </div>
 
     <div class="user-interface">
       <button id="update-graph" class="ui-button" onclick="update_graphs(hot)">Update Graphs</button>
@@ -46,9 +52,12 @@
       <div style="text-align: center;">
         <div id="table_input" style="display: inline-block;"></div>
       </div>
-      <button id='savePositionTimeButton' class="ui-button">Export Position Time Graph to PNG</button>
-      <br>
-      <button id='saveMotionMapButton' class="ui-button">Export Motion Map to PNG</button>
+
+      <p></p>
+      <button id='saveMotionMapButton' class="ui-button-small">Export Motion Map</button>
+      <button id='savePositionTimeButton' class="ui-button-small">Export Position Graph</button>
+      <button id='saveVelocityTimeButton' class="ui-button-small">Export Velocity Graph</button>
+      <button id='saveAccelerationTimeButton' class="ui-button-small">Export Acceleration Graph</button>
     </div>
     
     <footer>
@@ -58,7 +67,7 @@
         <label for="email">Email</label>
         <input type="email" id="email" required name="email" placeholder="teacher@physics.com">
         </select>
-      
+
         <input type="submit" value="Submit" onclick="return post_email()">
       </form>
       <ityr>

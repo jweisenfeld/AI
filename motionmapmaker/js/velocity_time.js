@@ -1,0 +1,91 @@
+function draw_velocity_time(data, object) {
+  // Calculate velocity from position data
+  let velocity_data = [];
+  for (let i = 0; i < data.length - 1; i++) {
+    let dt = data[i + 1].time - data[i].time;
+    let dp = data[i + 1].position - data[i].position;
+    let velocity = dt !== 0 ? dp / dt : 0;
+    velocity_data.push({
+      time: data[i].time,
+      velocity: velocity
+    });
+  }
+  // Add last point with same velocity as previous
+  if (data.length > 1) {
+    velocity_data.push({
+      time: data[data.length - 1].time,
+      velocity: velocity_data[velocity_data.length - 1].velocity
+    });
+  }
+
+  // set the dimensions and margins of the graph
+  let margin = {top: 40, right: 40, bottom: 60, left: 60},
+      width = getWidth()*0.6 - margin.left - margin.right,
+      height = getHeight()*0.35  - margin.top - margin.bottom;
+
+  // set the ranges
+  let x = d3.scaleLinear().range([0, width]);
+  let y = d3.scaleLinear().range([height, 0]);
+
+  // define the line
+  let valueline = d3.line()
+      .x(function(d) { return x(d.time); })
+      .y(function(d) { return y(d.velocity); });
+
+  // append the svg object to the body of the page
+  let velocity_time = d3.select("#velocity_time").append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+      .attr("transform",
+            "translate(" + margin.left + "," + margin.top + ")");
+
+  // Scale the range of the data
+  x.domain([d3.min(velocity_data, function(d) { return Math.min(d.time); }), d3.max(velocity_data, function(d) { return Math.max(d.time); })]);
+  y.domain([d3.min(velocity_data, function(d) { return Math.min(d.velocity); }), d3.max(velocity_data, function(d) { return Math.max(d.velocity); })]);
+
+  // Add the valueline path.
+  velocity_time.append("path")
+      .data([velocity_data])
+      .attr("d", valueline)
+      .style("fill", "none")
+      .style("stroke", "blue")
+      .style("stroke-width", "2px");
+
+  // Add the X Axis
+  velocity_time.append("g")
+      .style("font", "18px sans-serif")
+      .attr("transform", "translate(0," + height + ")")
+      .call(d3.axisBottom(x).tickValues(d3.range(d3.min(velocity_data, function(d) { return Math.min(d.time); }),d3.max(velocity_data, function(d) { return Math.max(d.time); }) + 1,1)));
+
+  // text label for the x axis
+  velocity_time.append("text")
+      .attr("transform","translate(" + (width/2) + " ," + (height + margin.top + 5) + ")")
+      .style("text-anchor", "middle")
+      .style("font", "20px sans-serif")
+      .text("Time");
+
+  // Add the Y Axis
+  velocity_time.append("g")
+      .style("font", "18px sans-serif")
+      .call(d3.axisLeft(y));
+
+  // text label for the y axis
+  velocity_time.append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 0 - margin.left - 5)
+      .attr("x",0 - (height / 2))
+      .attr("dy", "1em")
+      .style("text-anchor", "middle")
+      .style("font", "20px sans-serif")
+      .text("Velocity");
+
+  // Adding the Title
+  velocity_time.append("text")
+        .attr("x", (width / 2))
+        .attr("y", 0 - (margin.top / 2))
+        .attr("text-anchor", "middle")
+        .style("font-size", "24px")
+        .style("text-decoration", "bold")
+        .text("Velocity vs. Time Graph");
+}

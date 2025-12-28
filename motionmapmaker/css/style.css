@@ -1,3 +1,127 @@
-.handsontable td, .handsontable th {
+/* === Base Layout === */
+body {
+  font-family: 'Segoe UI', sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #f8f9fa;
+  color: #333;
+}
+
+.intro {
+  background-color: #004080;
+  color: white;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.intro h1 {
+  font-size: 2em;
+  margin-top: 10px;
+}
+
+blockquote h3 {
+  font-style: italic;
+  font-weight: normal;
+}
+
+/* === Grid and Content === */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 20px;
+  padding: 20px;
+}
+
+header {
+  grid-column: span 2;
+  font-size: 1.2em;
+  margin-bottom: 10px;
+}
+
+/* === Plot Containers === */
+#motion_map,
+#position_time,
+#velocity_time,
+#acceleration_time {
+  background-color: white;
+  border: 1px solid #ccc;
+  padding: 10px;
+  margin-bottom: 20px;
+}
+
+#position_time_container {
+  margin-bottom: 20px;
+}
+
+/* === Handsontable Table === */
+.handsontable td,
+.handsontable th {
   border: 1px solid #ccc !important;
+  padding: 6px;
+}
+
+.handsontable .htCore {
+  font-size: 14px;
+}
+
+/* === Buttons and UI === */
+.ui-button {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  margin: 5px 0;
+  cursor: pointer;
+  font-size: 14px;
+  border-radius: 4px;
+}
+
+.ui-button:hover {
+  background-color: #218838;
+}
+
+.user-interface {
+  text-align: center;
+}
+
+input[type="checkbox"] {
+  margin-right: 5px;
+}
+
+/* === Email Form === */
+footer {
+  grid-column: span 2;
+  margin-top: 40px;
+  padding: 20px;
+  background-color: #eee;
+  text-align: center;
+}
+
+footer input[type="email"] {
+  padding: 6px;
+  width: 250px;
+  margin-right: 10px;
+}
+
+footer input[type="submit"] {
+  padding: 6px 12px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+}
+
+footer input[type="submit"]:hover {
+  background-color: #0056b3;
+}
+
+/* === Responsive === */
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .user-interface {
+    margin-top: 20px;
+  }
 }

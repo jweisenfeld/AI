@@ -1,0 +1,77 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Motion Map</title>
+  <link rel="shortcut icon" href="images/favicon.ico" type="image/x-icon" />
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/lib/handsontable/handsontable.full.js"></script>
+  <link rel="stylesheet" media="screen" href="css/lib/handsontable.full.css">
+  <script src="js/lib/d3/d3.min.js"></script>
+  <script src="js/lib/download/canvas-toBlob.js"></script>
+  <script src="js/lib/download/file-saver.js"></script>
+  <script src="js/position_time.js"></script>
+  <script src="js/motion_map.js"></script>
+</head>
+<body onresize="update_graphs(hot)">
+  <!-- Full Screen Image and Quote-->
+  <div class="intro">
+    <div class="inner">
+        <div class="content">
+            <blockquote><h3>Education is not rocket science, it’s much harder.</h3> - George Nelson, actual rocket scientist</blockquote>
+            <h1>Teaching physics is hard... <br> Making motion maps doesn't have to be!</h1>
+            <i class="down"></i>
+        </div>
+    </div>
+  </div>
+
+  <!-- Grid Interface-->
+  <div class="grid">
+    <header>
+        Edit the data table and update the plots!
+    </header>
+
+    <div id="position_time"></div>
+    <div id="motion_map"></div>
+
+    <div class="user-interface">
+      <button id="update-graph" class="ui-button" onclick="update_graphs(hot)">Update Graphs</button>
+
+      <p></p>
+      <input type="checkbox" id="half-arrows">
+      <label for="contactChoice1">Toggle half-length arrows</label>
+      <p></p>
+
+      <div style="text-align: center;">
+        <div id="table_input" style="display: inline-block;"></div>
+      </div>
+      <button id='savePositionTimeButton' class="ui-button">Export Position Time Graph to PNG</button>
+      <br>
+      <button id='saveMotionMapButton' class="ui-button">Export Motion Map to PNG</button>
+    </div>
+    
+    <footer>
+      <form action = "" id="email_form">
+        <section>Want to be notified of other tools for physics teachers?</section>
+        <br>
+        <label for="email">Email</label>
+        <input type="email" id="email" required name="email" placeholder="teacher@physics.com">
+        </select>
+      
+        <input type="submit" value="Submit" onclick="return post_email()">
+      </form>
+      <ityr>
+      <div id="thanks" class="thanks" style="visibility: hidden;">
+        Thanks for visiting!
+      </div>
+    </footer>
+
+  </div>
+
+    <!-- Scripts-->
+   <script src="js/user_input.js"></script>
+
+</body>
+</html>

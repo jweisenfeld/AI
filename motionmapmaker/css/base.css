@@ -1,1 +1,176 @@
+html, body {
+	margin:0;
+	padding:0;
+	height:100%;
+	text-align: center;
+
+}
+body { font-family:Helvetica Neue,Helvetica,Arial,sans-serif; }
+h1, p { margin:0 0 2em; }
+h1 { text-align:center; }
+
+.intro {
+	display:table;
+	height:100%;
+	width:100%;
+	margin:auto;
+	background: linear-gradient(to bottom,  rgba(255,255,255,0) 0%,rgba(255,255,255,1) 100%) , url(../images/background.jpg) no-repeat 50% 50% ;
+	background-size:cover;
+}
+.intro .inner {
+	display:table-cell;
+	vertical-align:middle;
+	width:100%;
+	max-width:none;
+}
+.content {
+	padding:10px;
+	background:rgba(255,255,255,0.75);
+	max-width:75%;
+	margin:auto;
+	text-align:center;
+	border-radius: 25px;
+}
+.inner {
+	max-width:75%;
+	margin:auto;
+	font-size:140%;
+	line-height:1.6;
+	padding:10px;
+}
+
+blockquote {
+text-align:center;
+border:none;
+font-weight:bold;
+font-family:  Helvetica Neue,Helvetica,Arial,sans-serif;
+quotes: "\201C""\201D""\2018""\2019";
+}
+
+blockquote h3 {
+    font-size:25px;
+}
+
+blockquote h3:before { 
+    content: open-quote;
+    font-weight: bold;
+    font-size:50px;
+    color:black;
+} 
+blockquote h3:after { 
+    content: close-quote;
+    font-weight: bold;
+    font-size:50px;
+    color:black;
+  
+}
+
+i {
+  border: solid black;
+  border-width: 0 5px 5px 0;
+  display: inline-block;
+  padding: 20px;
+}
+.down {
+    transform: rotate(45deg);
+    -webkit-transform: rotate(45deg);
+}
+
+
+.grid {
+  display: grid;
+  grid-template-areas: "header"
+                       "ui"
+                       "pt"
+                       "mm "
+                       "footer";
+}
+
+@media (min-width: 700px) {
+  .grid {
+    grid-template-columns: 3fr 1fr;
+  	grid-template-rows: auto auto auto;
+ 	grid-gap: 0.1em; /* This is the size of default test so a ~16 px gap depending on browser*/
+    grid-template-areas: 
+      "header header"
+      "pt ui"
+      "mm footer";
+   }
+}
+
+/* This makes the grey boxes
+header,
+.plots,
+.user-interface,
+footer {
+  background: #ccc;
+  padding: 1em;
+}
+*/
+
+header {
+  font-family:  Helvetica Neue,Helvetica,Arial,sans-serif;
+  font-size: 50px;
+  grid-area: header;
+  padding: 1em;
+  margin: auto;
+}
+
+footer {
+  grid-area: footer;
+  padding: 1em;
+  border-radius: 5px;
+  background-color: #f2f2f2;
+  margin: auto;
+}
+
+#motion_map {
+	grid-area: mm;
+}
+
+#position_time {
+	grid-area: pt;
+}
+
+
+.user-interface {
+  grid-area: ui;
+  text-align: center;
+  width: 100%;
+  border-radius: 5px;
+  background-color: #f2f2f2;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+svg {
+	width: 3fr;
+	height: 100%;
+	margin: auto;
+
+}
+
+input[type=submit],
+.ui-button {
+    width: 50%;
+    height: auto;
+    white-space: normal;;
+    background-color: #4CAF50;
+    color: white;
+    padding: 14px 20px;
+    margin: 8px 0;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+input[type=submit]:hover,
+.ui-button {
+    background-color: #45a049;
+}
+
+.thanks{
+	font-family:  Helvetica Neue,Helvetica,Arial,sans-serif;
+  	font-size: 25px;
+}
 

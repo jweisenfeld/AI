@@ -38,9 +38,9 @@ function draw_position_time(data, object) {
   x.domain([0, 15]);
   let yMin = d3.min(data, function(d) { return d.position; });
   let yMax = d3.max(data, function(d) { return d.position; });
-  let yRange = yMax - yMin;
+  let yRange = Math.abs(yMax - yMin);
   let yPadding = yRange > 0 ? yRange * 0.1 : 1; // Add 10% padding or minimum of 1
-  y.domain([yMin - yPadding, yMax + yPadding]);
+  y.domain([yMax + yPadding, yMin - yPadding]);
   
   // Add the valueline path.
   position_time.append("path")

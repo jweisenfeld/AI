@@ -2,7 +2,7 @@ function draw_position_time(data, object) {
   // set the dimensions and margins of the graph
   let margin = {top: 40, right: 40, bottom: 60, left: 60},
       width = getWidth()*0.6 - margin.left - margin.right,
-      height = getHeight()*0.25  - margin.top - margin.bottom;
+      height = window.innerHeight*0.25  - margin.top - margin.bottom;
 
 
   // set the ranges

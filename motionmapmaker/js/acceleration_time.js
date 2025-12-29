@@ -33,7 +33,7 @@ function draw_acceleration_time(data, object) {
   // set the dimensions and margins of the graph
   let margin = {top: 40, right: 40, bottom: 60, left: 60},
       width = getWidth()*0.6 - margin.left - margin.right,
-      height = getHeight()*0.25  - margin.top - margin.bottom;
+      height = window.innerHeight*0.25  - margin.top - margin.bottom;
 
   // set the ranges
   let x = d3.scaleLinear().range([0, width]);

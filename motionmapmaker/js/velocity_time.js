@@ -10,13 +10,6 @@ function draw_velocity_time(data, object) {
       velocity: velocity
     });
   }
-  // Add last point with same velocity as previous
-  if (data.length > 1) {
-    velocity_data.push({
-      time: data[data.length - 1].time,
-      velocity: velocity_data[velocity_data.length - 1].velocity
-    });
-  }
 
   // set the dimensions and margins of the graph
   let margin = {top: 40, right: 40, bottom: 60, left: 60},

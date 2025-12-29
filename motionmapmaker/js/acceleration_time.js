@@ -7,9 +7,6 @@ function draw_acceleration_time(data, object) {
     let velocity = dt !== 0 ? dp / dt : 0;
     velocity_data.push(velocity);
   }
-  if (data.length > 1) {
-    velocity_data.push(velocity_data[velocity_data.length - 1]);
-  }
 
   // Calculate acceleration from velocity data
   let acceleration_data = [];
@@ -20,13 +17,6 @@ function draw_acceleration_time(data, object) {
     acceleration_data.push({
       time: data[i].time,
       acceleration: acceleration
-    });
-  }
-  // Add last point with same acceleration as previous
-  if (data.length > 1) {
-    acceleration_data.push({
-      time: data[data.length - 1].time,
-      acceleration: acceleration_data.length > 0 ? acceleration_data[acceleration_data.length - 1].acceleration : 0
     });
   }
 

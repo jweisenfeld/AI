@@ -31,7 +31,7 @@
   <!-- Grid Interface-->
   <div class="grid">
     <header>
-        (version 202512280916) Edit the data table and update the plots!
+        (version <span id="version">loading...</span>) Edit the data table and update the plots!
     </header>
 
     <div class="graphs-column">
@@ -80,6 +80,18 @@
 
     <!-- Scripts-->
    <script src="js/user_input.js"></script>
+   <script>
+     // Load version from version.txt
+     fetch('version.txt')
+       .then(response => response.text())
+       .then(version => {
+         document.getElementById('version').textContent = version.trim();
+       })
+       .catch(error => {
+         document.getElementById('version').textContent = 'unknown';
+         console.error('Error loading version:', error);
+       });
+   </script>
 
 </body>
 </html>

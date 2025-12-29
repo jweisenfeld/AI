@@ -35,8 +35,8 @@ function draw_position_time(data, object) {
 
 
   // Scale the range of the data
-  x.domain([d3.min(data, function(d) { return Math.min(d.time); }), d3.max(data, function(d) { return Math.max(d.time); })]);
-  y.domain([d3.min(data, function(d) { return Math.min(d.position); }), d3.max(data, function(d) { return Math.max(d.position); })]);
+  x.domain([d3.min(data, function(d) { return d.time; }), d3.max(data, function(d) { return d.time; })]);
+  y.domain([d3.min(data, function(d) { return d.position; }), d3.max(data, function(d) { return d.position; })]);
   
   // Add the valueline path.
   position_time.append("path")
@@ -46,6 +46,25 @@ function draw_position_time(data, object) {
       .style("stroke", "black")
       .style("stroke-width", "2px");
 
+  // Add gridlines
+  position_time.append("g")
+      .attr("class", "grid")
+      .attr("transform", "translate(0," + height + ")")
+      .call(d3.axisBottom(x)
+          .tickValues(d3.range(d3.min(data, function(d) { return Math.min(d.time); }),d3.max(data, function(d) { return Math.max(d.time); }) + 1,1))
+          .tickSize(-height)
+          .tickFormat(""))
+      .style("stroke-dasharray", "3,3")
+      .style("stroke-opacity", "0.3");
+
+  position_time.append("g")
+      .attr("class", "grid")
+      .call(d3.axisLeft(y)
+          .tickSize(-width)
+          .tickFormat(""))
+      .style("stroke-dasharray", "3,3")
+      .style("stroke-opacity", "0.3");
+
   // Add the X Axis
   position_time.append("g")
       .style("font", "18px sans-serif")
@@ -53,7 +72,7 @@ function draw_position_time(data, object) {
       .call(d3.axisBottom(x).tickValues(d3.range(d3.min(data, function(d) { return Math.min(d.time); }),d3.max(data, function(d) { return Math.max(d.time); }) + 1,1)));
 
   // text label for the x axis
-  position_time.append("text")             
+  position_time.append("text")
       .attr("transform","translate(" + (width/2) + " ," + (height + margin.top + 5) + ")")
       .style("text-anchor", "middle")
       .style("font", "20px sans-serif")

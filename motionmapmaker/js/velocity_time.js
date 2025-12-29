@@ -41,8 +41,8 @@ function draw_velocity_time(data, object) {
             "translate(" + margin.left + "," + margin.top + ")");
 
   // Scale the range of the data
-  x.domain([d3.min(velocity_data, function(d) { return Math.min(d.time); }), d3.max(velocity_data, function(d) { return Math.max(d.time); })]);
-  y.domain([d3.min(velocity_data, function(d) { return Math.min(d.velocity); }), d3.max(velocity_data, function(d) { return Math.max(d.velocity); })]);
+  x.domain([d3.min(velocity_data, function(d) { return d.time; }), d3.max(velocity_data, function(d) { return d.time; })]);
+  y.domain([d3.min(velocity_data, function(d) { return d.velocity; }), d3.max(velocity_data, function(d) { return d.velocity; })]);
 
   // Add the valueline path.
   velocity_time.append("path")
@@ -51,6 +51,25 @@ function draw_velocity_time(data, object) {
       .style("fill", "none")
       .style("stroke", "blue")
       .style("stroke-width", "2px");
+
+  // Add gridlines
+  velocity_time.append("g")
+      .attr("class", "grid")
+      .attr("transform", "translate(0," + height + ")")
+      .call(d3.axisBottom(x)
+          .tickValues(d3.range(d3.min(velocity_data, function(d) { return Math.min(d.time); }),d3.max(velocity_data, function(d) { return Math.max(d.time); }) + 1,1))
+          .tickSize(-height)
+          .tickFormat(""))
+      .style("stroke-dasharray", "3,3")
+      .style("stroke-opacity", "0.3");
+
+  velocity_time.append("g")
+      .attr("class", "grid")
+      .call(d3.axisLeft(y)
+          .tickSize(-width)
+          .tickFormat(""))
+      .style("stroke-dasharray", "3,3")
+      .style("stroke-opacity", "0.3");
 
   // Add the X Axis
   velocity_time.append("g")

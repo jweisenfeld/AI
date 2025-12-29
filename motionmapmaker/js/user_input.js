@@ -61,10 +61,15 @@ function update_graphs(hot){
   func_data = [];
   for (i=0;i<data.length;i++){
     func_data.push({
-      time: data[i][0],
-      position: data[i][1]
+      time: parseFloat(data[i][0]),
+      position: parseFloat(data[i][1])
       });
     }
+
+  // Debug logging
+  console.log("Data sample:", func_data.slice(0, 3));
+  console.log("Position range:", d3.min(func_data, d => d.position), "to", d3.max(func_data, d => d.position));
+
   draw_motion_map(func_data,document.getElementById("half-arrows").checked);
   draw_position_time(func_data,"hello");
   draw_velocity_time(func_data,"hello");

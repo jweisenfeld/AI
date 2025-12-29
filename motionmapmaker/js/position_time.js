@@ -35,7 +35,7 @@ function draw_position_time(data, object) {
 
 
   // Scale the range of the data
-  x.domain([d3.min(data, function(d) { return d.time; }), d3.max(data, function(d) { return d.time; })]);
+  x.domain([0, 15]);
   y.domain([d3.min(data, function(d) { return d.position; }), d3.max(data, function(d) { return d.position; })]);
   
   // Add the valueline path.
@@ -51,7 +51,7 @@ function draw_position_time(data, object) {
       .attr("class", "grid")
       .attr("transform", "translate(0," + height + ")")
       .call(d3.axisBottom(x)
-          .tickValues(d3.range(d3.min(data, function(d) { return Math.min(d.time); }),d3.max(data, function(d) { return Math.max(d.time); }) + 1,1))
+          .tickValues(d3.range(0, 16, 1))
           .tickSize(-height)
           .tickFormat(""))
       .style("stroke-dasharray", "3,3")
@@ -69,7 +69,7 @@ function draw_position_time(data, object) {
   position_time.append("g")
       .style("font", "18px sans-serif")
       .attr("transform", "translate(0," + height + ")")
-      .call(d3.axisBottom(x).tickValues(d3.range(d3.min(data, function(d) { return Math.min(d.time); }),d3.max(data, function(d) { return Math.max(d.time); }) + 1,1)));
+      .call(d3.axisBottom(x).tickValues(d3.range(0, 16, 1)));
 
   // text label for the x axis
   position_time.append("text")

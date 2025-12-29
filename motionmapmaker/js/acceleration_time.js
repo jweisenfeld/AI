@@ -56,7 +56,8 @@ function draw_acceleration_time(data, object) {
   x.domain([0, 15]);
   let yMin = d3.min(acceleration_data, function(d) { return d.acceleration; });
   let yMax = d3.max(acceleration_data, function(d) { return d.acceleration; });
-  let yPadding = (yMax - yMin) * 0.1; // Add 10% padding
+  let yRange = yMax - yMin;
+  let yPadding = yRange > 0 ? yRange * 0.1 : 1; // Add 10% padding or minimum of 1
   y.domain([yMin - yPadding, yMax + yPadding]);
 
   // Add the valueline path.

@@ -21,7 +21,7 @@ function draw_velocity_time(data, object) {
   // set the dimensions and margins of the graph
   let margin = {top: 40, right: 40, bottom: 60, left: 60},
       width = getWidth()*0.6 - margin.left - margin.right,
-      height = getHeight()*0.35  - margin.top - margin.bottom;
+      height = getHeight()*0.25  - margin.top - margin.bottom;
 
   // set the ranges
   let x = d3.scaleLinear().range([0, width]);
@@ -42,7 +42,10 @@ function draw_velocity_time(data, object) {
 
   // Scale the range of the data
   x.domain([0, 15]);
-  y.domain([d3.min(velocity_data, function(d) { return d.velocity; }), d3.max(velocity_data, function(d) { return d.velocity; })]);
+  let yMin = d3.min(velocity_data, function(d) { return d.velocity; });
+  let yMax = d3.max(velocity_data, function(d) { return d.velocity; });
+  let yPadding = (yMax - yMin) * 0.1; // Add 10% padding
+  y.domain([yMin - yPadding, yMax + yPadding]);
 
   // Add the valueline path.
   velocity_time.append("path")

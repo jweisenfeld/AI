@@ -50,7 +50,13 @@ function verify_data(hot){
 }
 
 function update_graphs(hot){
-  d3.selectAll("svg").remove(); //Delete out the graphs before addint new graphs
+  // Aggressively clear all SVG elements and their containers
+  d3.selectAll("svg").remove();
+  document.getElementById("motion_map").innerHTML = "";
+  document.getElementById("position_time").innerHTML = "";
+  document.getElementById("velocity_time").innerHTML = "";
+  document.getElementById("acceleration_time").innerHTML = "";
+
   data = verify_data(hot);
   func_data = [];
   for (i=0;i<data.length;i++){

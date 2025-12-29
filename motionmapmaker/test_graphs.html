@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Graph Tests</title>
+  <script src="js/lib/d3/d3.min.js"></script>
+  <script src="js/position_time.js"></script>
+  <script src="js/velocity_time.js"></script>
+  <script src="js/acceleration_time.js"></script>
+  <style>
+    .test-case { margin: 20px; padding: 20px; border: 2px solid #ccc; }
+    .graphs { display: flex; gap: 20px; }
+    .graphs > div { flex: 1; }
+  </style>
+</head>
+<body>
+  <h1>Graph Unit Tests</h1>
+
+  <div class="test-case">
+    <h2>Test Case 1: Positive values (100 to 44 to 100)</h2>
+    <div class="graphs">
+      <div id="test1_position"></div>
+      <div id="test1_velocity"></div>
+      <div id="test1_acceleration"></div>
+    </div>
+  </div>
+
+  <div class="test-case">
+    <h2>Test Case 2: Negative values (-100 to -44 to -100)</h2>
+    <div class="graphs">
+      <div id="test2_position"></div>
+      <div id="test2_velocity"></div>
+      <div id="test2_acceleration"></div>
+    </div>
+  </div>
+
+  <div class="test-case">
+    <h2>Test Case 3: Zero start (0 to 112.5)</h2>
+    <div class="graphs">
+      <div id="test3_position"></div>
+      <div id="test3_velocity"></div>
+      <div id="test3_acceleration"></div>
+    </div>
+  </div>
+
+  <script>
+    function getWidth() { return 400; }
+    function getHeight() { return 600; }
+
+    // Test Case 1
+    const test1Data = [
+      {time: 0, position: 100}, {time: 1, position: 86}, {time: 2, position: 74},
+      {time: 3, position: 64}, {time: 4, position: 56}, {time: 5, position: 50},
+      {time: 6, position: 46}, {time: 7, position: 44}, {time: 8, position: 44},
+      {time: 9, position: 46}, {time: 10, position: 50}, {time: 11, position: 56},
+      {time: 12, position: 64}, {time: 13, position: 74}, {time: 14, position: 86},
+      {time: 15, position: 100}
+    ];
+
+    // Test Case 2
+    const test2Data = [
+      {time: 0, position: -100}, {time: 1, position: -86}, {time: 2, position: -74},
+      {time: 3, position: -64}, {time: 4, position: -56}, {time: 5, position: -50},
+      {time: 6, position: -46}, {time: 7, position: -44}, {time: 8, position: -44},
+      {time: 9, position: -46}, {time: 10, position: -50}, {time: 11, position: -56},
+      {time: 12, position: -64}, {time: 13, position: -74}, {time: 14, position: -86},
+      {time: 15, position: -100}
+    ];
+
+    // Test Case 3
+    const test3Data = [
+      {time: 0, position: 0}, {time: 1, position: 0.5}, {time: 2, position: 2},
+      {time: 3, position: 4.5}, {time: 4, position: 8}, {time: 5, position: 12.5},
+      {time: 6, position: 18}, {time: 7, position: 24.5}, {time: 8, position: 32},
+      {time: 9, position: 40.5}, {time: 10, position: 50}, {time: 11, position: 60.5},
+      {time: 12, position: 72}, {time: 13, position: 84.5}, {time: 14, position: 98},
+      {time: 15, position: 112.5}
+    ];
+
+    // Override d3.select to work with test IDs
+    const originalSelect = d3.select;
+
+    function runTest(testNum, data) {
+      d3.select = function(selector) {
+        if (selector === "#position_time") return originalSelect("#test" + testNum + "_position");
+        if (selector === "#velocity_time") return originalSelect("#test" + testNum + "_velocity");
+        if (selector === "#acceleration_time") return originalSelect("#test" + testNum + "_acceleration");
+        return originalSelect(selector);
+      };
+
+      draw_position_time(data);
+      draw_velocity_time(data);
+      draw_acceleration_time(data);
+    }
+
+    runTest(1, test1Data);
+    runTest(2, test2Data);
+    runTest(3, test3Data);
+
+    d3.select = originalSelect;
+
+    console.log("Tests completed. Check that:");
+    console.log("1. All graphs have same height");
+    console.log("2. Y-axes show correct ranges with larger values at top");
+    console.log("3. Data is visible and properly scaled");
+  </script>
+</body>
+</html>

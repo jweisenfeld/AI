@@ -58,8 +58,18 @@ if (!isset($GEMINI_API_KEY) || empty($GEMINI_API_KEY)) {
     send_error("API Key is undefined in geminikey.php");
 }
 
-$model = $data['model'] ?? 'gemini-1.5-pro';
-$url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=" . trim($GEMINI_API_KEY);
+// Inside api-proxy.php
+// Map "friendly" names to "technical" Google names
+$modelMap = [
+    "gemini-pro" => "gemini-1.5-pro-002", // This is the stable production version
+    "gemini-flash" => "gemini-1.5-flash-002"
+];
+
+$requestedModel = $data['model'] ?? 'gemini-pro';
+$actualModel = $modelMap[$requestedModel] ?? $requestedModel; // Fallback to raw name if not in map
+
+// Use the V1 endpoint which is generally more stable than V1BETA
+$url = "https://generativelanguage.googleapis.com/v1/models/$actualModel:generateContent?key=" . trim($GEMINI_API_KEY);
 
 // Format Payload for Gemini Multimodal
 $geminiContents = [];

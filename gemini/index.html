@@ -24,7 +24,6 @@
             color: var(--text);
         }
 
-        /* LOGIN MODAL */
         .login-overlay {
             position: fixed;
             inset: 0;
@@ -54,7 +53,6 @@
             box-sizing: border-box;
         }
 
-        /* HEADER */
         .header {
             background: white;
             padding: 10px 20px;
@@ -64,7 +62,6 @@
             align-items: center;
         }
 
-        /* CHAT AREA */
         .main-container {
             flex: 1;
             display: flex;
@@ -87,7 +84,6 @@
             padding: 20px;
         }
 
-        /* BUBBLES */
         .message {
             margin-bottom: 20px;
             display: flex;
@@ -115,7 +111,6 @@
             border-bottom-left-radius: 4px;
         }
 
-        /* INPUT AREA */
         .input-area {
             padding: 20px;
             border-top: 1px solid var(--border);
@@ -148,11 +143,6 @@
             font-weight: bold;
         }
 
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
         .clip-btn {
             background: none;
             border: none;
@@ -161,15 +151,6 @@
             padding: 5px;
         }
 
-        /* TYPING INDICATOR */
-        .typing {
-            font-size: 0.8rem;
-            color: #666;
-            margin-bottom: 10px;
-            display: none;
-        }
-
-        /* IMAGE PREVIEWS */
         #image-previews img {
             height: 50px;
             border-radius: 4px;
@@ -183,52 +164,40 @@
     <div id="login-modal" class="login-overlay">
         <div class="login-card">
             <h2 style="color:var(--primary); margin-top:0;">Engineering Portal</h2>
-            <p style="font-size: 0.85rem; color: #666; margin-bottom: 20px;">Orion High Physics - Engineering Firm Login
-            </p>
             <input type="text" id="uid" class="login-input" placeholder="Student ID">
             <input type="password" id="pwd" class="login-input" placeholder="Password">
-            <button class="btn" style="width:100%" onclick="handleLogin()">Access Design Project</button>
+            <button class="btn" style="width:100%" onclick="handleLogin()">Access Project</button>
         </div>
     </div>
 
     <header class="header">
-        <div style="font-weight:bold; color: var(--primary);">OHS Infrastructure Project</div>
-        <div style="display:flex; gap:12px; align-items: center;">
+        <div style="font-weight:bold; color: var(--primary);">Pasco Engineering Assistant</div>
+        <div style="display:flex; gap:10px; align-items: center;">
+            <select id="model-select" style="padding: 5px; border-radius: 4px;">
+                <option value="gemini-pro">Gemini 1.5 Pro (Stable)</option>
+                <option value="gemini-flash">Gemini 1.5 Flash (Fast)</option>
+            </select>
             <select id="phase-select" style="padding: 5px; border-radius: 4px;">
                 <option value="1">Phase 1: Ideation</option>
-                <option value="2" selected>Phase 2: Engineering (PMC 25)</option>
-                <option value="3">Phase 3: Environmental</option>
-                <option value="4">Phase 4: Utility/ROW</option>
-                <option value="5">Phase 5: Prep</option>
+                <option value="2" selected>Phase 2: Engineering</option>
                 <option value="6">Phase 6: Council Pitch</option>
             </select>
-            <div id="user-tag"
-                style="background:#e8f0fe; padding:4px 12px; border-radius:15px; font-size:0.85em; font-weight:500;">Not
+            <div id="user-tag" style="background:#e8f0fe; padding:4px 12px; border-radius:15px; font-size:0.85em;">Not
                 Logged In</div>
         </div>
     </header>
 
     <div class="main-container">
         <div class="chat-area">
-            <div class="messages" id="messages">
-                <div class="message assistant">
-                    <div class="bubble">Welcome to the Design Phase. Please log in to begin your engineering report.
-                    </div>
-                </div>
-            </div>
-
+            <div class="messages" id="messages"></div>
             <div id="image-previews" style="padding: 0 20px; display: flex; gap: 8px;"></div>
-            <div id="typing-indicator" class="typing" style="padding: 0 20px;">Senior Lead is typing...</div>
-
             <div class="input-area">
                 <div class="input-group">
                     <button class="clip-btn" onclick="document.getElementById('file-input').click()">📎</button>
                     <input type="file" id="file-input" accept="image/*" multiple style="display:none"
                         onchange="handleFiles(this)">
-
-                    <textarea id="user-input" placeholder="Ask about setbacks, topography, or PMC 25 requirements..."
+                    <textarea id="user-input" placeholder="Enter your query..."
                         onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); sendMessage();}"></textarea>
-
                     <button class="btn" id="send-btn" onclick="sendMessage()">Send</button>
                 </div>
             </div>
@@ -236,42 +205,31 @@
     </div>
 
     <script>
-        let STUDENT_ID = null;
-        let STUDENT_NAME = null;
-        let HISTORY = [];
-        let PENDING_IMAGES = [];
+        let STUDENT_ID = null; let STUDENT_NAME = null; let HISTORY = []; let PENDING_IMAGES = [];
 
         async function handleLogin() {
             const id = document.getElementById('uid').value;
             const pw = document.getElementById('pwd').value;
-            try {
-                const res = await fetch('api-proxy.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'verify_login', student_id: id, password: pw })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    STUDENT_ID = id;
-                    STUDENT_NAME = data.student_name;
-                    document.getElementById('user-tag').textContent = "👤 " + STUDENT_NAME;
-                    document.getElementById('login-modal').style.display = 'none';
-                } else { alert("Login Failed: Check ID and Password"); }
-            } catch (e) { alert("Server Connection Error"); }
+            const res = await fetch('api-proxy.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'verify_login', student_id: id, password: pw })
+            });
+            const data = await res.json();
+            if (data.success) {
+                STUDENT_ID = id; STUDENT_NAME = data.student_name;
+                document.getElementById('user-tag').textContent = "👤 " + STUDENT_NAME;
+                document.getElementById('login-modal').style.display = 'none';
+            } else { alert("Login Failed"); }
         }
 
         function handleFiles(input) {
-            const previewArea = document.getElementById('image-previews');
             for (let file of input.files) {
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    PENDING_IMAGES.push({
-                        type: "image",
-                        source: { media_type: file.type, data: e.target.result.split(',')[1] }
-                    });
-                    const img = document.createElement('img');
-                    img.src = e.target.result;
-                    previewArea.appendChild(img);
+                    PENDING_IMAGES.push({ type: "image", source: { media_type: file.type, data: e.target.result.split(',')[1] } });
+                    const img = document.createElement('img'); img.src = e.target.result;
+                    document.getElementById('image-previews').appendChild(img);
                 };
                 reader.readAsDataURL(file);
             }
@@ -280,80 +238,40 @@
         async function sendMessage() {
             const input = document.getElementById('user-input');
             const text = input.value.trim();
-            const sendBtn = document.getElementById('send-btn');
             if (!text && PENDING_IMAGES.length === 0) return;
 
-            // UI Lock
-            input.disabled = true;
-            sendBtn.disabled = true;
-            document.getElementById('typing-indicator').style.display = 'block';
-
-            appendBubble('user', text || "(Image Uploaded)");
-
-            // Build payload
+            appendBubble('user', text || "(Image)");
             const userContent = text ? [{ type: "text", text: text }] : [];
             PENDING_IMAGES.forEach(img => userContent.push(img));
-
             HISTORY.push({ role: 'user', content: userContent });
-            input.value = '';
-            document.getElementById('image-previews').innerHTML = '';
-            const currentPending = [...PENDING_IMAGES];
-            PENDING_IMAGES = [];
+
+            input.value = ''; document.getElementById('image-previews').innerHTML = '';
+            const currentImages = [...PENDING_IMAGES]; PENDING_IMAGES = [];
 
             const phase = document.getElementById('phase-select').value;
-            const prompts = {
-                "1": "Help students ideate a creative bus shelter for Orion High.",
-                "2": "You are a Senior Engineer. Use Pasco Municipal Code Title 25. Focus on Topography, Site Plans, Setbacks, and Clear Vision Triangles. Reject vague plans.",
-                "3": "Focus on Environmental Review and SEPA for the Tri-Cities climate.",
-                "4": "Focus on Utilities and Right-of-Way standards.",
-                "5": "Help finalize the Detailed Engineering Plan documentation.",
-                "6": "Professional mentor for the City Council presentation."
-            };
+            const model = document.getElementById('model-select').value;
 
-            try {
-                const res = await fetch('api-proxy.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        student_id: STUDENT_ID,
-                        student_name: STUDENT_NAME,
-                        model: 'gemini-1.5-pro',
-                        system: prompts[phase],
-                        messages: HISTORY
-                    })
-                });
+            const res = await fetch('api-proxy.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    student_id: STUDENT_ID, student_name: STUDENT_NAME,
+                    model: model, system: "Act as a civil engineer. Use PMC Title 25 for Phase 2.",
+                    messages: HISTORY
+                })
+            });
 
-                const data = await res.json();
-                const reply = data.candidates[0].content.parts[0].text;
-                appendBubble('assistant', reply);
-                HISTORY.push({ role: 'assistant', content: reply });
-            } catch (e) {
-                appendBubble('assistant', "⚠️ Network Error. Please check your proxy.");
-            } finally {
-                input.disabled = false;
-                sendBtn.disabled = false;
-                document.getElementById('typing-indicator').style.display = 'none';
-                input.focus();
-            }
+            const data = await res.json();
+            const reply = data.candidates[0].content.parts[0].text;
+            appendBubble('assistant', reply);
+            HISTORY.push({ role: 'assistant', content: reply });
         }
 
         function appendBubble(role, text) {
             const div = document.createElement('div');
             div.className = `message ${role}`;
-
             let html = marked.parse(text);
-            let toolbar = '';
-
-            if (role === 'assistant') {
-                toolbar = `
-                <div style="margin-top: 8px;">
-                    <button class="btn" style="padding: 4px 8px; font-size: 0.75rem; background: #fff; color: #555; border: 1px solid #ddd;" onclick="downloadResponse(this)">
-                        💾 Save Report Segment
-                    </button>
-                    <div class="raw-text" style="display:none;">${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
-                </div>`;
-            }
-
+            let toolbar = role === 'assistant' ? `<div><button class="btn" style="padding:2px 5px; font-size:0.7em;" onclick="downloadResponse(this)">💾 Save</button><div class="raw" style="display:none;">${text}</div></div>` : '';
             div.innerHTML = `<div class="bubble">${html}</div>${toolbar}`;
             document.getElementById('messages').appendChild(div);
             div.scrollIntoView({ behavior: 'smooth' });
@@ -361,14 +279,9 @@
 
         function downloadResponse(btn) {
             const rawText = btn.nextElementSibling.textContent;
-            const filename = 'Engineering_Report_' + new Date().getTime() + '.md';
             const blob = new Blob([rawText], { type: 'text/markdown' });
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            a.click();
-            URL.revokeObjectURL(url);
+            const a = document.createElement('a'); a.href = url; a.download = 'Report.md'; a.click();
         }
     </script>
 </body>

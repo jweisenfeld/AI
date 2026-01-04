@@ -1,9 +1,7 @@
 <?php
 /**
- * Gemini API Proxy - OHS Infrastructure Project
- * Handles Authentication and Gemini Pro Requests
+ * OHS Gemini Proxy - Enhanced Debug Version
  */
-
 set_time_limit(300);
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
@@ -12,99 +10,73 @@ header('Content-Type: application/json; charset=utf-8');
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') { exit; }
 
-// --- CONFIGURATION ---
 $accountRoot = dirname($_SERVER['DOCUMENT_ROOT']); 
 $secretsFile = $accountRoot . '/.secrets/geminikey.php';
 $studentFile = $accountRoot . '/.secrets/student_roster.csv'; 
 
-// --- HELPER: ERROR RESPONSE ---
-function send_error($message, $code = 500, $details = null) {
-    http_response_code($code);
+function send_error($message, $details = null) {
     echo json_encode(['error' => $message, 'details' => $details]);
     exit;
 }
 
-// Read Incoming JSON
-$rawInput = file_get_contents('php://input');
-$data = json_decode($rawInput, true);
+$data = json_decode(file_get_contents('php://input'), true);
+if (!$data) send_error("No JSON data received by PHP.");
 
-if (!$data) send_error("No data received", 400);
-
-// --- ROUTE 1: LOGIN VERIFICATION ---
+// --- LOGIN ROUTE ---
 if (isset($data['action']) && $data['action'] === 'verify_login') {
-    $id = $data['student_id'] ?? '';
-    $pass = $data['password'] ?? '';
-    
-    if (!file_exists($studentFile)) send_error("Roster file missing", 500, "Looked in: $studentFile");
-
-    if (($handle = fopen($studentFile, "r")) !== FALSE) {
-        fgetcsv($handle); // Skip header
-        while (($row = fgetcsv($handle, 1000, ",")) !== FALSE) {
-            // CSV Indices: ID=2, Password=6, Name=9
-            if ($row[2] == $id && $row[6] == $pass) {
-                echo json_encode(['success' => true, 'student_name' => $row[9]]);
-                fclose($handle);
-                exit;
-            }
+    if (!file_exists($studentFile)) send_error("Roster missing", "Path: $studentFile");
+    $handle = fopen($studentFile, "r");
+    fgetcsv($handle); 
+    while (($row = fgetcsv($handle, 1000, ",")) !== FALSE) {
+        if ($row[2] == $data['student_id'] && $row[6] == $data['password']) {
+            echo json_encode(['success' => true, 'student_name' => $row[9]]);
+            fclose($handle); exit;
         }
-        fclose($handle);
     }
-    send_error("Invalid Credentials", 401);
+    fclose($handle);
+    send_error("Invalid credentials.");
 }
 
-// --- ROUTE 2: GEMINI PROXY ---
-if (!file_exists($secretsFile)) send_error("API Key file missing", 500);
-require_once($secretsFile); // Should define $GEMINI_API_KEY
+// --- CHAT ROUTE ---
+if (!file_exists($secretsFile)) send_error("API Key file missing.");
+require_once($secretsFile); // Defines $GEMINI_API_KEY
 
 $model = $data['model'] ?? 'gemini-1.5-pro';
 $url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$GEMINI_API_KEY";
 
-// Prepare Gemini Payload
-$geminiPayload = [
-    "systemInstruction" => [
-        "parts" => [["text" => $data['system'] ?? "You are a civil engineer."]]
-    ],
-    "contents" => []
-];
-
+// Format Gemini Payload
+$contents = [];
 foreach ($data['messages'] as $m) {
     $role = ($m['role'] === 'assistant') ? 'model' : 'user';
-    $parts = [];
-    
+    // Handle complex content (text + images) or simple strings
     if (is_string($m['content'])) {
-        $parts[] = ["text" => $m['content']];
+        $parts = [["text" => $m['content']]];
     } else {
-        foreach ($m['content'] as $p) {
-            if ($p['type'] === 'text') $parts[] = ["text" => $p['text']];
-            if ($p['type'] === 'image') {
-                $parts[] = [
-                    "inlineData" => [
-                        "mimeType" => $p['source']['media_type'],
-                        "data" => $p['source']['data']
-                    ]
-                ];
-            }
-        }
+        $parts = array_map(function($p) {
+            if (isset($p['text'])) return ["text" => $p['text']];
+            if (isset($p['source'])) return ["inlineData" => ["mimeType" => $p['source']['media_type'], "data" => $p['source']['data']]];
+            return null;
+        }, $m['content']);
     }
-    $geminiPayload['contents'][] = ["role" => $role, "parts" => $parts];
+    $contents[] = ["role" => $role, "parts" => array_filter($parts)];
 }
 
+$payload = [
+    "contents" => $contents,
+    "systemInstruction" => ["parts" => [["text" => $data['system']]]]
+];
+
 $ch = curl_init($url);
-curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-curl_setopt($ch, CURLOPT_POST, 1);
-curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($geminiPayload));
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
 
 $response = curl_exec($ch);
-$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-if (curl_errno($ch)) send_error("CURL Error", 500, curl_error($ch));
+$err = curl_error($ch);
 curl_close($ch);
 
-// LOGGING
-$logName = $data['student_name'] ?? 'unknown';
-$logLine = date('Y-m-d H:i:s') . " | $logName | HTTP $httpCode\n";
-file_put_contents('gemini_usage.log', $logLine, FILE_APPEND);
+if ($err) send_error("CURL Error", $err);
 
-http_response_code($httpCode);
+// This is the important part: forward the actual Google response
 echo $response;

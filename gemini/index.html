@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gemini Bus Shelter Project</title>
@@ -374,51 +375,11 @@
             .replace(/'/g, "&#039;");
     }
 
-    // --- MARKDOWN PARSER (THE FIX) ---
     function formatMessage(text) {
         if (!text) return '';
-        
-        // 1. Escape HTML first for security
-        let formatted = escapeHtml(text);
-        
-        // 2. Code Block Parser (Robust)
-        // Catches ``` followed by optional language name, then content, then ```
-        formatted = formatted.replace(/```[^\n]*\n([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-        
-        // 3. Inline code
-        formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
-        
-        // 4. Bold
-        formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-        
-        // 5. Italic
-        formatted = formatted.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-        
-        // 6. Headers
-        formatted = formatted.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-        formatted = formatted.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-        
-        // 7. Lists
-        formatted = formatted.replace(/^\s*[\-\*]\s+(.+)$/gm, '<li>$1</li>');
-        formatted = formatted.replace(/(<li>[\s\S]+?<\/li>)/gm, '<ul>$1</ul>');
-        formatted = formatted.replace(/<\/ul>\s*<ul>/g, ''); // Merge adjacent lists
-        
-        // 8. Paragraphs (Handle newlines outside of pre blocks)
-        // Split by pre blocks so we don't mess up the diagrams
-        let parts = formatted.split(/(<pre>[\s\S]*?<\/pre>)/g);
-        
-        formatted = parts.map(part => {
-            if (part.startsWith('<pre>')) {
-                return part; // Don't touch code blocks
-            } else {
-                // Convert newlines to breaks in regular text
-                return part.replace(/\n/g, '<br>');
-            }
-        }).join('');
-
-        return formatted;
+        return marked.parse(text);
     }
-
+    
     // --- LOGIN LOGIC ---
     function handleLogin() {
         const input = document.getElementById('team-input').value.trim();

@@ -111,10 +111,12 @@
                 if ($count >= 50) break;
                 
                 $parts = explode('|', $line);
-                if (count($parts) < 3) continue;
+                if (count($parts) >= 4) continue;
                 
                 $time = $parts[0];
-                $team = $parts[1];
+                $student = $parts[1];
+                $inTokens = $parts[2];
+                $outTokens = $parts[3];
                 // The rest is stats/prompts
                 $details = implode(' | ', array_slice($parts, 2));
 

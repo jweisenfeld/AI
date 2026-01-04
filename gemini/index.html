@@ -1,259 +1,128 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Bus Shelter Project</title>
+    <title>Pasco Engineering Assistant</title>
     <style>
         :root {
-            --primary: #4285f4; /* Google Blue */
-            --primary-dark: #3367d6;
-            --gemini-gradient: linear-gradient(90deg, #4b90ff, #ff5546);
+            --primary: #1a73e8;
             --bg: #f8f9fa;
-            --text: #202124;
             --border: #dadce0;
         }
-        
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        
+
         body {
-            font-family: 'Google Sans', -apple-system, sans-serif;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
             background: var(--bg);
-            color: var(--text);
             height: 100vh;
             display: flex;
             flex-direction: column;
+            margin: 0;
         }
 
-        /* --- LOGIN MODAL STYLES --- */
         .login-overlay {
             position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.8);
-            z-index: 9999;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 999;
             display: flex;
             align-items: center;
             justify-content: center;
-            backdrop-filter: blur(5px);
+            backdrop-filter: blur(4px);
         }
-        
+
         .login-card {
             background: white;
             padding: 40px;
-            border-radius: 16px;
-            width: 90%;
-            max-width: 400px;
+            border-radius: 12px;
+            width: 320px;
             text-align: center;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
         }
 
-        .login-card h2 { margin-bottom: 20px; color: var(--primary-dark); }
-        
         .login-input {
             width: 100%;
             padding: 12px;
-            margin-bottom: 20px;
-            border: 2px solid var(--border);
-            border-radius: 8px;
-            font-size: 1.1rem;
-            text-align: center;
-        }
-        
-        .login-btn {
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 12px 30px;
-            border-radius: 24px;
-            font-size: 1rem;
-            cursor: pointer;
-            font-weight: bold;
+            margin-bottom: 15px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            box-sizing: border-box;
         }
 
-        /* --- HEADER & LAYOUT --- */
         .header {
             background: white;
-            padding: 15px 20px;
+            padding: 10px 20px;
             border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        
-        .brand {
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .gemini-badge {
-            background: var(--gemini-gradient);
-            color: white;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: bold;
-        }
 
-        .team-display {
-            font-size: 0.9rem;
-            color: #5f6368;
-            background: #f1f3f4;
-            padding: 5px 12px;
-            border-radius: 16px;
-        }
-
-        .main-container { flex: 1; display: flex; overflow: hidden; }
-        
-        .chat-area {
+        .main-container {
             flex: 1;
             display: flex;
-            flex-direction: column;
-            max-width: 900px;
-            margin: 0 auto;
-            width: 100%;
-            background: white;
-            border-left: 1px solid var(--border);
-            border-right: 1px solid var(--border);
+            overflow: hidden;
+            justify-content: center;
         }
-        
-        .messages { flex: 1; overflow-y: auto; padding: 20px; }
-        
-        .message { margin-bottom: 20px; line-height: 1.6; }
-        .message.user { text-align: right; }
-        .message.assistant { text-align: left; }
-        
+
+        .chat-area {
+            width: 100%;
+            max-width: 900px;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            border-inline: 1px solid var(--border);
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
         .bubble {
-            display: inline-block;
             padding: 12px 18px;
             border-radius: 18px;
             max-width: 85%;
-            text-align: left;
+            margin-bottom: 15px;
+            line-height: 1.5;
         }
-        
+
         .user .bubble {
             background: var(--primary);
             color: white;
+            margin-left: auto;
             border-bottom-right-radius: 4px;
         }
-        
+
         .assistant .bubble {
             background: #f1f3f4;
-            color: var(--text);
             border-bottom-left-radius: 4px;
         }
 
-        /* --- INPUT AREA --- */
         .input-area {
             padding: 20px;
             border-top: 1px solid var(--border);
-            background: white;
         }
-        
-        .input-group {
-            display: flex;
-            gap: 10px;
-        }
-        
+
         textarea {
-            flex: 1;
+            width: 100%;
+            height: 60px;
             padding: 12px;
             border: 1px solid var(--border);
             border-radius: 8px;
             resize: none;
-            height: 50px;
             font-family: inherit;
         }
-        
-        button.send {
+
+        .btn {
             background: var(--primary);
             color: white;
             border: none;
-            padding: 0 25px;
-            border-radius: 8px;
+            padding: 10px 20px;
+            border-radius: 6px;
             cursor: pointer;
-        }
-
-        /* --- FOOTER --- */
-        .footer {
-            text-align: center;
-            font-size: 0.75rem;
-            color: #9aa0a6;
-            padding: 10px;
-            border-top: 1px solid var(--border);
-            background: #fff;
-        }
-
-        /* --- TYPING INDICATOR --- */
-        .typing-indicator {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 12px 18px;
-            background: #f1f3f4;
-            border-radius: 18px;
-            border-bottom-left-radius: 4px;
-            margin-bottom: 20px;
-        }
-
-        .typing-dot {
-            width: 6px;
-            height: 6px;
-            background: #9aa0a6;
-            border-radius: 50%;
-            animation: typing-bounce 1.4s infinite ease-in-out both;
-        }
-
-        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
-        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
-
-        @keyframes typing-bounce {
-            0%, 80%, 100% { transform: scale(0); }
-            40% { transform: scale(1); }
-        }
-
-        /* Gray out inputs when disabled */
-        textarea:disabled, button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            background-color: #eee;
-        }
-
-        /* --- MARKDOWN & CODE STYLES --- */
-        .bubble h1, .bubble h2 { font-size: 1.1em; margin-top: 10px; font-weight: 600; }
-        .bubble ul, .bubble ol { margin-left: 25px; margin-bottom: 10px; }
-        .bubble p { margin-bottom: 10px; }
-
-        /* INLINE CODE (like "this") */
-        .bubble code { 
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            background: rgba(0,0,0,0.06); 
-            padding: 2px 4px; 
-            border-radius: 4px; 
-            color: #c0392b;
-        }
-
-        /* BLOCK CODE (The ASCII Diagrams) */
-        .bubble pre {
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            background: #2d2d2d; /* Dark background like a terminal */
-            color: #f8f8f2;      /* Light text */
-            padding: 15px;
-            border-radius: 8px;
-            overflow-x: auto;    /* Allow scrolling if diagram is wide */
-            white-space: pre;    /* FORCE preservation of spaces/alignment */
-            margin: 10px 0;
-            line-height: 1.4;
-            border: 1px solid #444;
-        }
-        
-        .bubble pre code {
-            background: none;
-            color: inherit;
-            padding: 0;
-            border: none;
         }
     </style>
 </head>
@@ -262,326 +131,108 @@
 
     <div id="login-modal" class="login-overlay">
         <div class="login-card">
-            <h2>🚌 Engineering Grant Login</h2>
-            <p style="margin-bottom: 15px; color: #666;">Enter your Team Name to activate Gemini.</p>
-            <input type="text" id="team-input" class="login-input" placeholder="e.g., Team Alpha" autocomplete="off">
-            <button class="login-btn" onclick="handleLogin()">Start Designing</button>
+            <h2 style="color:var(--primary)">Engineering Portal</h2>
+            <input type="text" id="uid" class="login-input" placeholder="Student ID">
+            <input type="password" id="pwd" class="login-input" placeholder="Password">
+            <button class="btn" style="width:100%" onclick="handleLogin()">Login to Firm</button>
         </div>
     </div>
 
     <header class="header">
-        <div class="brand">
-            <span>Gemini Engineering Assistant</span>
-            <span class="gemini-badge">PRO</span>
-        </div>
-        
-        <div style="display: flex; gap: 10px; align-items: center;">
-            <select id="model-select" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
-                <option value="gemini-2.5-pro">Gemini 2.5 Pro (Latest)</option>
-                <option value="gemini-1.5-pro-002">Gemini 1.5 Pro (Stable)</option>
+        <div style="font-weight:bold">Pasco Infrastructure Project</div>
+        <div style="display:flex; gap:10px;">
+            <select id="phase-select" onchange="updateSystemPrompt()">
+                <option value="1">Phase 1: Preliminary/Ideation</option>
+                <option value="2" selected>Phase 2: Engineering (PMC 25)</option>
+                <option value="3">Phase 3: Environmental Review</option>
+                <option value="4">Phase 4: Utility & ROW</option>
+                <option value="5">Phase 5: Final Plan Prep</option>
+                <option value="6">Phase 6: Council Proposal</option>
             </select>
-            <div id="team-display" class="team-display">Not Logged In</div>
+            <div id="user-tag" style="background:#e8f0fe; padding:4px 10px; border-radius:15px; font-size:0.85em;">Not
+                Logged In</div>
         </div>
     </header>
 
     <div class="main-container">
         <div class="chat-area">
-            <div class="messages" id="messages">
-                <div class="message assistant">
-                    <div class="bubble">
-                        Hello! I am your Gemini-powered assistant. I can help with civil engineering specs, materials research, and cost estimation for your bus shelter project. What are we working on?
-                    </div>
-                </div>
-            </div>
-            
-            <div id="image-previews" style="padding: 0 20px; display: flex; gap: 10px;"></div>
-
+            <div class="messages" id="messages"></div>
             <div class="input-area">
-                <div class="input-group">
-                    <button onclick="document.getElementById('file-input').click()" style="background:none; border:none; cursor:pointer; font-size: 1.2rem;">📎</button>
-                    <input type="file" id="file-input" accept="image/*" multiple style="display:none" onchange="handleFiles(this)">
-                    
-                    <textarea id="user-input" placeholder="Ask about materials, dimensions, or costs..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); sendMessage();}"></textarea>
-                    
-                    <button class="send" onclick="sendMessage()">Send</button>
-                </div>
-                <div style="font-size: 0.8rem; color: #888; margin-top: 5px;">
-                    Model: Gemini 1.5 Pro • <span id="token-display">0 tokens used</span>
+                <textarea id="user-input" placeholder="Ask about engineering specs or PMC code..."
+                    onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); sendMessage();}"></textarea>
+                <div style="display:flex; justify-content: space-between; align-items: center; margin-top:10px;">
+                    <span id="status" style="font-size:0.8em; color:#666;">Ready</span>
+                    <button class="btn" id="send-btn" onclick="sendMessage()">Send to Project Lead</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <footer class="footer">
-        Pasco School District • <span id="version-id">Loading version...</span>
-    </footer>
+    <script>
+        let STUDENT_ID = null;
+        let STUDENT_NAME = null;
+        let HISTORY = [];
 
-<script>
-    let TEAM_ID = null;
-    let CONVERSATION = [];
-    let PENDING_IMAGES = [];
-    let TOKEN_COUNT = 0;
-
-    // NEW: Save to browser memory
-    function saveChat() {
-        const data = {
-            team: TEAM_ID,
-            history: CONVERSATION
-        };
-        localStorage.setItem('gemini_chat_history', JSON.stringify(data));
-    }
-
-    // NEW: Load from browser memory
-    function loadChat() {
-        const saved = localStorage.getItem('gemini_chat_history');
-        if (saved) {
-            const data = JSON.parse(saved);
-            // Only restore if it's the same team (optional safety)
-            if (data.team) {
-                TEAM_ID = data.team;
-                document.getElementById('team-input').value = TEAM_ID;
-                document.getElementById('team-display').textContent = "👤 " + TEAM_ID;
-                
-                // Restore messages
-                CONVERSATION = data.history;
-                // Clear default welcome message
-                document.getElementById('messages').innerHTML = '';
-                
-                // Re-render all bubbles
-                CONVERSATION.forEach(msg => {
-                    // Handle image arrays vs simple strings
-                    let textContent = "";
-                    if (Array.isArray(msg.content)) {
-                         // Find the text part
-                         const txt = msg.content.find(p => p.type === 'text');
-                         textContent = txt ? txt.text : "(Image)";
-                    } else {
-                        textContent = msg.content;
-                    }
-                    appendBubble(msg.role, textContent);
-                });
-            }
-        }
-    }
-
-    // --- UTILITY: HTML ESCAPE ---
-    function escapeHtml(text) {
-        if (!text) return text;
-        return text
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
-
-    function formatMessage(text) {
-        if (!text) return '';
-        return marked.parse(text);
-    }
-    
-    // --- LOGIN LOGIC ---
-    function handleLogin() {
-        const input = document.getElementById('team-input').value.trim();
-        if (input.length < 3) {
-            alert("Please enter a valid Team Name (at least 3 characters).");
-            return;
-        }
-        TEAM_ID = input;
-        document.getElementById('team-display').textContent = "👤 " + TEAM_ID;
-        document.getElementById('login-modal').style.display = 'none';
-        localStorage.setItem('gemini_team_id', TEAM_ID);
-    }
-
-    window.onload = () => {
-        // Load version footer
-        const vSpan = document.getElementById('version-id');
-        if (vSpan) vSpan.textContent = 'Build: ' + document.lastModified;
-
-        // NEW: Try to restore chat
-        loadChat();
-    };
-
-    // --- FILE HANDLING ---
-    function handleFiles(input) {
-        const files = input.files;
-        const previewArea = document.getElementById('image-previews');
-        
-        for (let file of files) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                PENDING_IMAGES.push({
-                    type: "image",
-                    source: {
-                        media_type: file.type,
-                        data: e.target.result.split(',')[1]
-                    }
-                });
-                
-                const img = document.createElement('img');
-                img.src = e.target.result;
-                img.style.height = '60px';
-                img.style.borderRadius = '5px';
-                img.style.border = '1px solid #ddd';
-                previewArea.appendChild(img);
-            };
-            reader.readAsDataURL(file);
-        }
-    }
-
-    // --- SEND MESSAGE ---
-    async function sendMessage() {
-        if (!TEAM_ID) { alert("Please refresh and log in."); return; }
-        
-        const txtInput = document.getElementById('user-input');
-        const sendBtn = document.querySelector('button.send');
-        const fileInput = document.getElementById('file-input');
-        const text = txtInput.value.trim();
-        const previewArea = document.getElementById('image-previews');
-        
-        if (!text && PENDING_IMAGES.length === 0) return;
-
-        // 1. LOCK UI
-        txtInput.disabled = true;
-        sendBtn.disabled = true;
-        fileInput.disabled = true;
-        sendBtn.textContent = "Thinking...";
-
-        // Build User Message
-        const userContent = [];
-        if (text) userContent.push({ type: "text", text: text });
-        PENDING_IMAGES.forEach(img => userContent.push(img));
-
-        // Display User Bubble
-        appendBubble('user', text || "(Image Upload)");
-        txtInput.value = '';
-        previewArea.innerHTML = '';
-        
-        CONVERSATION.push({ role: "user", content: userContent });
-        PENDING_IMAGES = [];
-
-        // 2. SHOW TYPING INDICATOR
-        const loadingBubbleId = 'loading-' + Date.now();
-        const loadingHTML = `
-            <div class="typing-indicator" id="${loadingBubbleId}">
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-            </div>`;
-        
-        const messagesDiv = document.getElementById('messages');
-        const loadingDiv = document.createElement('div');
-        loadingDiv.className = 'message assistant';
-        loadingDiv.innerHTML = loadingHTML;
-        messagesDiv.appendChild(loadingDiv);
-        loadingDiv.scrollIntoView({ behavior: 'smooth' });
-
-        try {
-            const modelSelect = document.getElementById('model-select');
-            const selectedModel = modelSelect ? modelSelect.value : 'gemini-1.5-pro-002';
-
-            const payload = {
-                team_id: TEAM_ID,
-                model: selectedModel,
-                system: "You are a helpful civil engineering assistant. Be concise.",
-                messages: CONVERSATION
-            };
-
-            const response = await fetch('api-proxy.php', {
+        async function handleLogin() {
+            const id = document.getElementById('uid').value;
+            const pw = document.getElementById('pwd').value;
+            const res = await fetch('api-proxy.php', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({ action: 'verify_login', student_id: id, password: pw })
+            });
+            const data = await res.json();
+            if (data.success) {
+                STUDENT_ID = id;
+                STUDENT_NAME = data.student_name;
+                document.getElementById('user-tag').textContent = "👤 " + STUDENT_NAME;
+                document.getElementById('login-modal').style.display = 'none';
+            } else { alert("Login Failed"); }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            appendBubble('user', text);
+            input.value = '';
+            HISTORY.push({ role: 'user', content: text });
+
+            const phase = document.getElementById('phase-select').value;
+            const prompts = {
+                "1": "You are a creative brainstorming assistant. Help students ideate.",
+                "2": "You are a Senior Engineer. Reference PMC Title 25. Focus on Topography, Site Plans, Setbacks, and Clear Vision Triangles. Be strict about measurements.",
+                "3": "Focus on SEPA requirements and environmental impact in Pasco's semi-arid climate.",
+                "4": "Focus on Utility Layouts and Right-of-Way (ROW) access per Pasco city standards.",
+                "5": "Help compile technical data into a final Engineering Plan.",
+                "6": "Professional mentor. Help prepare a presentation for Pasco City Council."
+            };
+
+            const res = await fetch('api-proxy.php', {
+                method: 'POST',
+                body: JSON.stringify({
+                    student_id: STUDENT_ID,
+                    student_name: STUDENT_NAME,
+                    model: 'gemini-1.5-pro',
+                    system: prompts[phase],
+                    messages: HISTORY
+                })
             });
 
-            const data = await response.json();
-
-            // 3. REMOVE INDICATOR
-            loadingDiv.remove();
-            
-            if (!response.ok || data.error) {
-                const errMsg = data.details || data.error || "Unknown Error";
-                appendBubble('assistant', `⚠️ <b>Error</b><br><code style="color:red">${errMsg}</code>`);
-            } else {
-                const reply = data.content[0].text;
-                appendBubble('assistant', reply);
-                CONVERSATION.push({ role: "assistant", content: reply });
-                
-                saveChat();
-
-                if (data.usage) {
-                    TOKEN_COUNT += (data.usage.input_tokens + data.usage.output_tokens);
-                    document.getElementById('token-display').textContent = TOKEN_COUNT + " tokens used";
-                }
-            }
-
-        } catch (e) {
-            loadingDiv.remove();
-            console.error(e);
-            appendBubble('assistant', `⚠️ <b>Network Error</b><br>Please try again.`);
-        } finally {
-            // 4. UNLOCK UI
-            txtInput.disabled = false;
-            sendBtn.disabled = false;
-            fileInput.disabled = false;
-            sendBtn.textContent = "Send";
-            txtInput.focus();
+            const data = await res.json();
+            const reply = data.candidates[0].content.parts[0].text;
+            appendBubble('assistant', reply);
+            HISTORY.push({ role: 'assistant', content: reply });
         }
-    }
 
-    function appendBubble(role, text) {
-        const div = document.createElement('div');
-        div.className = `message ${role}`;
-        
-        // 1. Format the text (Markdown, Code blocks, etc.)
-        let html = formatMessage(text);
-        
-        // 2. Add a Download Button ONLY for AI responses
-        let toolbar = '';
-        if (role === 'assistant') {
-            // We encode the text so we can pass it to the download function safely
-            const safeText = encodeURIComponent(text);
-            toolbar = `
-                <div style="margin-top: 8px; text-align: right;">
-                    <button onclick="downloadResponse(this)" style="
-                        background: none; border: 1px solid #ddd; border-radius: 4px; 
-                        padding: 4px 8px; cursor: pointer; color: #555; font-size: 0.8rem;
-                        display: inline-flex; align-items: center; gap: 4px;">
-                        💾 Save Report
-                    </button>
-                    <div class="raw-text" style="display:none;">${escapeHtml(text)}</div>
-                </div>`;
+        function appendBubble(role, text) {
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            div.innerHTML = `<div class="bubble">${marked.parse(text)}</div>`;
+            document.getElementById('messages').appendChild(div);
+            div.scrollIntoView({ behavior: 'smooth' });
         }
-            
-        div.innerHTML = `<div class="bubble">${html}</div>${toolbar}`;
-        
-        document.getElementById('messages').appendChild(div);
-        div.scrollIntoView({ behavior: 'smooth' });
-        return div;
-    }
-
-    // New Function: Handles the download
-    function downloadResponse(btn) {
-        // Find the hidden raw text next to the button
-        const container = btn.parentElement;
-        const rawHtml = container.querySelector('.raw-text').innerHTML;
-        
-        // Decode HTML entities (turn &lt; back into <) to get clean text
-        const txt = new DOMParser().parseFromString(rawHtml, 'text/html').documentElement.textContent;
-        
-        // Create filename based on timestamp
-        const filename = 'Gemini_Engineering_Report_' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-') + '.md';
-        
-        // Trigger download
-        const blob = new Blob([txt], { type: 'text/markdown' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-</script>
+    </script>
 </body>
+
 </html>

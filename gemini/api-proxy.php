@@ -1,7 +1,9 @@
 <?php
 /**
- * OHS Gemini Proxy - Enhanced Debug Version
+ * FINAL API PROXY - Orion High School Engineering Project
+ * Handles: Student Authentication, Gemini 1.5 Pro Multimodal, and Usage Logging
  */
+
 set_time_limit(300);
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
@@ -10,73 +12,111 @@ header('Content-Type: application/json; charset=utf-8');
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') { exit; }
 
+// --- 1. CONFIGURATION ---
 $accountRoot = dirname($_SERVER['DOCUMENT_ROOT']); 
 $secretsFile = $accountRoot . '/.secrets/geminikey.php';
 $studentFile = $accountRoot . '/.secrets/student_roster.csv'; 
 
-function send_error($message, $details = null) {
-    echo json_encode(['error' => $message, 'details' => $details]);
+function send_error($msg, $details = null) {
+    echo json_encode(['error' => $msg, 'details' => $details]);
     exit;
 }
 
-$data = json_decode(file_get_contents('php://input'), true);
-if (!$data) send_error("No JSON data received by PHP.");
+$rawInput = file_get_contents('php://input');
+$data = json_decode($rawInput, true);
+if (!$data) send_error("No valid JSON received.");
 
-// --- LOGIN ROUTE ---
+// --- 2. AUTHENTICATION ROUTE ---
 if (isset($data['action']) && $data['action'] === 'verify_login') {
-    if (!file_exists($studentFile)) send_error("Roster missing", "Path: $studentFile");
-    $handle = fopen($studentFile, "r");
-    fgetcsv($handle); 
-    while (($row = fgetcsv($handle, 1000, ",")) !== FALSE) {
-        if ($row[2] == $data['student_id'] && $row[6] == $data['password']) {
-            echo json_encode(['success' => true, 'student_name' => $row[9]]);
-            fclose($handle); exit;
+    if (!file_exists($studentFile)) send_error("Roster file not found.", "Path: $studentFile");
+    
+    $found = false;
+    if (($handle = fopen($studentFile, "r")) !== FALSE) {
+        fgetcsv($handle); // Skip header row
+        while (($row = fgetcsv($handle, 1000, ",")) !== FALSE) {
+            // Student ID = index 2 | Password = index 6 | Full Name = index 9
+            if (trim($row[2]) == trim($data['student_id']) && trim($row[6]) == trim($data['password'])) {
+                echo json_encode(['success' => true, 'student_name' => $row[9]]);
+                $found = true;
+                break;
+            }
         }
+        fclose($handle);
     }
-    fclose($handle);
-    send_error("Invalid credentials.");
+    if (!$found) send_error("Invalid Student ID or Password.");
+    exit;
 }
 
-// --- CHAT ROUTE ---
+// --- 3. GEMINI PROXY ROUTE ---
 if (!file_exists($secretsFile)) send_error("API Key file missing.");
 require_once($secretsFile); // Defines $GEMINI_API_KEY
 
-$model = $data['model'] ?? 'gemini-1.5-pro';
-$url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$GEMINI_API_KEY";
+if (!isset($GEMINI_API_KEY) || empty($GEMINI_API_KEY)) {
+    send_error("API Key is undefined in geminikey.php");
+}
 
-// Format Gemini Payload
-$contents = [];
+$model = $data['model'] ?? 'gemini-1.5-pro';
+$url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=" . trim($GEMINI_API_KEY);
+
+// Format Payload for Gemini Multimodal
+$geminiContents = [];
+$lastPromptSnippet = "";
+
 foreach ($data['messages'] as $m) {
     $role = ($m['role'] === 'assistant') ? 'model' : 'user';
-    // Handle complex content (text + images) or simple strings
+    $parts = [];
+
     if (is_string($m['content'])) {
-        $parts = [["text" => $m['content']]];
+        $parts[] = ["text" => $m['content']];
+        if ($role === 'user') $lastPromptSnippet = $m['content'];
     } else {
-        $parts = array_map(function($p) {
-            if (isset($p['text'])) return ["text" => $p['text']];
-            if (isset($p['source'])) return ["inlineData" => ["mimeType" => $p['source']['media_type'], "data" => $p['source']['data']]];
-            return null;
-        }, $m['content']);
+        foreach ($m['content'] as $p) {
+            if (isset($p['text'])) {
+                $parts[] = ["text" => $p['text']];
+                if ($role === 'user') $lastPromptSnippet = $p['text'];
+            }
+            if (isset($p['source'])) {
+                $parts[] = [
+                    "inlineData" => [
+                        "mimeType" => $p['source']['media_type'],
+                        "data" => $p['source']['data']
+                    ]
+                ];
+                if ($role === 'user') $lastPromptSnippet .= " [IMAGE] ";
+            }
+        }
     }
-    $contents[] = ["role" => $role, "parts" => array_filter($parts)];
+    $geminiContents[] = ["role" => $role, "parts" => $parts];
 }
 
 $payload = [
-    "contents" => $contents,
-    "systemInstruction" => ["parts" => [["text" => $data['system']]]]
+    "contents" => $geminiContents,
+    "systemInstruction" => [
+        "parts" => [["text" => $data['system'] ?? "You are a civil engineering mentor."]]
+    ]
 ];
 
+// Execute cURL
 $ch = curl_init($url);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
 curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+curl_setopt($ch, CURLOPT_POST, 1);
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
 $response = curl_exec($ch);
-$err = curl_error($ch);
+$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
 
-if ($err) send_error("CURL Error", $err);
+// --- 4. LOGGING FOR TEACHER DASHBOARD ---
+$responseData = json_decode($response, true);
+$usage = $responseData['usageMetadata'] ?? ['promptTokenCount' => 0, 'candidatesTokenCount' => 0];
+$studentName = $data['student_name'] ?? 'Unknown';
 
-// This is the important part: forward the actual Google response
+$cleanPrompt = str_replace(["\r", "\n", "|"], " ", substr($lastPromptSnippet, 0, 100));
+$logLine = date('Y-m-d H:i:s') . " | $studentName | $model | In:{$usage['promptTokenCount']} | Out:{$usage['candidatesTokenCount']} | PROMPT: $cleanPrompt\n";
+
+file_put_contents('gemini_usage.log', $logLine, FILE_APPEND);
+
+// Send response back to index.html
+http_response_code($httpCode);
 echo $response;

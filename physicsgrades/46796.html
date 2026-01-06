@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>What-if Grade Simulator — Gis, Nathan A. (46796)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 16px; }
+    .wrap { max-width: 980px; }
+    h2 { margin: 0 0 6px 0; }
+    .meta { color: #333; margin: 0 0 12px 0; }
+    .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 10px; background: #fff; }
+    .label { font-size: 12px; color: #555; }
+    .value { font-size: 22px; font-weight: 700; }
+    .small { font-size: 12px; color: #444; line-height: 1.35; }
+    canvas { background: #fff; border: 1px solid #eee; border-radius: 10px; }
+    .disclaimer { margin-top: 10px; font-size: 12px; color: #444; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
+    button { padding: 8px 10px; border-radius: 8px; border: 1px solid #ccc; background: #f8f8f8; cursor: pointer; }
+    button:hover { background: #f1f1f1; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h2 id="studentTitle"></h2>
+    <div class="meta">
+      Drag the red assessment points to see how your overall grade would change (what-if). The official grade line does not move.
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="label">Official current grade (from gradebook export)</div>
+        <div class="value" id="officialVal">—</div>
+      </div>
+      <div class="card">
+        <div class="label">What-if overall grade (dragging assessments)</div>
+        <div class="value" id="whatifVal">—</div>
+      </div>
+      <div class="card">
+        <div class="label">Change vs official</div>
+        <div class="value" id="deltaVal">—</div>
+      </div>
+    </div>
+
+    <div class="small">
+      Model used on this page:
+      overall = (0.90 × average(assessments)) + (0.10 × lesson_average) + constant_offset.<br/>
+      lesson_average and constant_offset are held fixed so the page starts at your official current grade.
+    </div>
+
+    <div class="row">
+      <button id="resetBtn" type="button">Reset dots</button>
+    </div>
+
+    <canvas id="chart" width="960" height="460"></canvas>
+
+    <div class="disclaimer">
+      This is a planning / visualization tool. It does not change your gradebook and may differ from the official calculation
+      if categories, dropped items, or extra credit rules change.
+    </div>
+  </div>
+
+  <!-- CDN dependencies (replace with local copies if your network blocks CDNs) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-dragdata@2.3.1"></script>
+
+  <script>
+    const pageData = {"studentId": "46796", "studentName": "Gis, Nathan A.", "assessmentLabels": ["Unit 1 Assessment", "Unit 2 Assessment", "Unit 5 Assessment", "Unit 13 Assessment", "Unit 3 Assessment", "Unit 4 Assessment"], "assessmentScores": [53.0, 73.0, 81.0, 46.0, 82.0, null], "officialPercent": 67.0, "lessonAvg": 50.0, "weights": {"assessments": 0.9, "lessons": 0.1}, "offset": 1.6999999999999886, "minPassing": 60.0};
+
+    // Try to register the drag plugin (safe across plugin build styles)
+    try { if (typeof ChartDragData !== "undefined") Chart.register(ChartDragData); } catch (e) {}
+
+    const labels = pageData.assessmentLabels.slice();
+    const originalScores = pageData.assessmentScores.slice();
+
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+    function avgNonNull(arr) {
+      const vals = arr.filter(v => typeof v === "number" && Number.isFinite(v));
+      if (!vals.length) return NaN;
+      return vals.reduce((a,b) => a+b, 0) / vals.length;
+    }
+
+    function computeWhatIf(scoresArr) {
+      const assessAvg = avgNonNull(scoresArr);
+      if (!Number.isFinite(assessAvg)) return NaN;
+      const wA = pageData.weights.assessments;
+      const wL = pageData.weights.lessons;
+      return (wA * assessAvg) + (wL * pageData.lessonAvg) + pageData.offset;
+    }
+
+    function fmtPct(v) {
+      if (!Number.isFinite(v)) return "—";
+      return v.toFixed(1) + "%";
+    }
+
+    function updateStats(scoresArr) {
+      const official = pageData.officialPercent;
+      const whatif = computeWhatIf(scoresArr);
+      document.getElementById("officialVal").textContent = fmtPct(official);
+      document.getElementById("whatifVal").textContent = fmtPct(whatif);
+      document.getElementById("deltaVal").textContent = Number.isFinite(whatif)
+        ? ((whatif - official >= 0 ? "+" : "") + (whatif - official).toFixed(1) + "%")
+        : "—";
+      return whatif;
+    }
+
+    document.getElementById("studentTitle").textContent = `${pageData.studentName} (${pageData.studentId})`;
+
+    const ctx = document.getElementById("chart").getContext("2d");
+
+    const assessmentDataset = {
+      label: "Assessments (drag red points)",
+      data: pageData.assessmentScores.map(v => (typeof v === "number" ? v : null)),
+      pointRadius: 6,
+      pointHoverRadius: 8,
+      showLine: true,
+      borderWidth: 2,
+      pointBackgroundColor: "red",
+      pointBorderColor: "red",
+      borderColor: "rgba(255,0,0,0.35)",
+      spanGaps: true,
+    };
+
+    const officialLine = {
+      label: "Official current grade",
+      data: labels.map(_ => pageData.officialPercent),
+      pointRadius: 0,
+      borderWidth: 2,
+      borderDash: [6, 4],
+      borderColor: "rgba(0,0,255,0.6)",
+    };
+
+    let currentWhatIf = updateStats(pageData.assessmentScores);
+
+    const whatIfLine = {
+      label: "What-if overall grade (updates as you drag)",
+      data: labels.map(_ => currentWhatIf),
+      pointRadius: 0,
+      borderWidth: 2,
+      borderDash: [2, 3],
+      borderColor: "rgba(0,128,0,0.7)",
+    };
+
+    const minPassLine = {
+      label: "Minimum passing grade (60%)",
+      data: labels.map(_ => pageData.minPassing),
+      pointRadius: 0,
+      borderWidth: 2,
+      borderDash: [1, 6],
+      borderColor: "rgba(255,165,0,0.9)",
+    };
+
+    const chart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [assessmentDataset, whatIfLine, officialLine, minPassLine]
+      },
+      options: {
+        responsive: true,
+        animation: false,
+        scales: {
+          y: {
+            min: 0,
+            max: 105,
+            title: { display: true, text: "Score (%)" }
+          },
+          x: {
+            ticks: {
+              autoSkip: false,
+              maxRotation: 60,
+              minRotation: 40
+            }
+          }
+        },
+        plugins: {
+          legend: { display: true },
+          dragData: {
+            round: 1,
+            showTooltip: true,
+            onDrag: function(e, datasetIndex, index, value) {
+              if (datasetIndex !== 0) return; // only assessments draggable
+              const v = clamp(value, 0, 105);
+              chart.data.datasets[0].data[index] = v;
+
+              const scoresArr = chart.data.datasets[0].data.map(x => (typeof x === "number" ? x : null));
+              const whatif = updateStats(scoresArr);
+              chart.data.datasets[1].data = labels.map(_ => whatif);
+              chart.update("none");
+            },
+          }
+        }
+      }
+    });
+
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      chart.data.datasets[0].data = originalScores.map(v => (typeof v === "number" ? v : null));
+      const scoresArr = chart.data.datasets[0].data.map(x => (typeof x === "number" ? x : null));
+      const whatif = updateStats(scoresArr);
+      chart.data.datasets[1].data = labels.map(_ => whatif);
+      chart.update("none");
+    });
+  </script>
+</body>
+</html>

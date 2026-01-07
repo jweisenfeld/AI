@@ -14,7 +14,8 @@
     .label { font-size: 12px; color: #555; }
     .value { font-size: 22px; font-weight: 700; }
     .small { font-size: 12px; color: #444; line-height: 1.35; }
-    canvas { background: #fff; border: 1px solid #eee; border-radius: 10px; width: 100% !important; height: 70vh !important; touch-action: manipulation; }
+    canvas { background: #fff; border: 1px solid #eee; border-radius: 10px; width: 100% !important; height: calc(100vh - 280px) !important; min-height: 340px; touch-action: manipulation; }
+    @media (orientation: landscape) { canvas { height: calc(100vh - 240px) !important; } }
     .disclaimer { margin-top: 10px; font-size: 12px; color: #444; }
     .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
     button { padding: 8px 10px; border-radius: 8px; border: 1px solid #ccc; background: #f8f8f8; cursor: pointer; }
@@ -110,18 +111,39 @@
 
     const ctx = document.getElementById("chart").getContext("2d");
 
-    const ghostDataset = {
-      label: "Original assessment scores",
-      data: originalScores.map(v => (typeof v === "number" ? v : null)),
-      showLine: false,
-      spanGaps: true,
-      pointRadius: 7,
-      pointHoverRadius: 7,
-      pointHitRadius: 0, // do not intercept touch/drag
-      borderWidth: 1,
-      pointBackgroundColor: "rgba(0,0,0,0)",
-      pointBorderColor: "rgba(0,0,0,0.35)",
-      borderColor: "rgba(0,0,0,0)",
+    const originalDotsPlugin = {
+      id: "originalDots",
+      // Draw reference (original) assessment points without adding a second dataset.
+      // A second dataset with overlapping points can "steal" hit-testing from the drag plugin.
+      afterDatasetsDraw(chart, args, pluginOptions) {
+        const meta = chart.getDatasetMeta(0); // assessments dataset index
+        if (!meta || !meta.data) return;
+        const yScale = chart.scales.y;
+        if (!yScale) return;
+
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.strokeStyle = "rgba(0,0,0,0.35)";
+        ctx.lineWidth = 2;
+
+        const r = 7;
+        for (let i = 0; i < originalScores.length; i++) {
+          const orig = originalScores[i];
+          if (typeof orig !== "number" || !Number.isFinite(orig)) continue;
+
+          const el = meta.data[i];
+          if (!el || typeof el.x !== "number") continue;
+
+          const x = el.x;
+          const y = yScale.getPixelForValue(orig);
+
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      }
     };
 
     const assessmentDataset = {
@@ -130,7 +152,7 @@
       // iPad-friendly touch targets:
       pointRadius: 10,
       pointHoverRadius: 14,
-      pointHitRadius: 22,
+      pointHitRadius: 34,
       showLine: true,
       borderWidth: 2,
       pointBackgroundColor: "red",
@@ -170,9 +192,10 @@
 
     const chart = new Chart(ctx, {
       type: "line",
+      plugins: [originalDotsPlugin],
       data: {
         labels,
-        datasets: [ghostDataset, assessmentDataset, whatIfLine, officialLine, minPassLine]
+        datasets: [assessmentDataset, whatIfLine, officialLine, minPassLine]
       },
       options: {
         responsive: true,
@@ -198,8 +221,8 @@
             enabled: true,
             callbacks: {
               label: function(ctx) {
-                // Draggable assessments dataset is index 1
-                if (ctx.datasetIndex === 1) {
+                // Draggable assessments dataset is index 0
+                if (ctx.datasetIndex === 0) {
                   const now = ctx.parsed.y;
                   const orig = originalScores[ctx.dataIndex];
                   const delta = (typeof orig === "number" && Number.isFinite(orig)) ? (now - orig) : NaN;
@@ -209,13 +232,9 @@
                   }
                   return "Assessment: " + now.toFixed(1) + "%" + d;
                 }
-                if (ctx.datasetIndex === 0) {
-                  const v = ctx.parsed.y;
-                  return "Original: " + v.toFixed(1) + "%";
-                }
-                if (ctx.datasetIndex === 2) return "What-if overall: " + ctx.parsed.y.toFixed(1) + "%";
-                if (ctx.datasetIndex === 3) return "Official overall: " + ctx.parsed.y.toFixed(1) + "%";
-                if (ctx.datasetIndex === 4) return "Minimum passing: " + ctx.parsed.y.toFixed(1) + "%";
+                if (ctx.datasetIndex === 1) return "What-if overall: " + ctx.parsed.y.toFixed(1) + "%";
+                if (ctx.datasetIndex === 2) return "Official overall: " + ctx.parsed.y.toFixed(1) + "%";
+                if (ctx.datasetIndex === 3) return "Minimum passing: " + ctx.parsed.y.toFixed(1) + "%";
                 return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(1) + "%";
               }
             }
@@ -228,13 +247,13 @@
             dragY: true,
             showTooltip: true,
             onDrag: function(e, datasetIndex, index, value) {
-              if (datasetIndex !== 1) return; // only assessments draggable
+              if (datasetIndex !== 0) return; // only assessments draggable
               const v = clamp(value, 0, 105);
-              chart.data.datasets[1].data[index] = v;
+              chart.data.datasets[0].data[index] = v;
 
-              const scoresArr = chart.data.datasets[1].data.map(x => (typeof x === "number" ? x : null));
+              const scoresArr = chart.data.datasets[0].data.map(x => (typeof x === "number" ? x : null));
               const whatif = updateStats(scoresArr);
-              chart.data.datasets[2].data = labels.map(_ => whatif);
+              chart.data.datasets[1].data = labels.map(_ => whatif);
               chart.update("none");
             },
           }
@@ -243,10 +262,10 @@
     });
 
     document.getElementById("resetBtn").addEventListener("click", () => {
-      chart.data.datasets[1].data = originalScores.map(v => (typeof v === "number" ? v : null));
-      const scoresArr = chart.data.datasets[1].data.map(x => (typeof x === "number" ? x : null));
+      chart.data.datasets[0].data = originalScores.map(v => (typeof v === "number" ? v : null));
+      const scoresArr = chart.data.datasets[0].data.map(x => (typeof x === "number" ? x : null));
       const whatif = updateStats(scoresArr);
-      chart.data.datasets[2].data = labels.map(_ => whatif);
+      chart.data.datasets[1].data = labels.map(_ => whatif);
       chart.update("none");
     });
   </script>

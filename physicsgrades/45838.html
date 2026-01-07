@@ -2,40 +2,43 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes, maximum-scale=5, viewport-fit=cover"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes, maximum-scale=5"/>
   <title>What-if Grade Simulator — Calderon Moran, Santiago (45838)</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 16px; }
-    .wrap { width: 100%; max-width: 1200px; margin: 0 auto; }
-    h2 { margin: 0 0 6px 0; }
-    .meta { color: #333; margin: 0 0 12px 0; }
-    .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
-    .card { border: 1px solid #ddd; border-radius: 10px; padding: 10px; background: #fff; }
-    .label { font-size: 12px; color: #555; }
-    .value { font-size: 22px; font-weight: 700; }
-    .small { font-size: 12px; color: #444; line-height: 1.35; }
-    canvas { background: #fff; border: 1px solid #eee; border-radius: 10px; width: 100% !important; height: calc(100vh - 280px) !important; min-height: 340px; touch-action: manipulation; }
-    @media (orientation: landscape) { canvas { height: calc(100vh - 240px) !important; } }
-    .disclaimer { margin-top: 10px; font-size: 12px; color: #444; }
-    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
-    button { padding: 8px 10px; border-radius: 8px; border: 1px solid #ccc; background: #f8f8f8; cursor: pointer; }
-    button:hover { background: #f1f1f1; }
+    :root { --card-border:#ddd; --muted:#444; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin:0; padding:14px; background:#fff; }
+    .wrap { max-width:1100px; margin:0 auto; }
+    h2 { margin:0 0 6px 0; font-size:20px; }
+    .meta { color:#333; margin:0 0 10px 0; line-height:1.35; font-size:13px; }
+    .cards { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; margin:10px 0; }
+    .card { border:1px solid var(--card-border); border-radius:12px; padding:10px; background:#fff; }
+    .label { font-size:12px; color:#555; margin-bottom:2px; }
+    .value { font-size:22px; font-weight:750; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:8px 0 10px 0; }
+    button { padding:8px 10px; border-radius:10px; border:1px solid #ccc; background:#f7f7f7; cursor:pointer; font-size:14px; }
+    button:hover { background:#f0f0f0; }
+    .small { font-size:12px; color:var(--muted); line-height:1.35; }
+    #chartWrap { width:100%; height:70vh; min-height:420px; border:1px solid #eee; border-radius:12px; overflow:hidden; background:#fff; position:relative; }
+    @media (orientation: landscape) and (max-width: 1400px) { #chartWrap { height:78vh; min-height:480px; } }
+    .tooltip { position:absolute; pointer-events:none; background:rgba(0,0,0,0.85); color:#fff; padding:6px 8px; border-radius:8px; font-size:12px; line-height:1.25; display:none; max-width:260px; }
+    .disclaimer { margin-top:10px; font-size:12px; color:var(--muted); line-height:1.35; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h2 id="studentTitle"></h2>
     <div class="meta">
-      Drag the red assessment points to see how your overall grade would change (what-if). The official grade line does not move.
+      Drag the assessment points to see how changes could impact the overall grade (what-if). The official grade line does not move.
+      Ghost rings show the starting score before you dragged.
     </div>
 
     <div class="cards">
       <div class="card">
-        <div class="label">Official current grade (from gradebook export)</div>
+        <div class="label">Official current grade (gradebook export)</div>
         <div class="value" id="officialVal">—</div>
       </div>
       <div class="card">
-        <div class="label">What-if overall grade (dragging assessments)</div>
+        <div class="label">What-if overall grade (updates as you drag)</div>
         <div class="value" id="whatifVal">—</div>
       </div>
       <div class="card">
@@ -44,230 +47,263 @@
       </div>
     </div>
 
-    <div class="small">
-      Model used on this page:
-      overall = (0.90 × average(assessments)) + (0.10 × lesson_average) + constant_offset.<br/>
-      lesson_average and constant_offset are held fixed so the page starts at your official current grade.
-    </div>
-
     <div class="row">
-      <button id="resetBtn" type="button">Reset dots</button>
+      <button id="resetBtn" type="button">Reset scores</button>
     </div>
 
-    <canvas id="chart"></canvas>
+    <div class="small">
+      Model on this page:
+      overall = (0.90 × average(assessments)) + (0.10 × lesson_average) + constant_offset.<br/>
+      lesson_average and constant_offset are held fixed so the page starts at the official current grade.
+    </div>
+
+    <div id="chartWrap">
+      <div id="tooltip" class="tooltip"></div>
+    </div>
 
     <div class="disclaimer">
-      This is a planning / visualization tool. It does not change your gradebook and may differ from the official calculation
-      if categories, dropped items, or extra credit rules change.
+      This is a planning / visualization tool. It does not change the gradebook. The gradebook is authoritative.
     </div>
   </div>
 
-  <!-- CDN dependencies (replace with local copies if your network blocks CDNs) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-dragdata@2.3.1"></script>
-
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script>
-    const pageData = {"studentId": "45838", "studentName": "Calderon Moran, Santiago", "assessmentLabels": ["Unit 1 Assessment", "Unit 2 Assessment", "Unit 5 Assessment", "Unit 13 Assessment", "Unit 3 Assessment", "Unit 4 Assessment"], "assessmentScores": [76.0, 88.0, 91.0, 81.0, 88.0, null], "officialPercent": 85.0, "lessonAvg": 66.66666666666667, "weights": {"assessments": 0.9, "lessons": 0.1}, "offset": 2.0133333333333354, "minPassing": 60.0};
+  const pageData = {"studentId": "45838", "studentName": "Calderon Moran, Santiago", "assessmentLabels": ["Unit 1 Assessment", "Unit 2 Assessment", "Unit 5 Assessment", "Unit 13 Assessment", "Unit 3 Assessment", "Unit 4 Assessment"], "originalScores": [76.0, 88.0, 91.0, 81.0, 88.0, null], "currentScores": [76.0, 88.0, 91.0, 81.0, 88.0, 0.0], "missingFlags": [false, false, false, false, false, true], "officialPercent": 85.0, "lessonAvg": 66.66666666666667, "weights": {"assessments": 0.9, "lessons": 0.1}, "offset": 2.0133333333333354, "minPassing": 60.0, "yMax": 105.0};
 
-    // Try to register the drag plugin (safe across plugin build styles)
-    try { if (typeof ChartDragData !== "undefined") Chart.register(ChartDragData); } catch (e) {}
+  const wrap = document.getElementById("chartWrap");
+  const tip  = document.getElementById("tooltip");
 
-    const labels = pageData.assessmentLabels.slice();
-    const originalScores = pageData.assessmentScores.slice();
+  function fmtPct(v){ return (Number.isFinite(v) ? v.toFixed(1) + "%" : "—"); }
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+  function avg(vals){
+    const xs = vals.filter(v => Number.isFinite(v));
+    return xs.length ? xs.reduce((a,b)=>a+b,0)/xs.length : NaN;
+  }
+  function computeWhatIf(scoresArr){
+    const assessAvg = avg(scoresArr);
+    if (!Number.isFinite(assessAvg)) return NaN;
+    return pageData.weights.assessments * assessAvg
+         + pageData.weights.lessons * pageData.lessonAvg
+         + pageData.offset;
+  }
+  function updateStats(){
+    const official = pageData.officialPercent;
+    const whatif = computeWhatIf(pageData.currentScores);
+    document.getElementById("officialVal").textContent = fmtPct(official);
+    document.getElementById("whatifVal").textContent  = fmtPct(whatif);
+    document.getElementById("deltaVal").textContent   = Number.isFinite(whatif)
+      ? ((whatif - official >= 0 ? "+" : "") + (whatif - official).toFixed(1) + "%")
+      : "—";
+    return whatif;
+  }
 
-    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  document.getElementById("studentTitle").textContent = pageData.studentName + " (" + pageData.studentId + ")";
 
-    function avgNonNull(arr) {
-      const vals = arr.filter(v => typeof v === "number" && Number.isFinite(v));
-      if (!vals.length) return NaN;
-      return vals.reduce((a,b) => a+b, 0) / vals.length;
+  function clientXY(se){
+    if (!se) return {x:0, y:0};
+    if (se.touches && se.touches.length) return {x: se.touches[0].clientX, y: se.touches[0].clientY};
+    if (se.changedTouches && se.changedTouches.length) return {x: se.changedTouches[0].clientX, y: se.changedTouches[0].clientY};
+    return {x: se.clientX || 0, y: se.clientY || 0};
+  }
+
+  function showTip(html, xPx, yPx){
+    tip.innerHTML = html;
+    tip.style.left = (xPx + 10) + "px";
+    tip.style.top  = (yPx + 10) + "px";
+    tip.style.display = "block";
+  }
+  function hideTip(){ tip.style.display = "none"; }
+
+  const margin = {top:18, right:18, bottom:92, left:54};
+
+  function render(){
+    // wipe any prior svg
+    Array.from(wrap.querySelectorAll("svg")).forEach(n => n.remove());
+
+    const rect = wrap.getBoundingClientRect();
+    const W = Math.max(320, rect.width);
+    const H = Math.max(420, rect.height);
+
+    const innerW = W - margin.left - margin.right;
+    const innerH = H - margin.top - margin.bottom;
+
+    const svg = d3.select(wrap).append("svg")
+      .attr("width", W)
+      .attr("height", H);
+
+    const g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    const x = d3.scalePoint()
+      .domain(pageData.assessmentLabels)
+      .range([0, innerW])
+      .padding(0.5);
+
+    const y = d3.scaleLinear()
+      .domain([0, pageData.yMax])
+      .range([innerH, 0]);
+
+    // axes
+    g.append("g")
+      .attr("transform", "translate(0," + innerH + ")")
+      .call(d3.axisBottom(x))
+      .selectAll("text")
+      .attr("transform", "rotate(50)")
+      .style("text-anchor", "start")
+      .style("font-size", "12px");
+
+    g.append("g").call(d3.axisLeft(y).ticks(7));
+
+    // y label
+    g.append("text")
+      .attr("x", -36).attr("y", -6)
+      .style("font-size", "12px")
+      .style("fill", "#333")
+      .text("Score (%)");
+
+    function hline(val, stroke, dash, label){
+      const yPos = y(val);
+      g.append("line")
+        .attr("x1", 0).attr("x2", innerW)
+        .attr("y1", yPos).attr("y2", yPos)
+        .attr("stroke", stroke).attr("stroke-width", 2)
+        .attr("stroke-dasharray", dash);
+
+      g.append("text")
+        .attr("x", 6).attr("y", yPos - 6)
+        .style("font-size", "12px")
+        .style("fill", stroke)
+        .text(label);
     }
 
-    function computeWhatIf(scoresArr) {
-      const assessAvg = avgNonNull(scoresArr);
-      if (!Number.isFinite(assessAvg)) return NaN;
-      const wA = pageData.weights.assessments;
-      const wL = pageData.weights.lessons;
-      return (wA * assessAvg) + (wL * pageData.lessonAvg) + pageData.offset;
+    hline(pageData.minPassing, "orange", "2,6", "minimum passing grade = " + pageData.minPassing + "%");
+    hline(pageData.officialPercent, "rgba(0,0,255,0.70)", "6,4", "official current grade");
+
+    // what-if line (dynamic)
+    let whatifVal = updateStats();
+    const whatIfLine = g.append("line")
+      .attr("x1", 0).attr("x2", innerW)
+      .attr("y1", y(whatifVal)).attr("y2", y(whatifVal))
+      .attr("stroke", "rgba(0,128,0,0.75)")
+      .attr("stroke-width", 2)
+      .attr("stroke-dasharray", "2,4");
+
+    const whatIfLabel = g.append("text")
+      .attr("x", 6).attr("y", y(whatifVal) - 6)
+      .style("font-size", "12px")
+      .style("fill", "rgba(0,128,0,0.85)")
+      .text("what-if overall grade");
+
+    const line = d3.line()
+      .x((d, i) => x(pageData.assessmentLabels[i]))
+      .y((d) => y(d))
+      .defined((d) => Number.isFinite(d));
+
+    const assessPath = g.append("path")
+      .datum(pageData.currentScores)
+      .attr("fill", "none")
+      .attr("stroke", "rgba(255,0,0,0.35)")
+      .attr("stroke-width", 2)
+      .attr("d", line);
+
+    // ghost rings at original scores (non-interactive)
+    g.selectAll("circle.ghost")
+      .data(pageData.originalScores.map((v, i) => ({v:v, i:i})).filter(d => Number.isFinite(d.v)))
+      .enter().append("circle")
+      .attr("class", "ghost")
+      .attr("cx", d => x(pageData.assessmentLabels[d.i]))
+      .attr("cy", d => y(d.v))
+      .attr("r", 9)
+      .attr("fill", "none")
+      .attr("stroke", "rgba(0,0,0,0.35)")
+      .attr("stroke-width", 2)
+      .style("pointer-events", "none");
+
+    // visible dots (red; missing are hollow)
+    const dots = g.selectAll("circle.dot")
+      .data(pageData.currentScores.map((v, i) => ({v:v, i:i})))
+      .enter().append("circle")
+      .attr("class", "dot")
+      .attr("cx", d => x(pageData.assessmentLabels[d.i]))
+      .attr("cy", d => y(d.v))
+      .attr("r", 7)
+      .attr("fill", d => pageData.missingFlags[d.i] ? "white" : "red")
+      .attr("stroke", "red")
+      .attr("stroke-width", 2)
+      .style("pointer-events", "none");
+
+    // hit targets (big, transparent, draggable)
+    const hits = g.selectAll("circle.hit")
+      .data(pageData.currentScores.map((v, i) => ({v:v, i:i})))
+      .enter().append("circle")
+      .attr("class", "hit")
+      .attr("cx", d => x(pageData.assessmentLabels[d.i]))
+      .attr("cy", d => y(d.v))
+      .attr("r", 26)
+      .attr("fill", "transparent")
+      .style("cursor", "ns-resize");
+
+    function refresh(){
+      dots.data(pageData.currentScores.map((v, i) => ({v:v, i:i})))
+        .attr("cy", d => y(d.v));
+
+      hits.data(pageData.currentScores.map((v, i) => ({v:v, i:i})))
+        .attr("cy", d => y(d.v));
+
+      assessPath.datum(pageData.currentScores).attr("d", line);
+
+      whatifVal = updateStats();
+      const yW = y(whatifVal);
+      whatIfLine.attr("y1", yW).attr("y2", yW);
+      whatIfLabel.attr("y", yW - 6);
     }
 
-    function fmtPct(v) {
-      if (!Number.isFinite(v)) return "—";
-      return v.toFixed(1) + "%";
-    }
+    const drag = d3.drag()
+      .on("start", (event, d) => {
+        try { if (event.sourceEvent) event.sourceEvent.preventDefault(); } catch (e) {}
+      })
+      .on("drag", (event, d) => {
+        const newY = clamp(event.y, 0, innerH);
+        const newVal = clamp(y.invert(newY), 0, pageData.yMax);
+        pageData.currentScores[d.i] = Math.round(newVal * 10) / 10;
 
-    function updateStats(scoresArr) {
-      const official = pageData.officialPercent;
-      const whatif = computeWhatIf(scoresArr);
-      document.getElementById("officialVal").textContent = fmtPct(official);
-      document.getElementById("whatifVal").textContent = fmtPct(whatif);
-      document.getElementById("deltaVal").textContent = Number.isFinite(whatif)
-        ? ((whatif - official >= 0 ? "+" : "") + (whatif - official).toFixed(1) + "%")
-        : "—";
-      return whatif;
-    }
-
-    document.getElementById("studentTitle").textContent = `${pageData.studentName} (${pageData.studentId})`;
-
-    const ctx = document.getElementById("chart").getContext("2d");
-
-    const originalDotsPlugin = {
-      id: "originalDots",
-      // Draw reference (original) assessment points without adding a second dataset.
-      // A second dataset with overlapping points can "steal" hit-testing from the drag plugin.
-      afterDatasetsDraw(chart, args, pluginOptions) {
-        const meta = chart.getDatasetMeta(0); // assessments dataset index
-        if (!meta || !meta.data) return;
-        const yScale = chart.scales.y;
-        if (!yScale) return;
-
-        const ctx = chart.ctx;
-        ctx.save();
-        ctx.strokeStyle = "rgba(0,0,0,0.35)";
-        ctx.lineWidth = 2;
-
-        const r = 7;
-        for (let i = 0; i < originalScores.length; i++) {
-          const orig = originalScores[i];
-          if (typeof orig !== "number" || !Number.isFinite(orig)) continue;
-
-          const el = meta.data[i];
-          if (!el || typeof el.x !== "number") continue;
-
-          const x = el.x;
-          const y = yScale.getPixelForValue(orig);
-
-          ctx.beginPath();
-          ctx.arc(x, y, r, 0, Math.PI * 2);
-          ctx.stroke();
+        const orig = pageData.originalScores[d.i];
+        const delta = Number.isFinite(orig) ? (pageData.currentScores[d.i] - orig) : NaN;
+        let deltaTxt = "";
+        if (Number.isFinite(delta)) {
+          deltaTxt = " (" + (delta >= 0 ? "+" : "") + delta.toFixed(1) + "%)";
         }
+        const label = pageData.assessmentLabels[d.i];
+        const html = "<b>" + label + "</b><br/>" + pageData.currentScores[d.i].toFixed(1) + "%" + deltaTxt;
 
-        ctx.restore();
-      }
+        const xy = clientXY(event.sourceEvent);
+        const wrapRect = wrap.getBoundingClientRect();
+        showTip(html, xy.x - wrapRect.left, xy.y - wrapRect.top);
+
+        refresh();
+      })
+      .on("end", () => { hideTip(); });
+
+    hits.call(drag);
+
+    document.getElementById("resetBtn").onclick = () => {
+      pageData.currentScores = pageData.originalScores.map((v, i) => (Number.isFinite(v) ? v : 0.0));
+      refresh();
     };
 
-    const assessmentDataset = {
-      label: "Assessments (drag red points)",
-      data: pageData.assessmentScores.map(v => (typeof v === "number" ? v : null)),
-      // iPad-friendly touch targets:
-      pointRadius: 10,
-      pointHoverRadius: 14,
-      pointHitRadius: 34,
-      showLine: true,
-      borderWidth: 2,
-      pointBackgroundColor: "red",
-      pointBorderColor: "red",
-      borderColor: "rgba(255,0,0,0.35)",
-      spanGaps: true,
-    };
+    return {svg: svg};
+  }
 
-    const officialLine = {
-      label: "Official current grade",
-      data: labels.map(_ => pageData.officialPercent),
-      pointRadius: 0,
-      borderWidth: 2,
-      borderDash: [6, 4],
-      borderColor: "rgba(0,0,255,0.6)",
-    };
-
-    let currentWhatIf = updateStats(pageData.assessmentScores);
-
-    const whatIfLine = {
-      label: "What-if overall grade (updates as you drag)",
-      data: labels.map(_ => currentWhatIf),
-      pointRadius: 0,
-      borderWidth: 2,
-      borderDash: [2, 3],
-      borderColor: "rgba(0,128,0,0.7)",
-    };
-
-    const minPassLine = {
-      label: "Minimum passing grade (60%)",
-      data: labels.map(_ => pageData.minPassing),
-      pointRadius: 0,
-      borderWidth: 2,
-      borderDash: [1, 6],
-      borderColor: "rgba(255,165,0,0.9)",
-    };
-
-    const chart = new Chart(ctx, {
-      type: "line",
-      plugins: [originalDotsPlugin],
-      data: {
-        labels,
-        datasets: [assessmentDataset, whatIfLine, officialLine, minPassLine]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: "nearest", intersect: true },
-        animation: false,
-        scales: {
-          y: {
-            min: 0,
-            max: 105,
-            title: { display: true, text: "Score (%)" }
-          },
-          x: {
-            ticks: {
-              autoSkip: false,
-              maxRotation: 60,
-              minRotation: 40
-            }
-          }
-        },
-        plugins: {
-          tooltip: {
-            enabled: true,
-            callbacks: {
-              label: function(ctx) {
-                // Draggable assessments dataset is index 0
-                if (ctx.datasetIndex === 0) {
-                  const now = ctx.parsed.y;
-                  const orig = originalScores[ctx.dataIndex];
-                  const delta = (typeof orig === "number" && Number.isFinite(orig)) ? (now - orig) : NaN;
-                  let d = "";
-                  if (Number.isFinite(delta)) {
-                    d = " (" + (delta >= 0 ? "+" : "") + delta.toFixed(1) + "%)";
-                  }
-                  return "Assessment: " + now.toFixed(1) + "%" + d;
-                }
-                if (ctx.datasetIndex === 1) return "What-if overall: " + ctx.parsed.y.toFixed(1) + "%";
-                if (ctx.datasetIndex === 2) return "Official overall: " + ctx.parsed.y.toFixed(1) + "%";
-                if (ctx.datasetIndex === 3) return "Minimum passing: " + ctx.parsed.y.toFixed(1) + "%";
-                return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(1) + "%";
-              }
-            }
-          },
-          legend: { display: true },
-
-          dragData: {
-            round: 1,
-            dragX: false,
-            dragY: true,
-            showTooltip: true,
-            onDrag: function(e, datasetIndex, index, value) {
-              if (datasetIndex !== 0) return; // only assessments draggable
-              const v = clamp(value, 0, 105);
-              chart.data.datasets[0].data[index] = v;
-
-              const scoresArr = chart.data.datasets[0].data.map(x => (typeof x === "number" ? x : null));
-              const whatif = updateStats(scoresArr);
-              chart.data.datasets[1].data = labels.map(_ => whatif);
-              chart.update("none");
-            },
-          }
-        }
-      }
+  if (typeof d3 === "undefined") {
+    wrap.innerHTML = "D3 failed to load. If your network blocks CDNs, run with --d3 local and place d3.v7.min.js in the output folder.";
+  } else {
+    render();
+    // debounced rerender on resize
+    let t = null;
+    window.addEventListener("resize", () => {
+      clearTimeout(t);
+      t = setTimeout(() => { hideTip(); render(); }, 120);
     });
-
-    document.getElementById("resetBtn").addEventListener("click", () => {
-      chart.data.datasets[0].data = originalScores.map(v => (typeof v === "number" ? v : null));
-      const scoresArr = chart.data.datasets[0].data.map(x => (typeof x === "number" ? x : null));
-      const whatif = updateStats(scoresArr);
-      chart.data.datasets[1].data = labels.map(_ => whatif);
-      chart.update("none");
-    });
+  }
   </script>
 </body>
 </html>

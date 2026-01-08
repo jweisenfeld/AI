@@ -8,6 +8,8 @@
  * Usage: <img src="https://psd1.net/email-tracking/track.php?id=EMAIL_ID" width="1" height="1" />
  */
 
+date_default_timezone_set('America/Los_Angeles');  // Pacific Time
+
 // Database configuration
 $DB_HOST = 'localhost';
 $DB_NAME = 'fikrttmy_email_tracking';

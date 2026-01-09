@@ -3,34 +3,28 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes, maximum-scale=5"/>
-  <title>What-if Grade Simulator — Fajardo Inzunza, Ariana M. (45866)</title>
+  <title>Physics Grade History — Fajardo Inzunza, Ariana M. (45866)</title>
   <style>
-    :root { --card-border:#ddd; --muted:#444; }
+    :root { --card-border:#ddd; --muted:#666; --blue:#2563eb; --red:#dc2626; --brown:#92400e; }
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin:0; padding:14px; background:#fff; }
-    .wrap { max-width:1100px; margin:0 auto; }
-    h2 { margin:0 0 6px 0; font-size:20px; }
-    .meta { color:#333; margin:0 0 10px 0; line-height:1.35; font-size:13px; }
-    .cards { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; margin:10px 0; }
-    .card { border:1px solid var(--card-border); border-radius:12px; padding:10px; background:#fff; }
+    .wrap { max-width:1200px; margin:0 auto; }
+    h2 { margin:0 0 8px 0; font-size:22px; font-weight:bold; }
+    .cards { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; margin:12px 0; }
+    .card { border:1px solid var(--card-border); border-radius:10px; padding:10px; background:#fff; }
     .label { font-size:12px; color:#555; margin-bottom:2px; }
     .value { font-size:22px; font-weight:750; }
-    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:8px 0 10px 0; }
-    button { padding:8px 10px; border-radius:10px; border:1px solid #ccc; background:#f7f7f7; cursor:pointer; font-size:14px; }
+    .row { display:flex; gap:10px; align-items:center; margin:10px 0; }
+    button { padding:8px 12px; border-radius:8px; border:1px solid #ccc; background:#f7f7f7; cursor:pointer; font-size:14px; }
     button:hover { background:#f0f0f0; }
-    .small { font-size:12px; color:var(--muted); line-height:1.35; }
-    #chartWrap { width:100%; height:70vh; min-height:420px; border:1px solid #eee; border-radius:12px; overflow:hidden; background:#fff; position:relative; }
-    @media (orientation: landscape) and (max-width: 1400px) { #chartWrap { height:78vh; min-height:480px; } }
-    .tooltip { position:absolute; pointer-events:none; background:rgba(0,0,0,0.85); color:#fff; padding:6px 8px; border-radius:8px; font-size:12px; line-height:1.25; display:none; max-width:260px; }
-    .disclaimer { margin-top:10px; font-size:12px; color:var(--muted); line-height:1.35; }
+    #chartWrap { width:100%; height:65vh; min-height:500px; border:1px solid #ddd; border-radius:10px; overflow:hidden; background:#fff; position:relative; }
+    .footnote { margin-top:12px; padding:10px; background:#f9f9f9; border-left:3px solid var(--blue); font-size:13px; color:var(--muted); line-height:1.5; }
+    #dragLabel { position:absolute; bottom:10px; right:10px; background:rgba(0,0,0,0.85); color:#fff; padding:8px 12px; border-radius:8px; font-size:14px; display:none; pointer-events:none; z-index:10; }
+    @media (max-width: 900px) { .cards { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h2 id="studentTitle"></h2>
-    <div class="meta">
-      Drag the assessment points to see how changes could impact the overall grade (what-if). The official grade line does not move.
-      Ghost rings show the starting score before you dragged.
-    </div>
+    <h2 id="studentTitle">Physics Grade History: 45866</h2>
 
     <div class="cards">
       <div class="card">
@@ -51,27 +45,23 @@
       <button id="resetBtn" type="button">Reset scores</button>
     </div>
 
-    <div class="small">
-      Model on this page:
-      overall = (0.90 × average(assessments)) + (0.10 × lesson_average) + constant_offset.<br/>
-      lesson_average and constant_offset are held fixed so the page starts at the official current grade.
-    </div>
-
     <div id="chartWrap">
-      <div id="tooltip" class="tooltip"></div>
+      <div id="dragLabel"></div>
     </div>
 
-    <div class="disclaimer">
-      This is a planning / visualization tool. It does not change the gradebook. The gradebook is authoritative.
+    <div class="footnote">
+      <strong>Grade calculation model:</strong> overall = (0.90 × average(assessments)) + (0.10 × lesson_average) + constant_offset.
+      The lesson average and constant offset are held fixed so the page starts at your official current grade.
+      Your current grade is the average of your assessment grades (the red dots).
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script>
-  const pageData = {"studentId": "45866", "studentName": "Fajardo Inzunza, Ariana M.", "assessmentLabels": ["Unit 1 Assessment", "Unit 2 Assessment", "Unit 5 Assessment", "Unit 13 Assessment", "Unit 3 Assessment", "Unit 4 Assessment"], "originalScores": [75.0, 66.0, 47.0, 87.0, 72.0, null], "currentScores": [75.0, 66.0, 47.0, 87.0, 72.0, 0.0], "missingFlags": [false, false, false, false, false, true], "officialPercent": 72.0, "lessonAvg": 95.75, "weights": {"assessments": 0.9, "lessons": 0.1}, "offset": -0.0350000000000108, "minPassing": 60.0, "yMax": 105.0};
+  const pageData = {"studentId": "45866", "studentName": "Fajardo Inzunza, Ariana M.", "milestones": [{"date": "2025-10-10T00:00:00", "label": "Unit 1 Assessment"}, {"date": "2025-10-24T00:00:00", "label": "Unit 2 Assessment"}, {"date": "2025-11-14T00:00:00", "label": "Unit 5 Assessment"}, {"date": "2025-12-05T00:00:00", "label": "Unit 13 Assessment"}, {"date": "2025-12-16T00:00:00", "label": "Unit 3 Assessment"}, {"date": "2026-01-20T00:00:00", "label": "Unit 4 Assessment"}], "otherMilestones": [{"date": "2026-01-23T00:00:00", "label": "END OF SEMESTER 1 - 2026-01-23"}], "history": [], "originalScores": [75.0, 66.0, 47.0, 87.0, 72.0, null], "currentScores": [75.0, 66.0, 47.0, 87.0, 72.0, 0.0], "missingFlags": [false, false, false, false, false, true], "officialPercent": 72.0, "lessonAvg": 95.75, "weights": {"assessments": 0.9, "lessons": 0.1}, "offset": -0.0350000000000108, "gradeLines": [{"value": 60, "label": "2.0"}, {"value": 70, "label": "2.3"}, {"value": 75, "label": "2.7"}, {"value": 80, "label": "3"}, {"value": 85, "label": "3.3"}, {"value": 90, "label": "3.7"}, {"value": 95, "label": "4.0"}]};
 
   const wrap = document.getElementById("chartWrap");
-  const tip  = document.getElementById("tooltip");
+  const dragLabel = document.getElementById("dragLabel");
 
   function fmtPct(v){ return (Number.isFinite(v) ? v.toFixed(1) + "%" : "—"); }
   function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
@@ -80,7 +70,9 @@
     return xs.length ? xs.reduce((a,b)=>a+b,0)/xs.length : NaN;
   }
   function computeWhatIf(scoresArr){
-    const assessAvg = avg(scoresArr);
+    // Only include scores that are not missing (filter out by checking missingFlags)
+    const validScores = scoresArr.filter((v, i) => !pageData.missingFlags[i] && Number.isFinite(v));
+    const assessAvg = validScores.length > 0 ? avg(validScores) : NaN;
     if (!Number.isFinite(assessAvg)) return NaN;
     return pageData.weights.assessments * assessAvg
          + pageData.weights.lessons * pageData.lessonAvg
@@ -97,164 +89,257 @@
     return whatif;
   }
 
-  document.getElementById("studentTitle").textContent = pageData.studentName + " (" + pageData.studentId + ")";
-
-  function clientXY(se){
-    if (!se) return {x:0, y:0};
-    if (se.touches && se.touches.length) return {x: se.touches[0].clientX, y: se.touches[0].clientY};
-    if (se.changedTouches && se.changedTouches.length) return {x: se.changedTouches[0].clientX, y: se.changedTouches[0].clientY};
-    return {x: se.clientX || 0, y: se.clientY || 0};
-  }
-
-  function showTip(html, xPx, yPx){
-    tip.innerHTML = html;
-    tip.style.left = (xPx + 10) + "px";
-    tip.style.top  = (yPx + 10) + "px";
-    tip.style.display = "block";
-  }
-  function hideTip(){ tip.style.display = "none"; }
-
-  const margin = {top:18, right:18, bottom:92, left:54};
+  const margin = {top:20, right:20, bottom:100, left:60};
 
   function render(){
-    // wipe any prior svg
     Array.from(wrap.querySelectorAll("svg")).forEach(n => n.remove());
 
     const rect = wrap.getBoundingClientRect();
-    const W = Math.max(320, rect.width);
-    const H = Math.max(420, rect.height);
+    const W = Math.max(400, rect.width);
+    const H = Math.max(500, rect.height);
 
     const innerW = W - margin.left - margin.right;
     const innerH = H - margin.top - margin.bottom;
 
-    const svg = d3.select(wrap).append("svg")
+    const svg = d3.select(wrap).insert("svg", "#dragLabel")
       .attr("width", W)
       .attr("height", H);
 
     const g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-    const x = d3.scalePoint()
-      .domain(pageData.assessmentLabels)
-      .range([0, innerW])
-      .padding(0.5);
+    // X scale: time-based for historical data
+    const allDates = [
+      ...pageData.history.map(d => new Date(d.date)),
+      ...pageData.milestones.map(m => new Date(m.date)),
+      ...pageData.otherMilestones.map(m => new Date(m.date))
+    ];
+    const xExtent = d3.extent(allDates);
+    const x = d3.scaleTime()
+      .domain(xExtent)
+      .range([0, innerW]);
 
+    // Y scale: grades 0-105
     const y = d3.scaleLinear()
-      .domain([0, pageData.yMax])
+      .domain([0, 105])
       .range([innerH, 0]);
 
-    // axes
+    // Axes
     g.append("g")
       .attr("transform", "translate(0," + innerH + ")")
-      .call(d3.axisBottom(x))
+      .call(d3.axisBottom(x).ticks(8))
       .selectAll("text")
-      .attr("transform", "rotate(50)")
+      .attr("transform", "rotate(45)")
       .style("text-anchor", "start")
-      .style("font-size", "12px");
+      .style("font-size", "11px");
 
-    g.append("g").call(d3.axisLeft(y).ticks(7));
+    g.append("g").call(d3.axisLeft(y).ticks(10));
 
-    // y label
+    // Y-axis label
     g.append("text")
-      .attr("x", -36).attr("y", -6)
-      .style("font-size", "12px")
+      .attr("x", -40).attr("y", -8)
+      .style("font-size", "13px")
       .style("fill", "#333")
-      .text("Score (%)");
+      .text("Grade (%)");
 
-    function hline(val, stroke, dash, label){
-      const yPos = y(val);
+    // Frame lines at 0% and 100% (black solid)
+    g.append("line")
+      .attr("x1", 0).attr("x2", innerW)
+      .attr("y1", y(0)).attr("y2", y(0))
+      .attr("stroke", "black")
+      .attr("stroke-width", 2);
+
+    g.append("line")
+      .attr("x1", 0).attr("x2", innerW)
+      .attr("y1", y(100)).attr("y2", y(100))
+      .attr("stroke", "black")
+      .attr("stroke-width", 2);
+
+    // Standards-based grade lines (brown dotted)
+    pageData.gradeLines.forEach(gl => {
+      const yPos = y(gl.value);
       g.append("line")
         .attr("x1", 0).attr("x2", innerW)
         .attr("y1", yPos).attr("y2", yPos)
-        .attr("stroke", stroke).attr("stroke-width", 2)
-        .attr("stroke-dasharray", dash);
+        .attr("stroke", "#92400e")
+        .attr("stroke-width", 1.5)
+        .attr("stroke-dasharray", "3,3");
+
+      // Label at left, center, right
+      [0.02, 0.5, 0.98].forEach(xPos => {
+        const ha = xPos < 0.1 ? "start" : (xPos === 0.5 ? "middle" : "end");
+        g.append("text")
+          .attr("x", xPos * innerW)
+          .attr("y", yPos - 2)
+          .style("font-size", "10px")
+          .style("fill", "#92400e")
+          .style("text-anchor", ha)
+          .text(gl.label);
+      });
+    });
+
+    // Assessment milestone lines (blue dashed)
+    pageData.milestones.forEach(m => {
+      const xPos = x(new Date(m.date));
+      g.append("line")
+        .attr("x1", xPos).attr("x2", xPos)
+        .attr("y1", 0).attr("y2", innerH)
+        .attr("stroke", "#1d4ed8")
+        .attr("stroke-width", 1)
+        .attr("stroke-dasharray", "4,4");
 
       g.append("text")
-        .attr("x", 6).attr("y", yPos - 6)
-        .style("font-size", "12px")
-        .style("fill", stroke)
-        .text(label);
+        .attr("x", xPos)
+        .attr("y", innerH + 5)
+        .attr("transform", "rotate(90," + xPos + "," + (innerH + 5) + ")")
+        .style("font-size", "9px")
+        .style("fill", "#1d4ed8")
+        .style("text-anchor", "start")
+        .text(m.label);
+    });
+
+    // Other milestone lines (blue dashed, no assessment dots)
+    pageData.otherMilestones.forEach(m => {
+      const xPos = x(new Date(m.date));
+      g.append("line")
+        .attr("x1", xPos).attr("x2", xPos)
+        .attr("y1", 0).attr("y2", innerH)
+        .attr("stroke", "#1d4ed8")
+        .attr("stroke-width", 1)
+        .attr("stroke-dasharray", "4,4");
+
+      g.append("text")
+        .attr("x", xPos)
+        .attr("y", innerH + 5)
+        .attr("transform", "rotate(90," + xPos + "," + (innerH + 5) + ")")
+        .style("font-size", "9px")
+        .style("fill", "#1d4ed8")
+        .style("text-anchor", "start")
+        .text(m.label);
+    });
+
+    // Historical grade line (blue solid)
+    if (pageData.history.length > 0) {
+      const line = d3.line()
+        .x(d => x(new Date(d.date)))
+        .y(d => y(d.percent));
+
+      g.append("path")
+        .datum(pageData.history)
+        .attr("fill", "none")
+        .attr("stroke", "#2563eb")
+        .attr("stroke-width", 2)
+        .attr("d", line);
+
+      // Historical points (small blue circles)
+      g.selectAll("circle.histPt")
+        .data(pageData.history)
+        .enter().append("circle")
+        .attr("class", "histPt")
+        .attr("cx", d => x(new Date(d.date)))
+        .attr("cy", d => y(d.percent))
+        .attr("r", 4)
+        .attr("fill", "#2563eb");
+
+      // Label the last historical point
+      const lastHist = pageData.history[pageData.history.length - 1];
+      g.append("text")
+        .attr("x", x(new Date(lastHist.date)))
+        .attr("y", y(lastHist.percent) - 8)
+        .style("font-size", "11px")
+        .style("fill", "#1e40af")
+        .style("text-anchor", "middle")
+        .text(lastHist.percent.toFixed(1) + "%");
     }
 
-    hline(pageData.minPassing, "orange", "2,6", "minimum passing grade = " + pageData.minPassing + "%");
-    hline(pageData.officialPercent, "rgba(0,0,255,0.70)", "6,4", "official current grade");
-
-    // what-if line (dynamic)
+    // Current grade point (dynamic, moves with what-if)
     let whatifVal = updateStats();
-    const whatIfLine = g.append("line")
-      .attr("x1", 0).attr("x2", innerW)
-      .attr("y1", y(whatifVal)).attr("y2", y(whatifVal))
-      .attr("stroke", "rgba(0,128,0,0.75)")
+    const lastHistDate = pageData.history.length > 0
+      ? new Date(pageData.history[pageData.history.length - 1].date)
+      : new Date();
+
+    const currentGradeLine = g.append("line")
+      .attr("x1", x(lastHistDate))
+      .attr("x2", x(lastHistDate))
+      .attr("y1", y(pageData.officialPercent))
+      .attr("y2", y(whatifVal))
+      .attr("stroke", "#2563eb")
       .attr("stroke-width", 2)
-      .attr("stroke-dasharray", "2,4");
+      .attr("stroke-dasharray", "3,3")
+      .style("display", Math.abs(whatifVal - pageData.officialPercent) > 0.1 ? "block" : "none");
 
-    const whatIfLabel = g.append("text")
-      .attr("x", 6).attr("y", y(whatifVal) - 6)
-      .style("font-size", "12px")
-      .style("fill", "rgba(0,128,0,0.85)")
-      .text("what-if overall grade");
+    const currentGradeDot = g.append("circle")
+      .attr("class", "currentGrade")
+      .attr("cx", x(lastHistDate))
+      .attr("cy", y(whatifVal))
+      .attr("r", 6)
+      .attr("fill", "#2563eb")
+      .attr("stroke", "#1e40af")
+      .attr("stroke-width", 2);
 
-    const line = d3.line()
-      .x((d, i) => x(pageData.assessmentLabels[i]))
-      .y((d) => y(d))
-      .defined((d) => Number.isFinite(d));
+    const currentGradeLabel = g.append("text")
+      .attr("x", x(lastHistDate))
+      .attr("y", y(whatifVal) - 10)
+      .style("font-size", "11px")
+      .style("fill", "#1e40af")
+      .style("font-weight", "bold")
+      .style("text-anchor", "middle")
+      .text(whatifVal.toFixed(1) + "%");
 
-    const assessPath = g.append("path")
-      .datum(pageData.currentScores)
-      .attr("fill", "none")
-      .attr("stroke", "rgba(255,0,0,0.35)")
-      .attr("stroke-width", 2)
-      .attr("d", line);
-
-    // ghost rings at original scores (non-interactive)
+    // Assessment dots (draggable red dots on milestone dates)
+    // Ghost rings at original positions (non-interactive)
     g.selectAll("circle.ghost")
-      .data(pageData.originalScores.map((v, i) => ({v:v, i:i})).filter(d => Number.isFinite(d.v)))
+      .data(pageData.milestones.map((m, i) => ({m:m, i:i, v:pageData.originalScores[i]})).filter(d => Number.isFinite(d.v)))
       .enter().append("circle")
       .attr("class", "ghost")
-      .attr("cx", d => x(pageData.assessmentLabels[d.i]))
+      .attr("cx", d => x(new Date(d.m.date)))
       .attr("cy", d => y(d.v))
       .attr("r", 9)
       .attr("fill", "none")
-      .attr("stroke", "rgba(0,0,0,0.35)")
+      .attr("stroke", "rgba(0,0,0,0.3)")
       .attr("stroke-width", 2)
       .style("pointer-events", "none");
 
-    // visible dots (red; missing are hollow)
-    const dots = g.selectAll("circle.dot")
-      .data(pageData.currentScores.map((v, i) => ({v:v, i:i})))
+    // Visible assessment dots (only show if not missing)
+    const assessDots = g.selectAll("circle.assessDot")
+      .data(pageData.milestones.map((m, i) => ({m:m, i:i, v:pageData.currentScores[i], missing: pageData.missingFlags[i]})))
       .enter().append("circle")
-      .attr("class", "dot")
-      .attr("cx", d => x(pageData.assessmentLabels[d.i]))
+      .attr("class", "assessDot")
+      .attr("cx", d => x(new Date(d.m.date)))
       .attr("cy", d => y(d.v))
-      .attr("r", 7)
-      .attr("fill", d => pageData.missingFlags[d.i] ? "white" : "red")
-      .attr("stroke", "red")
+      .attr("r", 8)
+      .attr("fill", d => d.missing ? "none" : "#dc2626")
+      .attr("stroke", "#dc2626")
       .attr("stroke-width", 2)
-      .style("pointer-events", "none");
+      .style("pointer-events", "none")
+      .style("display", d => d.missing ? "none" : "block");
 
-    // hit targets (big, transparent, draggable)
+    // Hit targets for dragging (large transparent circles)
     const hits = g.selectAll("circle.hit")
-      .data(pageData.currentScores.map((v, i) => ({v:v, i:i})))
+      .data(pageData.milestones.map((m, i) => ({m:m, i:i, v:pageData.currentScores[i], missing: pageData.missingFlags[i]})))
       .enter().append("circle")
       .attr("class", "hit")
-      .attr("cx", d => x(pageData.assessmentLabels[d.i]))
+      .attr("cx", d => x(new Date(d.m.date)))
       .attr("cy", d => y(d.v))
-      .attr("r", 26)
+      .attr("r", 28)
       .attr("fill", "transparent")
-      .style("cursor", "ns-resize");
+      .style("cursor", "ns-resize")
+      .style("display", d => d.missing ? "none" : "block");
 
     function refresh(){
-      dots.data(pageData.currentScores.map((v, i) => ({v:v, i:i})))
+      assessDots.data(pageData.milestones.map((m, i) => ({m:m, i:i, v:pageData.currentScores[i], missing: pageData.missingFlags[i]})))
         .attr("cy", d => y(d.v));
 
-      hits.data(pageData.currentScores.map((v, i) => ({v:v, i:i})))
+      hits.data(pageData.milestones.map((m, i) => ({m:m, i:i, v:pageData.currentScores[i], missing: pageData.missingFlags[i]})))
         .attr("cy", d => y(d.v));
-
-      assessPath.datum(pageData.currentScores).attr("d", line);
 
       whatifVal = updateStats();
       const yW = y(whatifVal);
-      whatIfLine.attr("y1", yW).attr("y2", yW);
-      whatIfLabel.attr("y", yW - 6);
+      currentGradeDot.attr("cy", yW);
+      currentGradeLabel.attr("y", yW - 10).text(whatifVal.toFixed(1) + "%");
+
+      currentGradeLine
+        .attr("y2", yW)
+        .style("display", Math.abs(whatifVal - pageData.officialPercent) > 0.1 ? "block" : "none");
     }
 
     const drag = d3.drag()
@@ -263,30 +348,28 @@
       })
       .on("drag", (event, d) => {
         const newY = clamp(event.y, 0, innerH);
-        const newVal = clamp(y.invert(newY), 0, pageData.yMax);
+        const newVal = clamp(y.invert(newY), 0, 100);  // Max 100%
         pageData.currentScores[d.i] = Math.round(newVal * 10) / 10;
 
         const orig = pageData.originalScores[d.i];
-        const delta = Number.isFinite(orig) ? (pageData.currentScores[d.i] - orig) : NaN;
-        let deltaTxt = "";
-        if (Number.isFinite(delta)) {
-          deltaTxt = " (" + (delta >= 0 ? "+" : "") + delta.toFixed(1) + "%)";
-        }
-        const label = pageData.assessmentLabels[d.i];
-        const html = "<b>" + label + "</b><br/>" + pageData.currentScores[d.i].toFixed(1) + "%" + deltaTxt;
+        const delta = Number.isFinite(orig) ? (pageData.currentScores[d.i] - orig) : 0;
+        const deltaTxt = (delta >= 0 ? "+" : "") + delta.toFixed(1) + "%";
 
-        const xy = clientXY(event.sourceEvent);
-        const wrapRect = wrap.getBoundingClientRect();
-        showTip(html, xy.x - wrapRect.left, xy.y - wrapRect.top);
+        dragLabel.innerHTML = "<strong>" + d.m.label + "</strong><br/>" + pageData.currentScores[d.i].toFixed(1) + "% (" + deltaTxt + ")";
+        dragLabel.style.display = "block";
 
         refresh();
       })
-      .on("end", () => { hideTip(); });
+      .on("end", () => {
+        dragLabel.style.display = "none";
+      });
 
     hits.call(drag);
 
     document.getElementById("resetBtn").onclick = () => {
-      pageData.currentScores = pageData.originalScores.map((v, i) => (Number.isFinite(v) ? v : 0.0));
+      pageData.currentScores = pageData.originalScores.map(v => (Number.isFinite(v) ? v : 0.0));
+      pageData.missingFlags = pageData.originalScores.map(v => !Number.isFinite(v));
+      dragLabel.style.display = "none";
       refresh();
     };
 
@@ -294,14 +377,13 @@
   }
 
   if (typeof d3 === "undefined") {
-    wrap.innerHTML = "D3 failed to load. If your network blocks CDNs, run with --d3 local and place d3.v7.min.js in the output folder.";
+    wrap.innerHTML = "D3 failed to load. Check your internet connection.";
   } else {
     render();
-    // debounced rerender on resize
     let t = null;
     window.addEventListener("resize", () => {
       clearTimeout(t);
-      t = setTimeout(() => { hideTip(); render(); }, 120);
+      t = setTimeout(() => { dragLabel.style.display = "none"; render(); }, 150);
     });
   }
   </script>

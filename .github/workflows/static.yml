@@ -33,7 +33,7 @@ jobs:
           local-dir: ./
       
           # Put it into /home2/flkrttmy/public_html/
-          server-dir: /
+          server-dir: .
       
           timeout: 180000
           log-level: verbose

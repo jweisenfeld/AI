@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Projectile Motion Calculator</title>
+    <title>Weisenfeld OHS Projectile Motion Calculator</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -179,7 +179,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Projectile Motion Calculator</h1>
+        <h1>Weisenfeld OHS Projectile Motion Calculator V2</h1>
         <div class="subtitle">Enter any two values to calculate all projectile motion parameters</div>
         
         <div class="instructions">
@@ -200,6 +200,18 @@
                 <label for="angle">Launch Angle (θ):</label>
                 <input type="number" id="angle" step="0.01" min="0" max="90" placeholder="Leave blank">
                 <span class="unit">degrees</span>
+            </div>
+            
+            <div class="input-group">
+                <label for="v0x">Initial Horizontal Velocity (v₀ₓ):</label>
+                <input type="number" id="v0x" step="0.01" placeholder="Leave blank">
+                <span class="unit">m/s</span>
+            </div>
+            
+            <div class="input-group">
+                <label for="v0y">Initial Vertical Velocity (v₀ᵧ):</label>
+                <input type="number" id="v0y" step="0.01" placeholder="Leave blank">
+                <span class="unit">m/s</span>
             </div>
             
             <div class="input-group">
@@ -288,7 +300,7 @@
     </div>
     
     <script>
-        const g = 10.0; // acceleration due to gravity (m/s²)
+        const g = 9.8; // acceleration due to gravity (m/s²)
         
         function showError(message) {
             const errorDiv = document.getElementById('errorMessage');
@@ -305,6 +317,8 @@
             const inputs = {
                 v0: parseFloat(document.getElementById('v0').value),
                 angle: parseFloat(document.getElementById('angle').value),
+                v0x: parseFloat(document.getElementById('v0x').value),
+                v0y: parseFloat(document.getElementById('v0y').value),
                 range: parseFloat(document.getElementById('range').value),
                 totalTime: parseFloat(document.getElementById('totalTime').value),
                 peakHeight: parseFloat(document.getElementById('peakHeight').value),
@@ -349,7 +363,261 @@
                     results.peakHeight = (results.v0y * results.v0y) / (2 * g);
                     results.range = (v0 * v0 * Math.sin(2 * angleRad)) / g;
                 }
-                // Case 2: v0 and range provided
+                // Case 2: v0x and v0y provided
+                else if (!isNaN(inputs.v0x) && !isNaN(inputs.v0y)) {
+                    const v0x = inputs.v0x;
+                    const v0y = inputs.v0y;
+                    
+                    results.v0x = v0x;
+                    results.v0y = v0y;
+                    results.v0 = Math.sqrt(v0x * v0x + v0y * v0y);
+                    results.angle = Math.atan2(v0y, v0x) * 180 / Math.PI;
+                    results.totalTime = (2 * v0y) / g;
+                    results.riseTime = results.totalTime / 2;
+                    results.peakHeight = (v0y * v0y) / (2 * g);
+                    results.range = v0x * results.totalTime;
+                }
+                // Case 3: v0 and v0x provided
+                else if (!isNaN(inputs.v0) && !isNaN(inputs.v0x)) {
+                    const v0 = inputs.v0;
+                    const v0x = inputs.v0x;
+                    
+                    if (v0x > v0) {
+                        showError('Invalid combination: Horizontal velocity cannot be greater than launch velocity.');
+                        return;
+                    }
+                    
+                    const v0y = Math.sqrt(v0 * v0 - v0x * v0x);
+                    const angleRad = Math.atan2(v0y, v0x);
+                    
+                    results.v0 = v0;
+                    results.v0x = v0x;
+                    results.v0y = v0y;
+                    results.angle = angleRad * 180 / Math.PI;
+                    results.totalTime = (2 * v0y) / g;
+                    results.riseTime = results.totalTime / 2;
+                    results.peakHeight = (v0y * v0y) / (2 * g);
+                    results.range = v0x * results.totalTime;
+                }
+                // Case 4: v0 and v0y provided
+                else if (!isNaN(inputs.v0) && !isNaN(inputs.v0y)) {
+                    const v0 = inputs.v0;
+                    const v0y = inputs.v0y;
+                    
+                    if (v0y > v0) {
+                        showError('Invalid combination: Vertical velocity cannot be greater than launch velocity.');
+                        return;
+                    }
+                    
+                    const v0x = Math.sqrt(v0 * v0 - v0y * v0y);
+                    const angleRad = Math.atan2(v0y, v0x);
+                    
+                    results.v0 = v0;
+                    results.v0x = v0x;
+                    results.v0y = v0y;
+                    results.angle = angleRad * 180 / Math.PI;
+                    results.totalTime = (2 * v0y) / g;
+                    results.riseTime = results.totalTime / 2;
+                    results.peakHeight = (v0y * v0y) / (2 * g);
+                    results.range = v0x * results.totalTime;
+                }
+                // Case 5: angle and v0x provided
+                else if (!isNaN(inputs.angle) && !isNaN(inputs.v0x)) {
+                    const angleRad = inputs.angle * Math.PI / 180;
+                    const v0x = inputs.v0x;
+                    
+                    const cosTheta = Math.cos(angleRad);
+                    
+                    if (Math.abs(cosTheta) < 0.0001) {
+                        showError('Invalid angle: Angle must be between 0° and 90° (not 90°).');
+                        return;
+                    }
+                    
+                    const v0 = v0x / cosTheta;
+                    const v0y = v0 * Math.sin(angleRad);
+                    
+                    results.v0 = v0;
+                    results.angle = inputs.angle;
+                    results.v0x = v0x;
+                    results.v0y = v0y;
+                    results.totalTime = (2 * v0y) / g;
+                    results.riseTime = results.totalTime / 2;
+                    results.peakHeight = (v0y * v0y) / (2 * g);
+                    results.range = v0x * results.totalTime;
+                }
+                // Case 6: angle and v0y provided
+                else if (!isNaN(inputs.angle) && !isNaN(inputs.v0y)) {
+                    const angleRad = inputs.angle * Math.PI / 180;
+                    const v0y = inputs.v0y;
+                    
+                    const sinTheta = Math.sin(angleRad);
+                    
+                    if (Math.abs(sinTheta) < 0.0001) {
+                        showError('Invalid angle: Angle must be between 0° and 90° (not 0°).');
+                        return;
+                    }
+                    
+                    const v0 = v0y / sinTheta;
+                    const v0x = v0 * Math.cos(angleRad);
+                    
+                    results.v0 = v0;
+                    results.angle = inputs.angle;
+                    results.v0x = v0x;
+                    results.v0y = v0y;
+                    results.totalTime = (2 * v0y) / g;
+                    results.riseTime = results.totalTime / 2;
+                    results.peakHeight = (v0y * v0y) / (2 * g);
+                    results.range = v0x * results.totalTime;
+                }
+                // Case 7: v0x and range provided
+                else if (!isNaN(inputs.v0x) && !isNaN(inputs.range)) {
+                    const v0x = inputs.v0x;
+                    const R = inputs.range;
+                    
+                    // R = v0x * t => t = R / v0x
+                    const t = R / v0x;
+                    
+                    // v0y = gt/2
+                    const v0y = (g * t) / 2;
+                    
+                    results.v0x = v0x;
+                    results.v0y = v0y;
+                    results.v0 = Math.sqrt(v0x * v0x + v0y * v0y);
+                    results.angle = Math.atan2(v0y, v0x) * 180 / Math.PI;
+                    results.totalTime = t;
+                    results.riseTime = t / 2;
+                    results.peakHeight = (v0y * v0y) / (2 * g);
+                    results.range = R;
+                }
+                // Case 8: v0x and totalTime provided
+                else if (!isNaN(inputs.v0x) && !isNaN(inputs.totalTime)) {
+                    const v0x = inputs.v0x;
+                    const t = inputs.totalTime;
+                    
+                    // R = v0x * t
+                    const R = v0x * t;
+                    
+                    // v0y = gt/2
+                    const v0y = (g * t) / 2;
+                    
+                    results.v0x = v0x;
+                    results.v0y = v0y;
+                    results.v0 = Math.sqrt(v0x * v0x + v0y * v0y);
+                    results.angle = Math.atan2(v0y, v0x) * 180 / Math.PI;
+                    results.totalTime = t;
+                    results.riseTime = t / 2;
+                    results.peakHeight = (v0y * v0y) / (2 * g);
+                    results.range = R;
+                }
+                // Case 9: v0x and peakHeight provided
+                else if (!isNaN(inputs.v0x) && !isNaN(inputs.peakHeight)) {
+                    const v0x = inputs.v0x;
+                    const h = inputs.peakHeight;
+                    
+                    // h = v0y² / (2g) => v0y = sqrt(2gh)
+                    const v0y = Math.sqrt(2 * g * h);
+                    
+                    // t = 2v0y / g
+                    const t = (2 * v0y) / g;
+                    
+                    results.v0x = v0x;
+                    results.v0y = v0y;
+                    results.v0 = Math.sqrt(v0x * v0x + v0y * v0y);
+                    results.angle = Math.atan2(v0y, v0x) * 180 / Math.PI;
+                    results.totalTime = t;
+                    results.riseTime = t / 2;
+                    results.peakHeight = h;
+                    results.range = v0x * t;
+                }
+                // Case 10: v0x and riseTime provided
+                else if (!isNaN(inputs.v0x) && !isNaN(inputs.riseTime)) {
+                    const v0x = inputs.v0x;
+                    const tRise = inputs.riseTime;
+                    
+                    // v0y = g * tRise
+                    const v0y = g * tRise;
+                    
+                    // t = 2 * tRise
+                    const t = 2 * tRise;
+                    
+                    results.v0x = v0x;
+                    results.v0y = v0y;
+                    results.v0 = Math.sqrt(v0x * v0x + v0y * v0y);
+                    results.angle = Math.atan2(v0y, v0x) * 180 / Math.PI;
+                    results.totalTime = t;
+                    results.riseTime = tRise;
+                    results.peakHeight = (v0y * v0y) / (2 * g);
+                    results.range = v0x * t;
+                }
+                // Case 11: v0y and range provided
+                else if (!isNaN(inputs.v0y) && !isNaN(inputs.range)) {
+                    const v0y = inputs.v0y;
+                    const R = inputs.range;
+                    
+                    // t = 2v0y / g
+                    const t = (2 * v0y) / g;
+                    
+                    // R = v0x * t => v0x = R / t
+                    const v0x = R / t;
+                    
+                    results.v0x = v0x;
+                    results.v0y = v0y;
+                    results.v0 = Math.sqrt(v0x * v0x + v0y * v0y);
+                    results.angle = Math.atan2(v0y, v0x) * 180 / Math.PI;
+                    results.totalTime = t;
+                    results.riseTime = t / 2;
+                    results.peakHeight = (v0y * v0y) / (2 * g);
+                    results.range = R;
+                }
+                // Case 12: v0y and totalTime provided
+                else if (!isNaN(inputs.v0y) && !isNaN(inputs.totalTime)) {
+                    const v0y = inputs.v0y;
+                    const t = inputs.totalTime;
+                    
+                    // Check consistency: t = 2v0y / g
+                    const expected_t = (2 * v0y) / g;
+                    
+                    if (Math.abs(t - expected_t) > 0.1) {
+                        showError('Invalid combination: Total time and vertical velocity are inconsistent with each other.');
+                        return;
+                    }
+                    
+                    showError('This combination (v₀ᵧ and total time) does not provide enough information to determine the horizontal motion. Please use a different pair of inputs.');
+                    return;
+                }
+                // Case 13: v0y and peakHeight provided
+                else if (!isNaN(inputs.v0y) && !isNaN(inputs.peakHeight)) {
+                    const v0y = inputs.v0y;
+                    const h = inputs.peakHeight;
+                    
+                    // Check consistency: h = v0y² / (2g)
+                    const expected_h = (v0y * v0y) / (2 * g);
+                    
+                    if (Math.abs(h - expected_h) > 0.1) {
+                        showError('Invalid combination: Peak height and vertical velocity are inconsistent with each other.');
+                        return;
+                    }
+                    
+                    showError('This combination (v₀ᵧ and peak height) does not provide enough information to determine the horizontal motion. Please use a different pair of inputs.');
+                    return;
+                }
+                // Case 14: v0y and riseTime provided
+                else if (!isNaN(inputs.v0y) && !isNaN(inputs.riseTime)) {
+                    const v0y = inputs.v0y;
+                    const tRise = inputs.riseTime;
+                    
+                    // Check consistency: tRise = v0y / g
+                    const expected_tRise = v0y / g;
+                    
+                    if (Math.abs(tRise - expected_tRise) > 0.01) {
+                        showError('Invalid combination: Rise time and vertical velocity are inconsistent with each other.');
+                        return;
+                    }
+                    
+                    showError('This combination (v₀ᵧ and rise time) does not provide enough information to determine the horizontal motion. Please use a different pair of inputs.');
+                    return;
+                }
+                // Case 15: v0 and range provided
                 else if (!isNaN(inputs.v0) && !isNaN(inputs.range)) {
                     const v0 = inputs.v0;
                     const R = inputs.range;
@@ -375,7 +643,7 @@
                     results.peakHeight = (results.v0y * results.v0y) / (2 * g);
                     results.range = R;
                 }
-                // Case 3: v0 and totalTime provided
+                // Case 16: v0 and totalTime provided
                 else if (!isNaN(inputs.v0) && !isNaN(inputs.totalTime)) {
                     const v0 = inputs.v0;
                     const t = inputs.totalTime;
@@ -399,7 +667,7 @@
                     results.peakHeight = (v0y * v0y) / (2 * g);
                     results.range = (v0 * v0 * Math.sin(2 * angleRad)) / g;
                 }
-                // Case 4: v0 and peakHeight provided
+                // Case 17: v0 and peakHeight provided
                 else if (!isNaN(inputs.v0) && !isNaN(inputs.peakHeight)) {
                     const v0 = inputs.v0;
                     const h = inputs.peakHeight;
@@ -423,7 +691,7 @@
                     results.peakHeight = h;
                     results.range = (v0 * v0 * Math.sin(2 * angleRad)) / g;
                 }
-                // Case 5: v0 and riseTime provided
+                // Case 18: v0 and riseTime provided
                 else if (!isNaN(inputs.v0) && !isNaN(inputs.riseTime)) {
                     const v0 = inputs.v0;
                     const tRise = inputs.riseTime;
@@ -447,7 +715,7 @@
                     results.peakHeight = (v0y * v0y) / (2 * g);
                     results.range = (v0 * v0 * Math.sin(2 * angleRad)) / g;
                 }
-                // Case 6: angle and range provided
+                // Case 19: angle and range provided
                 else if (!isNaN(inputs.angle) && !isNaN(inputs.range)) {
                     const angleRad = inputs.angle * Math.PI / 180;
                     const R = inputs.range;
@@ -471,7 +739,7 @@
                     results.peakHeight = (results.v0y * results.v0y) / (2 * g);
                     results.range = R;
                 }
-                // Case 7: angle and totalTime provided
+                // Case 20: angle and totalTime provided
                 else if (!isNaN(inputs.angle) && !isNaN(inputs.totalTime)) {
                     const angleRad = inputs.angle * Math.PI / 180;
                     const t = inputs.totalTime;
@@ -498,7 +766,7 @@
                     results.peakHeight = (v0y * v0y) / (2 * g);
                     results.range = (v0 * v0 * Math.sin(2 * angleRad)) / g;
                 }
-                // Case 8: angle and peakHeight provided
+                // Case 21: angle and peakHeight provided
                 else if (!isNaN(inputs.angle) && !isNaN(inputs.peakHeight)) {
                     const angleRad = inputs.angle * Math.PI / 180;
                     const h = inputs.peakHeight;
@@ -525,7 +793,7 @@
                     results.peakHeight = h;
                     results.range = (v0 * v0 * Math.sin(2 * angleRad)) / g;
                 }
-                // Case 9: angle and riseTime provided
+                // Case 22: angle and riseTime provided
                 else if (!isNaN(inputs.angle) && !isNaN(inputs.riseTime)) {
                     const angleRad = inputs.angle * Math.PI / 180;
                     const tRise = inputs.riseTime;
@@ -552,7 +820,7 @@
                     results.peakHeight = (v0y * v0y) / (2 * g);
                     results.range = (v0 * v0 * Math.sin(2 * angleRad)) / g;
                 }
-                // Case 10: range and totalTime provided
+                // Case 23: range and totalTime provided
                 else if (!isNaN(inputs.range) && !isNaN(inputs.totalTime)) {
                     const R = inputs.range;
                     const t = inputs.totalTime;
@@ -573,7 +841,7 @@
                     results.peakHeight = (v0y * v0y) / (2 * g);
                     results.range = R;
                 }
-                // Case 11: range and peakHeight provided
+                // Case 24: range and peakHeight provided
                 else if (!isNaN(inputs.range) && !isNaN(inputs.peakHeight)) {
                     const R = inputs.range;
                     const h = inputs.peakHeight;
@@ -599,7 +867,7 @@
                     results.peakHeight = h;
                     results.range = R;
                 }
-                // Case 12: range and riseTime provided
+                // Case 25: range and riseTime provided
                 else if (!isNaN(inputs.range) && !isNaN(inputs.riseTime)) {
                     const R = inputs.range;
                     const tRise = inputs.riseTime;
@@ -625,7 +893,7 @@
                     results.peakHeight = (v0y * v0y) / (2 * g);
                     results.range = R;
                 }
-                // Case 13: totalTime and peakHeight provided
+                // Case 26: totalTime and peakHeight provided
                 else if (!isNaN(inputs.totalTime) && !isNaN(inputs.peakHeight)) {
                     const t = inputs.totalTime;
                     const h = inputs.peakHeight;
@@ -642,15 +910,10 @@
                         return;
                     }
                     
-                    const v0y = (v0y_from_time + v0y_from_height) / 2;
-                    
-                    // We need another equation to find v0x
-                    // This combination is actually underdetermined for finding angle
-                    // We'll use the average and warn the user
                     showError('This combination (time and peak height) does not uniquely determine the launch angle and velocity. Please use a different pair of inputs.');
                     return;
                 }
-                // Case 14: totalTime and riseTime provided
+                // Case 27: totalTime and riseTime provided
                 else if (!isNaN(inputs.totalTime) && !isNaN(inputs.riseTime)) {
                     const t = inputs.totalTime;
                     const tRise = inputs.riseTime;
@@ -664,7 +927,7 @@
                     showError('This combination (total time and rise time) does not provide enough information to determine the projectile motion. Please use a different pair of inputs.');
                     return;
                 }
-                // Case 15: peakHeight and riseTime provided
+                // Case 28: peakHeight and riseTime provided
                 else if (!isNaN(inputs.peakHeight) && !isNaN(inputs.riseTime)) {
                     const h = inputs.peakHeight;
                     const tRise = inputs.riseTime;
@@ -713,6 +976,8 @@
         function clearAll() {
             document.getElementById('v0').value = '';
             document.getElementById('angle').value = '';
+            document.getElementById('v0x').value = '';
+            document.getElementById('v0y').value = '';
             document.getElementById('range').value = '';
             document.getElementById('totalTime').value = '';
             document.getElementById('peakHeight').value = '';

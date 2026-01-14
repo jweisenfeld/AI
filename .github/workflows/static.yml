@@ -19,16 +19,32 @@ jobs:
           echo $(date -u +"%Y%m%d%H%M%S") > public/version.txt
           cat public/version.txt
       
-      - name: 📂 Sync files
+      - name: 📂 Sync repo root into public_html
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
+      
           protocol: ftp
           port: 21
-          local-dir: ./public/
+      
+          # Deploy the *repo root*
+          local-dir: ./
+      
+          # Put it into /home2/flkrttmy/public_html/
           server-dir: public_html/
+      
           timeout: 180000
           log-level: verbose
+      
+          # Optional but recommended (keeps private/dev folders off your website)
+          exclude: |
+            **/.git*
+            **/.github/**
+            **/.vscode/**
+            **/node_modules/**
+            **/*.ps1
+            **/*.py
+            **/__pycache__/**
 

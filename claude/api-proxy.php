@@ -4,11 +4,20 @@
  * Pasco School District - Community Engineering Project
  */
 
+session_start();
+
 // Always return JSON (even on errors)
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
+
+// Check authentication
+if (!isset($_SESSION['student_id'])) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Not authenticated. Please log in.']);
+    exit;
+}
 
 // Handle preflight OPTIONS request
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
@@ -62,10 +71,12 @@ if (!isset($requestData['model'], $requestData['messages'])) {
     exit;
 }
 
-// Allow only specific models
+// Allow only specific models (updated to latest versions)
 $allowedModels = [
     'claude-sonnet-4-20250514',
-    'claude-opus-4-20250514'
+    'claude-opus-4-20250514',
+    'claude-sonnet-4-5-20250929',  // Sonnet 4.5 (Latest, Fast & Capable)
+    'claude-opus-4-5-20251101'      // Opus 4.5 (Latest, Most Intelligent)
 ];
 
 if (!in_array($requestData['model'], $allowedModels, true)) {
@@ -85,14 +96,28 @@ if (isset($requestData['system'])) {
     $apiRequest['system'] = $requestData['system'];
 }
 
-// Optional logging
-$logEntry = [
+// Enhanced logging with student tracking (before API call)
+$studentId = $_SESSION['student_id'] ?? 'unknown';
+$requestTime = microtime(true);
+
+$preLogEntry = [
     'timestamp' => date('Y-m-d H:i:s'),
+    'student_id' => $studentId,
+    'session_id' => session_id(),
     'model' => $requestData['model'],
     'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
-    'message_count' => is_array($requestData['messages']) ? count($requestData['messages']) : 0
+    'message_count' => is_array($requestData['messages']) ? count($requestData['messages']) : 0,
+    'request_id' => uniqid('req_', true)
 ];
-file_put_contents(__DIR__ . '/claude_usage.log', json_encode($logEntry) . "\n", FILE_APPEND | LOCK_EX);
+
+// Extract first message for anomaly detection
+if (!empty($requestData['messages'])) {
+    $lastMessage = end($requestData['messages']);
+    $messageContent = is_string($lastMessage['content'] ?? '')
+        ? $lastMessage['content']
+        : json_encode($lastMessage['content'] ?? '');
+    $preLogEntry['message_preview'] = substr($messageContent, 0, 200);
+}
 
 // Call Anthropic
 $ch = curl_init('https://api.anthropic.com/v1/messages');
@@ -119,6 +144,56 @@ if ($curlError) {
     echo json_encode(['error' => 'Failed to connect to API: ' . $curlError]);
     exit;
 }
+
+// Log response with cost calculation
+$responseData = json_decode($response, true);
+$responseTime = microtime(true) - $requestTime;
+
+// Calculate costs (as of Jan 2026 - adjust as needed)
+$costPer1MInputTokens = [
+    'claude-sonnet-4-20250514' => 3.00,
+    'claude-opus-4-20250514' => 15.00,
+    'claude-sonnet-4-5-20250929' => 3.00,
+    'claude-opus-4-5-20251101' => 15.00
+];
+
+$costPer1MOutputTokens = [
+    'claude-sonnet-4-20250514' => 15.00,
+    'claude-opus-4-20250514' => 75.00,
+    'claude-sonnet-4-5-20250929' => 15.00,
+    'claude-opus-4-5-20251101' => 75.00
+];
+
+$inputTokens = $responseData['usage']['input_tokens'] ?? 0;
+$outputTokens = $responseData['usage']['output_tokens'] ?? 0;
+$model = $requestData['model'];
+
+$inputCost = ($inputTokens / 1000000) * ($costPer1MInputTokens[$model] ?? 0);
+$outputCost = ($outputTokens / 1000000) * ($costPer1MOutputTokens[$model] ?? 0);
+$totalCost = $inputCost + $outputCost;
+
+$fullLogEntry = array_merge($preLogEntry, [
+    'input_tokens' => $inputTokens,
+    'output_tokens' => $outputTokens,
+    'total_tokens' => $inputTokens + $outputTokens,
+    'input_cost_usd' => round($inputCost, 6),
+    'output_cost_usd' => round($outputCost, 6),
+    'total_cost_usd' => round($totalCost, 6),
+    'response_time_sec' => round($responseTime, 3),
+    'http_code' => $httpCode,
+    'success' => $httpCode === 200
+]);
+
+// Log to JSON file for easy parsing
+$logFile = __DIR__ . '/logs/student_requests.jsonl';
+$logDir = dirname($logFile);
+if (!is_dir($logDir)) {
+    mkdir($logDir, 0755, true);
+}
+file_put_contents($logFile, json_encode($fullLogEntry) . "\n", FILE_APPEND | LOCK_EX);
+
+// Also log to legacy format
+file_put_contents(__DIR__ . '/claude_usage.log', json_encode($fullLogEntry) . "\n", FILE_APPEND | LOCK_EX);
 
 http_response_code($httpCode);
 echo $response;

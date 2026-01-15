@@ -481,14 +481,119 @@
             40% { transform: scale(1); }
         }
         
+        /* Login Screen */
+        .login-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+        }
+
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-box h1 {
+            color: var(--primary);
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .login-box p {
+            text-align: center;
+            color: var(--text-light);
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-light);
+        }
+
+        .login-btn {
+            width: 100%;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .login-btn:hover {
+            background: var(--primary-light);
+        }
+
+        .login-btn:disabled {
+            background: var(--text-light);
+            cursor: not-allowed;
+        }
+
+        .error-message {
+            background: #fee;
+            color: var(--danger);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .app-container {
+            display: none;
+        }
+
+        .app-container.active {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .sidebar {
                 display: none;
             }
-            
+
             .header h1 {
                 font-size: 1.1rem;
+            }
+
+            .login-box {
+                margin: 20px;
+                padding: 30px 20px;
             }
         }
         
@@ -532,13 +637,41 @@
     </style>
 </head>
 <body>
+    <!-- Login Screen -->
+    <div class="login-container" id="login-container">
+        <div class="login-box">
+            <h1>🏗️ Community Engineering AI</h1>
+            <p>Pasco School District Student Login</p>
+
+            <div class="error-message" id="login-error"></div>
+
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label for="student-id">Student ID</label>
+                    <input type="text" id="student-id" name="student-id" required autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+
+                <button type="submit" class="login-btn" id="login-btn">Log In</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Application (hidden until logged in) -->
+    <div class="app-container" id="app-container">
     <header class="header">
         <div>
             <h1>🏗️ Community Engineering AI Assistant</h1>
             <div class="header-subtitle">Pasco School District • Students + AI > City Planner?</div>
         </div>
         <div class="header-controls">
+            <span id="student-display" style="margin-right: 15px; font-size: 0.9rem;">Student ID: <strong id="logged-in-student"></strong></span>
             <button onclick="openExportModal()" class="new-chat-btn" style="background: var(--primary-light);">📥 Export</button>
+            <button onclick="handleLogout()" class="new-chat-btn" style="background: var(--danger);">🚪 Logout</button>
         </div>
     </header>
     
@@ -559,6 +692,8 @@
                        style="border: none; font-size: 1.1rem; font-weight: 600; flex: 1; outline: none;"
                        onchange="updateProjectTitle()">
                 <select id="model-select" class="model-select">
+                    <option value="claude-sonnet-4-5-20250929">Claude Sonnet 4.5 (Latest - Fast & Capable)</option>
+                    <option value="claude-opus-4-5-20251101">Claude Opus 4.5 (Latest - Most Intelligent)</option>
                     <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (Fast & Capable)</option>
                     <option value="claude-opus-4-20250514">Claude Opus 4 (Most Intelligent)</option>
                 </select>
@@ -604,7 +739,8 @@
             </div>
         </main>
     </div>
-    
+    </div> <!-- Close app-container -->
+
     <!-- Export Modal -->
     <div class="modal-overlay" id="export-modal">
         <div class="modal">
@@ -1195,10 +1331,94 @@ Remember: You're a tool to help students learn, not a replacement for their thin
         });
         
         // ============================================
-        // INITIALIZATION
+        // AUTHENTICATION
         // ============================================
-        
-        window.onload = function() {
+
+        async function handleLogin(event) {
+            event.preventDefault();
+
+            const studentId = document.getElementById('student-id').value;
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('login-btn');
+            const errorDiv = document.getElementById('login-error');
+
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Logging in...';
+            errorDiv.classList.remove('show');
+
+            try {
+                const response = await fetch('auth.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'login',
+                        studentId: studentId,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Store student ID
+                    sessionStorage.setItem('studentId', data.studentId);
+                    document.getElementById('logged-in-student').textContent = data.studentId;
+
+                    // Hide login, show app
+                    document.getElementById('login-container').style.display = 'none';
+                    document.getElementById('app-container').classList.add('active');
+
+                    // Initialize app
+                    initializeApp();
+                } else {
+                    throw new Error(data.error || 'Login failed');
+                }
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.classList.add('show');
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Log In';
+            }
+        }
+
+        async function handleLogout() {
+            if (!confirm('Are you sure you want to log out?')) return;
+
+            try {
+                await fetch('auth.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'logout' })
+                });
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+
+            sessionStorage.removeItem('studentId');
+            location.reload();
+        }
+
+        async function checkAuthentication() {
+            try {
+                const response = await fetch('auth.php');
+                const data = await response.json();
+
+                if (data.authenticated) {
+                    sessionStorage.setItem('studentId', data.studentId);
+                    document.getElementById('logged-in-student').textContent = data.studentId;
+                    document.getElementById('login-container').style.display = 'none';
+                    document.getElementById('app-container').classList.add('active');
+                    initializeApp();
+                } else {
+                    document.getElementById('login-container').style.display = 'flex';
+                }
+            } catch (error) {
+                console.error('Auth check error:', error);
+                document.getElementById('login-container').style.display = 'flex';
+            }
+        }
+
+        function initializeApp() {
             const projects = getProjects();
             if (projects.length === 0) {
                 createNewProject();
@@ -1206,6 +1426,14 @@ Remember: You're a tool to help students learn, not a replacement for their thin
                 loadProject(projects[0].id);
             }
             renderProjectList();
+        }
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+
+        window.onload = function() {
+            checkAuthentication();
         };
     </script>
 </body>

@@ -1,0 +1,61 @@
+name: Deploy to Test Server
+
+on:
+  push:
+    branches:
+      - 'claude/review-html-premium-client-a03L4'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  deploy-test:
+    name: Deploy to claude-test folder
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy claude folder to test server
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'logs/' \
+            --exclude 'claude_usage.log' \
+            --exclude 'node_modules/' \
+            claude/ \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH_TEST }}/claude/
+
+      - name: Deploy Misc folder (student passwords)
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            --exclude '.git' \
+            Misc/ \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH_TEST }}/Misc/
+
+      - name: Create logs directory on server
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "mkdir -p ${{ secrets.DEPLOY_PATH_TEST }}/claude/logs && chmod 755 ${{ secrets.DEPLOY_PATH_TEST }}/claude/logs"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
+
+      - name: Deployment Summary
+        run: |
+          echo "✅ Deployment completed successfully!"
+          echo "🌐 Test site: http://psd1.net/claude-test"
+          echo "📁 Deployed from branch: ${{ github.ref_name }}"
+          echo "🔨 Commit: ${{ github.sha }}"

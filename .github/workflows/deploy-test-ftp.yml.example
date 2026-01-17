@@ -1,0 +1,53 @@
+# Alternative FTP Deployment (if SSH not available)
+# Rename to deploy-test-ftp.yml to use this instead of SSH deployment
+
+name: Deploy to Test Server (FTP)
+
+on:
+  push:
+    branches:
+      - 'claude/review-html-premium-client-a03L4'
+  workflow_dispatch:
+
+jobs:
+  deploy-test-ftp:
+    name: Deploy via FTP to claude-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Test Server via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./claude/
+          server-dir: /public_html/claude-test/claude/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/logs/**
+            claude_usage.log
+
+      - name: Deploy Misc folder via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./Misc/
+          server-dir: /public_html/claude-test/Misc/
+
+      - name: Deployment Summary
+        run: |
+          echo "✅ FTP Deployment completed!"
+          echo "🌐 Test site: http://psd1.net/claude-test/claude/"
+
+# Required GitHub Secrets for FTP:
+# - FTP_SERVER (e.g., ftp.psd1.net)
+# - FTP_USERNAME (your FTP username)
+# - FTP_PASSWORD (your FTP password)

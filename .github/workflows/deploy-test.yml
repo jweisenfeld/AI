@@ -15,6 +15,53 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Validate secrets are configured
+        run: |
+          echo "Checking required secrets..."
+          MISSING=""
+
+          if [ -z "${{ secrets.SSH_HOST }}" ]; then
+            echo "❌ SSH_HOST is not set"
+            MISSING="SSH_HOST $MISSING"
+          else
+            echo "✅ SSH_HOST: ${{ secrets.SSH_HOST }}"
+          fi
+
+          if [ -z "${{ secrets.SSH_USER }}" ]; then
+            echo "❌ SSH_USER is not set"
+            MISSING="SSH_USER $MISSING"
+          else
+            echo "✅ SSH_USER: ${{ secrets.SSH_USER }}"
+          fi
+
+          if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "❌ SSH_PRIVATE_KEY is not set"
+            MISSING="SSH_PRIVATE_KEY $MISSING"
+          else
+            echo "✅ SSH_PRIVATE_KEY is configured"
+          fi
+
+          if [ -z "${{ secrets.DEPLOY_PATH_TEST }}" ]; then
+            echo "❌ DEPLOY_PATH_TEST is not set"
+            MISSING="DEPLOY_PATH_TEST $MISSING"
+          else
+            echo "✅ DEPLOY_PATH_TEST: ${{ secrets.DEPLOY_PATH_TEST }}"
+          fi
+
+          if [ -n "$MISSING" ]; then
+            echo ""
+            echo "⚠️  Missing secrets: $MISSING"
+            echo ""
+            echo "Please configure these in GitHub:"
+            echo "Settings → Secrets and variables → Actions → New repository secret"
+            echo ""
+            echo "See .github/DEPLOYMENT-QUICKSTART.md for setup instructions"
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ All required secrets are configured!"
+
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh

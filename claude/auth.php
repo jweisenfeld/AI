@@ -17,9 +17,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
     exit;
 }
 
-// Get account root (one level above public_html)
-$accountRoot = dirname($_SERVER['DOCUMENT_ROOT']);
-$csvPath = $accountRoot . '/AI/Misc/25-26-S2-Passwords-Combined.csv';
+// Get CSV path relative to where this file is deployed
+// auth.php is in: public_html/claude-test/claude/ (test) or public_html/claude/ (prod)
+// CSV is in: public_html/claude-test/Misc/ (test) or public_html/Misc/ (prod)
+// So we go up one level from auth.php and into Misc/
+$csvPath = dirname(__DIR__) . '/Misc/25-26-S2-Passwords-Combined.csv';
 
 // Login endpoint
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

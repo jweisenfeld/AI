@@ -308,7 +308,30 @@
             font-size: 14px;
             line-height: 1;
         }
-        
+
+        .pdf-preview {
+            background: var(--bg);
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            max-width: 250px;
+        }
+
+        .pdf-icon {
+            font-size: 24px;
+        }
+
+        .pdf-name {
+            flex: 1;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
         .input-row {
             display: flex;
             gap: 10px;
@@ -711,7 +734,7 @@
                             <li><strong>Budgeting</strong> – Cost estimates, vendor research</li>
                             <li><strong>Presentations</strong> – Pitch decks, poster content, talking points</li>
                         </ul>
-                        <p>📸 You can also upload images (site photos, sketches, inspiration) using the 📎 button.</p>
+                        <p>📎 You can also upload images and PDFs (site photos, building codes, research papers) using the 📎 button.</p>
                         <p><em>Remember: I'm a starting point, not the final answer. Your critical thinking makes the difference!</em></p>
                     </div>
                 </div>
@@ -726,7 +749,7 @@
                         <button class="attach-btn" onclick="document.getElementById('file-input').click()">
                             📎
                         </button>
-                        <input type="file" id="file-input" accept="image/*" multiple style="display: none;" 
+                        <input type="file" id="file-input" accept="image/*,application/pdf" multiple style="display: none;"
                                onchange="handleFileSelect(event)">
                     </div>
                     <button class="send-btn" id="send-btn" onclick="sendMessage()">Send</button>
@@ -838,7 +861,7 @@ Remember: You're a tool to help students learn, not a replacement for their thin
                                 <li><strong>Budgeting</strong> – Cost estimates, vendor research</li>
                                 <li><strong>Presentations</strong> – Pitch decks, poster content, talking points</li>
                             </ul>
-                            <p>📸 You can also upload images (site photos, sketches, inspiration) using the 📎 button.</p>
+                            <p>📎 You can also upload images and PDFs (site photos, building codes, research papers) using the 📎 button.</p>
                             <p><em>Remember: I'm a starting point, not the final answer. Your critical thinking makes the difference!</em></p>
                         </div>
                     </div>
@@ -925,17 +948,30 @@ Remember: You're a tool to help students learn, not a replacement for their thin
             
             // Build user message content
             let userContent = [];
-            
-            // Add images first
-            pendingImages.forEach(img => {
-                userContent.push({
-                    type: 'image',
-                    source: {
-                        type: 'base64',
-                        media_type: img.type,
-                        data: img.data
-                    }
-                });
+
+            // Add files (images and PDFs)
+            pendingImages.forEach(file => {
+                if (file.isPDF) {
+                    // PDFs use document type
+                    userContent.push({
+                        type: 'document',
+                        source: {
+                            type: 'base64',
+                            media_type: file.type,
+                            data: file.data
+                        }
+                    });
+                } else {
+                    // Images use image type
+                    userContent.push({
+                        type: 'image',
+                        source: {
+                            type: 'base64',
+                            media_type: file.type,
+                            data: file.data
+                        }
+                    });
+                }
             });
             
             // Add text
@@ -1129,41 +1165,69 @@ Remember: You're a tool to help students learn, not a replacement for their thin
         
         function handleFileSelect(event) {
             const files = event.target.files;
-            
+
             for (const file of files) {
-                if (!file.type.startsWith('image/')) continue;
+                // Accept images and PDFs
+                const isImage = file.type.startsWith('image/');
+                const isPDF = file.type === 'application/pdf';
+
+                if (!isImage && !isPDF) {
+                    alert(`File type not supported: ${file.type}\nPlease upload images or PDFs only.`);
+                    continue;
+                }
+
                 if (pendingImages.length >= 5) {
-                    alert('Maximum 5 images per message');
+                    alert('Maximum 5 files per message');
                     break;
                 }
-                
+
+                // Check PDF size (Claude has a 5MB limit for PDFs)
+                if (isPDF && file.size > 5 * 1024 * 1024) {
+                    alert(`PDF file "${file.name}" is too large. Maximum size is 5MB.`);
+                    continue;
+                }
+
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const base64 = e.target.result;
                     const base64Data = base64.split(',')[1];
-                    
+
                     pendingImages.push({
                         type: file.type,
                         data: base64Data,
-                        preview: base64
+                        preview: isImage ? base64 : null,
+                        isPDF: isPDF,
+                        fileName: file.name
                     });
-                    
+
                     renderImagePreviews();
                 };
                 reader.readAsDataURL(file);
             }
-            
+
             event.target.value = '';
         }
         
         function renderImagePreviews() {
             const container = document.getElementById('image-preview');
-            container.innerHTML = pendingImages.map((img, index) => `
-                <div class="image-preview-item">
-                    <img src="${img.preview}" alt="Preview">
-                    <button class="remove-image" onclick="removeImage(${index})">×</button>
-                </div>
-            `).join('');
+            container.innerHTML = pendingImages.map((file, index) => {
+                if (file.isPDF) {
+                    return `
+                        <div class="image-preview-item pdf-preview">
+                            <div class="pdf-icon">📄</div>
+                            <div class="pdf-name">${escapeHtml(file.fileName)}</div>
+                            <button class="remove-image" onclick="removeImage(${index})">×</button>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="image-preview-item">
+                            <img src="${file.preview}" alt="Preview">
+                            <button class="remove-image" onclick="removeImage(${index})">×</button>
+                        </div>
+                    `;
+                }
+            }).join('');
         }
         
         function removeImage(index) {

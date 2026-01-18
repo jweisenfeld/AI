@@ -18,29 +18,41 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to Test Server via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      - name: Deploy claude folder to Test Server via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
+          port: 21
           local-dir: ./claude/
-          server-dir: /public_html/claude-test/claude/
+          server-dir: ./claude-test/claude/
+          timeout: 180000
+          log-level: verbose
           exclude: |
             **/.git*
             **/.git*/**
+            **/.github/**
             **/node_modules/**
             **/logs/**
             claude_usage.log
 
-      - name: Deploy Misc folder via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      - name: Deploy Misc folder to Test Server via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
+          port: 21
           local-dir: ./Misc/
-          server-dir: /public_html/claude-test/Misc/
+          server-dir: ./claude-test/Misc/
+          timeout: 180000
+          log-level: verbose
+          exclude: |
+            **/.git*
+            **/.git*/**
 
       - name: Deployment Summary
         run: |

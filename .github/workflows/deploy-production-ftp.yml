@@ -1,0 +1,45 @@
+name: Deploy to Production Server (FTP)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy-production-ftp:
+    name: Deploy via FTP to production
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy claude folder to Production via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./claude/
+          server-dir: /public_html/claude/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/logs/**
+            claude_usage.log
+
+      - name: Deploy Misc folder via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./Misc/
+          server-dir: /public_html/Misc/
+
+      - name: Deployment Summary
+        run: |
+          echo "✅ Production deployment completed!"
+          echo "🌐 Production site: http://psd1.net/claude/"

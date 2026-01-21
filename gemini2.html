@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Smart Chat v202512042338</title>
+    <title>Gemini Smart Chat v2.0 (Secure Proxy)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -13,7 +13,6 @@
             font-family: 'Inter', sans-serif;
         }
 
-        /* Custom scrollbar for chat area */
         .scrollbar-hide::-webkit-scrollbar {
             display: none;
         }
@@ -38,8 +37,7 @@
             padding: 1rem;
             border-radius: 0.5rem;
             overflow-x: auto;
-            margin-top: 0.5rem;
-            margin-bottom: 0.5rem;
+            margin: 0.5rem 0;
         }
 
         .markdown-body code {
@@ -63,7 +61,6 @@
             margin-bottom: 0;
         }
 
-        /* Loading dots animation */
         .typing-dot {
             animation: typing 1.4s infinite ease-in-out both;
         }
@@ -89,44 +86,25 @@
             }
         }
 
-        /* Tooltip animation */
         .tool-btn:active {
             transform: scale(0.95);
         }
-    </style>
-    <script type="importmap">
-      {
-        "imports": {
-          "@google/generative-ai": "https://esm.run/@google/generative-ai"
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
-      }
-    </script>
+    </style>
 </head>
 
 <body class="bg-gray-100 h-screen flex flex-col items-center justify-center p-4 sm:p-6">
-
-    <div id="apiKeyModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
-        <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all">
-            <h2 class="text-2xl font-bold text-gray-800 mb-4">Welcome to Gemini Chat</h2>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
-                    <input type="password" id="apiKeyInput" placeholder="Paste your API key here"
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
-                </div>
-                <button id="saveKeyBtn"
-                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition-colors duration-200">
-                    Start Chatting
-                </button>
-                <div class="text-center">
-                    <a href="https://aistudio.google.com/app/apikey" target="_blank"
-                        class="text-xs text-blue-500 hover:underline">
-                        Get a free API key here &rarr;
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <div
         class="bg-white w-full max-w-4xl h-[85vh] rounded-2xl shadow-xl flex flex-col overflow-hidden ring-1 ring-gray-900/5">
@@ -135,71 +113,52 @@
             <div class="flex items-center gap-3">
                 <div
                     class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm">
-                    AI
-                </div>
+                    AI</div>
                 <div>
-                    <h1 class="font-semibold text-gray-800">Gemini 2.5 Flash v202512042338</h1>
+                    <h1 class="font-semibold text-gray-800">Gemini 2.5 Flash</h1>
                     <p class="text-xs text-green-500 flex items-center gap-1">
-                        <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Online
+                        <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Server Secured
                     </p>
                 </div>
             </div>
-            <button id="settingsBtn"
-                class="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 transition-colors"
-                title="Settings">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
-                    stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-            </button>
         </header>
 
         <div id="chatHistory" class="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide bg-gray-50/50">
-            <div class="flex gap-4 max-w-3xl mx-auto opacity-0 animate-fade-in"
-                style="animation-fill-mode: forwards; animation-duration: 0.5s;">
+            <div class="flex gap-4 max-w-3xl mx-auto animate-fade-in">
                 <div
                     class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex-shrink-0 flex items-center justify-center text-white text-xs">
                     AI</div>
                 <div
                     class="flex-1 bg-white p-4 rounded-2xl rounded-tl-none shadow-sm border border-gray-100 text-gray-800 text-sm leading-relaxed">
-                    Hello! I'm ready to chat. I can also use my API tools to summarize, explain, or code for you. What
-                    can I help you with today?
+                    Hello! Your connection is now secured via your server proxy. How can I help you with your Physics
+                    classes or coding today?
                 </div>
             </div>
         </div>
 
         <div class="bg-white p-4 border-t border-gray-100 shrink-0">
             <div class="max-w-3xl mx-auto relative">
-
                 <div class="flex gap-2 mb-3 overflow-x-auto pb-1 scrollbar-hide">
                     <button id="toolSummarize"
-                        class="tool-btn whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-medium hover:bg-indigo-100 transition-colors">
-                        ✨ Summarize
-                    </button>
+                        class="tool-btn whitespace-nowrap px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-medium hover:bg-indigo-100">✨
+                        Summarize</button>
                     <button id="toolEli5"
-                        class="tool-btn whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 bg-pink-50 text-pink-600 rounded-lg text-xs font-medium hover:bg-pink-100 transition-colors">
-                        ✨ ELI5
-                    </button>
+                        class="tool-btn whitespace-nowrap px-3 py-1.5 bg-pink-50 text-pink-600 rounded-lg text-xs font-medium hover:bg-pink-100">✨
+                        ELI5</button>
                     <button id="toolBrainstorm"
-                        class="tool-btn whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-600 rounded-lg text-xs font-medium hover:bg-amber-100 transition-colors">
-                        ✨ Brainstorm
-                    </button>
+                        class="tool-btn whitespace-nowrap px-3 py-1.5 bg-amber-50 text-amber-600 rounded-lg text-xs font-medium hover:bg-amber-100">✨
+                        Brainstorm</button>
                     <button id="toolCode"
-                        class="tool-btn whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-medium hover:bg-emerald-100 transition-colors">
-                        ✨ Code This
-                    </button>
+                        class="tool-btn whitespace-nowrap px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-medium hover:bg-emerald-100">✨
+                        Code This</button>
                 </div>
 
                 <form id="chatForm"
-                    class="relative flex items-end gap-2 bg-gray-50 border border-gray-200 rounded-xl p-2 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-400 transition-all">
-                    <textarea id="userInput" rows="1" placeholder="Type a message or use a tool..."
-                        class="w-full bg-transparent border-none focus:ring-0 text-gray-700 placeholder-gray-400 resize-none py-3 px-3 max-h-32 text-sm"
+                    class="relative flex items-end gap-2 bg-gray-50 border border-gray-200 rounded-xl p-2 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                    <textarea id="userInput" rows="1" placeholder="Type a message..."
+                        class="w-full bg-transparent border-none focus:ring-0 text-gray-700 resize-none py-3 px-3 max-h-32 text-sm"
                         style="min-height: 44px;"></textarea>
-                    <button type="submit" id="sendBtn"
-                        class="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mb-1">
+                    <button type="submit" class="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 mb-1">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transform rotate-90" viewBox="0 0 20 20"
                             fill="currentColor">
                             <path
@@ -208,201 +167,62 @@
                     </button>
                 </form>
                 <div class="text-center mt-2">
-                    <p class="text-xs text-gray-400">Powered by Google Gemini • Stored locally in browser • Key required
-                    </p>
+                    <p class="text-xs text-gray-400">Powered by Gemini 2.5 Flash • Server-Side Authentication</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <script type="module">
-        import { GoogleGenerativeAI } from "@google/generative-ai";
-
-        // --- URL Parameter Logic ---
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlKey = urlParams.get('key') || urlParams.get('apikey');
-
-        // State Management
-        let apiKey = urlKey || localStorage.getItem('gemini_api_key');
-
-        // If key came from URL, save it and clean the URL history
-        if (urlKey) {
-            localStorage.setItem('gemini_api_key', urlKey);
-            window.history.replaceState({}, document.title, window.location.pathname);
-        }
-
-        let chat = null;
-        let genAI = null;
-        let model = null;
-
-        // DOM Elements
-        const modal = document.getElementById('apiKeyModal');
-        const keyInput = document.getElementById('apiKeyInput');
-        const saveKeyBtn = document.getElementById('saveKeyBtn');
-        const settingsBtn = document.getElementById('settingsBtn');
+    <script>
+        const chatHistory = document.getElementById('chatHistory');
         const chatForm = document.getElementById('chatForm');
         const userInput = document.getElementById('userInput');
-        const chatHistory = document.getElementById('chatHistory');
-        const sendBtn = document.getElementById('sendBtn');
 
-        // Tool Buttons
-        const btnSummarize = document.getElementById('toolSummarize');
-        const btnEli5 = document.getElementById('toolEli5');
-        const btnBrainstorm = document.getElementById('toolBrainstorm');
-        const btnCode = document.getElementById('toolCode');
-
-        // Initialize
-        function init() {
-            if (!apiKey) {
-                showModal();
-            } else {
-                initializeGemini(apiKey);
-            }
-        }
-
-        function showModal() {
-            modal.classList.remove('hidden');
-            if (apiKey) keyInput.value = apiKey;
-        }
-
-        function hideModal() {
-            modal.classList.add('hidden');
-        }
-
-        function initializeGemini(key) {
-            try {
-                genAI = new GoogleGenerativeAI(key);
-                model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); // Updated to gemini-2.5-flash
-
-                chat = model.startChat({
-                    history: []
-//                    history: [
-//                       {
-//                            role: "user",
-//                           parts: [{ text: "Hello, who are you?" }],
-//                        },
-//                        {
-//                            role: "model",
-//                            parts: [{ text: "I am a helpful AI assistant powered by Google's Gemini model." }],
-//                        },
-//                    ],
-                });
-
-                hideModal();
-            } catch (error) {
-                alert("Error initializing Gemini: " + error.message);
-                showModal();
-            }
-        }
-
-        // --- Core Chat Logic ---
-
+        // Core logic to talk to proxy2.php
         async function handleChat(message) {
             if (!message) return;
 
             userInput.value = '';
+            userInput.style.height = '44px';
             appendMessage('user', message);
             const loadingId = appendLoading();
 
             try {
-                // We now call our OWN server, not Google's directly
                 const response = await fetch('proxy2.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: message })
                 });
 
+                if (!response.ok) throw new Error('Proxy error or invalid response');
+
                 const data = await response.json();
 
-                // Extract the text from Gemini's standard response format
-                const text = data.candidates[0].content.parts[0].text;
+                // Handle the Gemini API structure returned from PHP
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "I received an unexpected response format.";
 
                 removeLoading(loadingId);
                 appendMessage('model', text);
 
             } catch (error) {
                 removeLoading(loadingId);
-                appendMessage('error', 'Connection error. Check your server proxy.');
+                appendMessage('error', 'Error connecting to server. Please check proxy2.php.');
                 console.error(error);
             }
         }
-        // --- Event Listeners ---
 
-        saveKeyBtn.addEventListener('click', () => {
-            const key = keyInput.value.trim();
-            if (key) {
-                apiKey = key;
-                localStorage.setItem('gemini_api_key', key);
-                initializeGemini(key);
-            } else {
-                alert('Please enter a valid API key');
-            }
-        });
-
-        settingsBtn.addEventListener('click', showModal);
-
-        // Auto-resize textarea
-        userInput.addEventListener('input', function () {
-            this.style.height = 'auto';
-            this.style.height = (this.scrollHeight) + 'px';
-            if (this.value === '') this.style.height = '44px';
-        });
-
-        // Handle Enter key
-        userInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                chatForm.dispatchEvent(new Event('submit'));
-            }
-        });
-
-        chatForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            handleChat(userInput.value.trim());
-        });
-
-        // --- Tool Logic ---
-
-        btnSummarize.addEventListener('click', () => {
-            handleChat("Please provide a concise summary of our conversation so far, highlighting the key points in a bulleted list.");
-        });
-
-        btnEli5.addEventListener('click', () => {
-            handleChat("Can you explain the last concept or response simply, like I'm 5 years old? Use an analogy if possible.");
-        });
-
-        btnBrainstorm.addEventListener('click', () => {
-            const currentText = userInput.value.trim();
-            if (currentText) {
-                handleChat(`Brainstorm 5 creative ideas or variations based on this topic: "${currentText}"`);
-            } else {
-                handleChat("Please brainstorm 5 random, creative ideas for a software project or helpful tool.");
-            }
-        });
-
-        btnCode.addEventListener('click', () => {
-            handleChat("Please provide a code example (in Python or JavaScript) that demonstrates the concept we are currently discussing.");
-        });
-
-        // --- UI Helpers ---
-
+        // UI Helpers
         function appendMessage(role, text) {
             const div = document.createElement('div');
-            div.className = `flex gap-4 max-w-3xl mx-auto opacity-0 animate-fade-in ${role === 'user' ? 'flex-row-reverse' : ''}`;
+            div.className = `flex gap-4 max-w-3xl mx-auto ${role === 'user' ? 'flex-row-reverse' : ''}`;
             div.style.animation = 'fadeIn 0.3s forwards';
 
             const avatar = document.createElement('div');
-            avatar.className = `w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs ${role === 'user' ? 'bg-gray-700' :
-                    role === 'error' ? 'bg-red-500' :
-                        'bg-gradient-to-tr from-blue-500 to-purple-500'
-                }`;
+            avatar.className = `w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs ${role === 'user' ? 'bg-gray-700' : role === 'error' ? 'bg-red-500' : 'bg-gradient-to-tr from-blue-500 to-purple-500'}`;
             avatar.textContent = role === 'user' ? 'You' : 'AI';
 
             const bubble = document.createElement('div');
-            bubble.className = `flex-1 p-4 rounded-2xl shadow-sm text-sm leading-relaxed ${role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' :
-                    role === 'error' ? 'bg-red-50 text-red-600 border border-red-100' :
-                        'bg-white text-gray-800 border border-gray-100 rounded-tl-none markdown-body'
-                }`;
+            bubble.className = `flex-1 p-4 rounded-2xl shadow-sm text-sm leading-relaxed ${role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : role === 'error' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none markdown-body'}`;
 
             if (role === 'model' || role === 'error') {
                 bubble.innerHTML = marked.parse(text);
@@ -413,27 +233,23 @@
             div.appendChild(avatar);
             div.appendChild(bubble);
             chatHistory.appendChild(div);
-            scrollToBottom();
+            chatHistory.scrollTop = chatHistory.scrollHeight;
         }
 
         function appendLoading() {
             const id = 'loading-' + Date.now();
             const div = document.createElement('div');
             div.id = id;
-            div.className = "flex gap-4 max-w-3xl mx-auto opacity-0 animate-fade-in";
-            div.style.animation = 'fadeIn 0.3s forwards';
-
+            div.className = "flex gap-4 max-w-3xl mx-auto";
             div.innerHTML = `
                 <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex-shrink-0 flex items-center justify-center text-white text-xs">AI</div>
                 <div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm border border-gray-100 flex items-center gap-1 h-12">
                     <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
                     <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
                     <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
-                </div>
-            `;
-
+                </div>`;
             chatHistory.appendChild(div);
-            scrollToBottom();
+            chatHistory.scrollTop = chatHistory.scrollHeight;
             return id;
         }
 
@@ -442,22 +258,33 @@
             if (el) el.remove();
         }
 
-        function scrollToBottom() {
-            chatHistory.scrollTop = chatHistory.scrollHeight;
-        }
+        // Listeners
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            handleChat(userInput.value.trim());
+        });
 
-        // Add Keyframes for animations
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                chatForm.dispatchEvent(new Event('submit'));
             }
-        `;
-        document.head.appendChild(style);
+        });
 
-        // Start
-        init();
+        userInput.addEventListener('input', function () {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+            if (this.value === '') this.style.height = '44px';
+        });
+
+        // Tool Listeners
+        document.getElementById('toolSummarize').addEventListener('click', () => handleChat("Summarize our conversation so far in a few bullet points."));
+        document.getElementById('toolEli5').addEventListener('click', () => handleChat("Explain the last concept like I'm 5 years old."));
+        document.getElementById('toolBrainstorm').addEventListener('click', () => {
+            const topic = userInput.value.trim() || "a physics-based educational game";
+            handleChat(`Brainstorm 5 creative ideas for: ${topic}`);
+        });
+        document.getElementById('toolCode').addEventListener('click', () => handleChat("Show me a Python or JavaScript example related to our discussion."));
     </script>
 </body>
 

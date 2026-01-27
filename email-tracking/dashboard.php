@@ -50,6 +50,36 @@ if (!isset($_SESSION['authenticated'])) {
     }
 }
 
+// Handle flush database request
+$flush_message = '';
+if (isset($_GET['flush']) && $_GET['flush'] === 'confirm') {
+    try {
+        $pdo = new PDO(
+            "mysql:host=$DB_HOST;dbname=$DB_NAME;charset=utf8mb4",
+            $DB_USER,
+            $DB_PASS,
+            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+        );
+        // Delete in correct order due to foreign key constraints
+        $pdo->exec("DELETE FROM email_opens");
+        $pdo->exec("DELETE FROM email_sent");
+        $flush_message = 'success';
+    } catch (PDOException $e) {
+        $flush_message = 'error: ' . $e->getMessage();
+    }
+}
+
+// Handle sorting
+$sort_column = $_GET['sort'] ?? 'sent_at';
+$sort_dir = $_GET['dir'] ?? 'DESC';
+
+// Whitelist valid sort columns to prevent SQL injection
+$valid_columns = ['student_id', 'recipient_name', 'recipient_email', 'subject', 'sent_at', 'open_count', 'status'];
+if (!in_array($sort_column, $valid_columns)) {
+    $sort_column = 'sent_at';
+}
+$sort_dir = strtoupper($sort_dir) === 'ASC' ? 'ASC' : 'DESC';
+
 // Fetch data from database
 try {
     $pdo = new PDO(
@@ -69,7 +99,7 @@ try {
     ");
     $stats = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // Get individual email records
+    // Get individual email records with sorting
     $stmt = $pdo->query("
         SELECT
             student_id,
@@ -81,13 +111,23 @@ try {
             first_opened_at,
             status
         FROM email_stats
-        ORDER BY sent_at DESC
+        ORDER BY $sort_column $sort_dir
         LIMIT 100
     ");
     $emails = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 } catch (PDOException $e) {
     die("Database error: " . $e->getMessage());
+}
+
+// Helper function to generate sort link
+function sortLink($column, $label, $current_sort, $current_dir) {
+    $new_dir = ($current_sort === $column && $current_dir === 'ASC') ? 'DESC' : 'ASC';
+    $arrow = '';
+    if ($current_sort === $column) {
+        $arrow = $current_dir === 'ASC' ? ' ▲' : ' ▼';
+    }
+    return "<a href=\"?sort=$column&dir=$new_dir\" style=\"color: white; text-decoration: none;\">$label$arrow</a>";
 }
 ?>
 <!DOCTYPE html>
@@ -212,6 +252,111 @@ try {
         .refresh:hover {
             background: #218838;
         }
+        .export {
+            float: right;
+            margin-right: 10px;
+            background: #6c757d;
+            color: white;
+            padding: 8px 16px;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .export:hover {
+            background: #5a6268;
+        }
+        th a {
+            color: white;
+            text-decoration: none;
+        }
+        th a:hover {
+            text-decoration: underline;
+        }
+        .flush {
+            float: right;
+            margin-right: 10px;
+            background: #dc3545;
+            color: white;
+            padding: 8px 16px;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 14px;
+            border: none;
+            cursor: pointer;
+        }
+        .flush:hover {
+            background: #c82333;
+        }
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 450px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        .modal h3 {
+            color: #dc3545;
+            margin-bottom: 15px;
+        }
+        .modal p {
+            margin-bottom: 20px;
+            color: #666;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .modal-buttons a, .modal-buttons button {
+            padding: 10px 20px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 14px;
+            cursor: pointer;
+            border: none;
+        }
+        .btn-cancel {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-cancel:hover {
+            background: #5a6268;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
     </style>
 </head>
 <body>
@@ -220,7 +365,19 @@ try {
             Email Tracking Dashboard
             <a href="?logout" class="logout">Logout</a>
             <a href="dashboard.php" class="refresh">Refresh</a>
+            <a href="export_unopened.php" class="export">Export Unopened</a>
+            <button class="flush" onclick="document.getElementById('flushModal').style.display='flex'">Flush Database</button>
         </h1>
+
+        <?php if ($flush_message === 'success'): ?>
+            <div class="alert alert-success">
+                Database flushed successfully. All tracking data has been deleted.
+            </div>
+        <?php elseif ($flush_message): ?>
+            <div class="alert alert-error">
+                Error flushing database: <?= htmlspecialchars(str_replace('error: ', '', $flush_message)) ?>
+            </div>
+        <?php endif; ?>
 
         <div class="stats-cards">
             <div class="card">
@@ -240,14 +397,14 @@ try {
         <table>
             <thead>
                 <tr>
-                    <th>Student ID</th>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Subject</th>
-                    <th>Sent</th>
-                    <th>Opens</th>
+                    <th><?= sortLink('student_id', 'Student ID', $sort_column, $sort_dir) ?></th>
+                    <th><?= sortLink('recipient_name', 'Name', $sort_column, $sort_dir) ?></th>
+                    <th><?= sortLink('recipient_email', 'Email', $sort_column, $sort_dir) ?></th>
+                    <th><?= sortLink('subject', 'Subject', $sort_column, $sort_dir) ?></th>
+                    <th><?= sortLink('sent_at', 'Sent', $sort_column, $sort_dir) ?></th>
+                    <th><?= sortLink('open_count', 'Opens', $sort_column, $sort_dir) ?></th>
                     <th>First Opened</th>
-                    <th>Status</th>
+                    <th><?= sortLink('status', 'Status', $sort_column, $sort_dir) ?></th>
                 </tr>
             </thead>
             <tbody>
@@ -277,6 +434,18 @@ try {
                 <?php endif; ?>
             </tbody>
         </table>
+    </div>
+
+    <!-- Flush Confirmation Modal -->
+    <div class="modal-overlay" id="flushModal">
+        <div class="modal">
+            <h3>Flush Database?</h3>
+            <p>This will permanently delete <strong>ALL</strong> email tracking data including sent records and open events. This action cannot be undone!</p>
+            <div class="modal-buttons">
+                <button class="btn-cancel" onclick="document.getElementById('flushModal').style.display='none'">Cancel</button>
+                <a href="?flush=confirm" class="btn-danger">Yes, Delete Everything</a>
+            </div>
+        </div>
     </div>
 </body>
 </html>

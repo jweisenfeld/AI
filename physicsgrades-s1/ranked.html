@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html><head><meta charset='utf-8'>
+<title>Ranked Student Grades</title>
+
+<style>
+  body { font-family: Arial, sans-serif; margin: 16px; }
+  .controls { margin: 12px 0 16px 0; display: flex; gap: 8px; flex-wrap: wrap; }
+  button { padding: 8px 12px; cursor: pointer; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #ccc; padding: 6px 8px; }
+  th { background: #f3f3f3; }
+  .note { color: #555; font-size: 0.95em; margin-top: 6px; }
+</style>
+</head><body>
+<h1>Ranked Student Grades</h1>
+
+<div class="controls">
+  <button type="button" onclick="sortBy('percent')">Sort by Percent</button>
+  <button type="button" onclick="sortBy('last')">Sort by Last Name</button>
+  <button type="button" onclick="sortBy('first')">Sort by First Name</button>
+</div>
+<div class="note"><a href="https://psd1.net/physicsgrades/master.calendar.html" target="_blank"
+    rel="noopener noreferrer">Master Calendar</a> | <a href="https://psd1.net/public/s2.png" target="_blank"
+    rel="noopener noreferrer">S2 Adventures</a> | <a href="https://psd1.net/public/scale.png" target="_blank"
+    rel="noopener noreferrer">SBG Scale</a> | <a href="http://psd1.us/calendar" target="_blank"
+    rel="noopener noreferrer">PSD1 Calendar</a></div>
+<table id="gradesTable" border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Student Name</th>
+      <th>Student Number</th>
+      <th>Final Grade</th>
+      <th>Percent</th>
+      <th>Graphs</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Garcia, Elijah J.</td>
+      <td>45563</td>
+      <td>2.0</td>
+      <td>0.64</td>
+      <td><a href="http://psd1.net/physicsgrades/45563.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45563.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45563.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Johnson, Eli</td>
+      <td>52842</td>
+      <td>2.0</td>
+      <td>0.65</td>
+      <td><a href="http://psd1.net/physicsgrades/52842.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/52842.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/52842.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Ibarra, Julian</td>
+      <td>45550</td>
+      <td>2.0</td>
+      <td>0.66</td>
+      <td><a href="http://psd1.net/physicsgrades/45550.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45550.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45550.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Ramirez Garcia, Joel M.</td>
+      <td>40700</td>
+      <td>2.0</td>
+      <td>0.67</td>
+      <td><a href="http://psd1.net/physicsgrades/40700.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/40700.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/40700.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Paolo, Parker A.</td>
+      <td>63045</td>
+      <td>2.0</td>
+      <td>0.68</td>
+      <td><a href="http://psd1.net/physicsgrades/63045.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/63045.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/63045.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Razo, Juan F.</td>
+      <td>45882</td>
+      <td>2.3</td>
+      <td>0.70</td>
+      <td><a href="http://psd1.net/physicsgrades/45882.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45882.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45882.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Hueso Cardenas, Jose I.</td>
+      <td>45735</td>
+      <td>2.3</td>
+      <td>0.70</td>
+      <td><a href="http://psd1.net/physicsgrades/45735.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45735.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45735.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Salazar, Erik</td>
+      <td>46049</td>
+      <td>2.3</td>
+      <td>0.71</td>
+      <td><a href="http://psd1.net/physicsgrades/46049.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46049.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46049.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Picicci, Landon J.</td>
+      <td>46144</td>
+      <td>2.3</td>
+      <td>0.71</td>
+      <td><a href="http://psd1.net/physicsgrades/46144.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46144.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46144.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Escamilla, David A.</td>
+      <td>46550</td>
+      <td>2.3</td>
+      <td>0.71</td>
+      <td><a href="http://psd1.net/physicsgrades/46550.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46550.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46550.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Birrueta Contreras, Alondra</td>
+      <td>44775</td>
+      <td>2.3</td>
+      <td>0.72</td>
+      <td><a href="http://psd1.net/physicsgrades/44775.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/44775.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/44775.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Lizarraga, Edgar J.</td>
+      <td>45934</td>
+      <td>2.3</td>
+      <td>0.72</td>
+      <td><a href="http://psd1.net/physicsgrades/45934.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45934.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45934.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Mejia Rodriguez, Isabela</td>
+      <td>46039</td>
+      <td>2.3</td>
+      <td>0.72</td>
+      <td><a href="http://psd1.net/physicsgrades/46039.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46039.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46039.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Vazquez, Adrian</td>
+      <td>44160</td>
+      <td>2.3</td>
+      <td>0.73</td>
+      <td><a href="http://psd1.net/physicsgrades/44160.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/44160.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/44160.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Moreno, Evalyn J.</td>
+      <td>54167</td>
+      <td>2.3</td>
+      <td>0.73</td>
+      <td><a href="http://psd1.net/physicsgrades/54167.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/54167.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/54167.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Torres Garcia, Zsurya G.</td>
+      <td>44136</td>
+      <td>2.3</td>
+      <td>0.73</td>
+      <td><a href="http://psd1.net/physicsgrades/44136.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/44136.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/44136.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Martynyuk, Joseph</td>
+      <td>50584</td>
+      <td>2.3</td>
+      <td>0.73</td>
+      <td><a href="http://psd1.net/physicsgrades/50584.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/50584.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/50584.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Mendoza, Juan</td>
+      <td>45752</td>
+      <td>2.3</td>
+      <td>0.74</td>
+      <td><a href="http://psd1.net/physicsgrades/45752.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45752.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45752.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Silva, Said</td>
+      <td>64720</td>
+      <td>2.3</td>
+      <td>0.74</td>
+      <td><a href="http://psd1.net/physicsgrades/64720.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/64720.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/64720.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Estrada Reyes, Oscar A.</td>
+      <td>51567</td>
+      <td>2.3</td>
+      <td>0.74</td>
+      <td><a href="http://psd1.net/physicsgrades/51567.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/51567.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/51567.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Howe, Austin T.</td>
+      <td>34259</td>
+      <td>2.7</td>
+      <td>0.75</td>
+      <td><a href="http://psd1.net/physicsgrades/34259.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/34259.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/34259.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Castro, Christneylli</td>
+      <td>45931</td>
+      <td>2.7</td>
+      <td>0.75</td>
+      <td><a href="http://psd1.net/physicsgrades/45931.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45931.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45931.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Almaraz Ramirez, Magaby R.</td>
+      <td>45855</td>
+      <td>2.7</td>
+      <td>0.75</td>
+      <td><a href="http://psd1.net/physicsgrades/45855.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45855.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45855.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Alvarado R, Marco A.</td>
+      <td>46018</td>
+      <td>2.7</td>
+      <td>0.75</td>
+      <td><a href="http://psd1.net/physicsgrades/46018.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46018.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46018.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Anguiano Valencia, Eric</td>
+      <td>46906</td>
+      <td>2.7</td>
+      <td>0.75</td>
+      <td><a href="http://psd1.net/physicsgrades/46906.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46906.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46906.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Alvarado Gonzalez, Noel N.</td>
+      <td>46761</td>
+      <td>2.7</td>
+      <td>0.76</td>
+      <td><a href="http://psd1.net/physicsgrades/46761.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46761.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46761.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Harshberger III, Richard G.</td>
+      <td>46328</td>
+      <td>2.7</td>
+      <td>0.77</td>
+      <td><a href="http://psd1.net/physicsgrades/46328.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46328.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46328.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Guizar Santana, Jimena</td>
+      <td>45869</td>
+      <td>2.7</td>
+      <td>0.77</td>
+      <td><a href="http://psd1.net/physicsgrades/45869.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45869.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45869.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Bushaw, Rowen</td>
+      <td>46101</td>
+      <td>2.7</td>
+      <td>0.77</td>
+      <td><a href="http://psd1.net/physicsgrades/46101.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46101.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46101.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Angulo, Cesar A.</td>
+      <td>44608</td>
+      <td>2.7</td>
+      <td>0.78</td>
+      <td><a href="http://psd1.net/physicsgrades/44608.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/44608.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/44608.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Moreno Villatoro, Yatziri</td>
+      <td>44690</td>
+      <td>2.7</td>
+      <td>0.78</td>
+      <td><a href="http://psd1.net/physicsgrades/44690.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/44690.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/44690.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Schouviller, Teagan M.</td>
+      <td>47077</td>
+      <td>2.7</td>
+      <td>0.79</td>
+      <td><a href="http://psd1.net/physicsgrades/47077.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/47077.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/47077.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Leal Ortiz, Justin M.</td>
+      <td>45844</td>
+      <td>2.7</td>
+      <td>0.79</td>
+      <td><a href="http://psd1.net/physicsgrades/45844.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45844.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45844.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Gutierrez Bernal, Juan A.</td>
+      <td>54385</td>
+      <td>2.7</td>
+      <td>0.79</td>
+      <td><a href="http://psd1.net/physicsgrades/54385.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/54385.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/54385.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Dorante, Rony</td>
+      <td>65043</td>
+      <td>2.7</td>
+      <td>0.79</td>
+      <td><a href="http://psd1.net/physicsgrades/65043.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/65043.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/65043.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Figueroa, Bruno B.</td>
+      <td>48056</td>
+      <td>2.7</td>
+      <td>0.79</td>
+      <td><a href="http://psd1.net/physicsgrades/48056.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/48056.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/48056.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Hernandez, Diego</td>
+      <td>45749</td>
+      <td>2.7</td>
+      <td>0.79</td>
+      <td><a href="http://psd1.net/physicsgrades/45749.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45749.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45749.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Lopez tellez, Rodrigo</td>
+      <td>45557</td>
+      <td>2.7</td>
+      <td>0.79</td>
+      <td><a href="http://psd1.net/physicsgrades/45557.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45557.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45557.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Pelegrin Granillo, Gisel A.</td>
+      <td>45843</td>
+      <td>2.7</td>
+      <td>0.79</td>
+      <td><a href="http://psd1.net/physicsgrades/45843.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45843.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45843.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Bloom, Ethan M.</td>
+      <td>46201</td>
+      <td>2.7</td>
+      <td>0.79</td>
+      <td><a href="http://psd1.net/physicsgrades/46201.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46201.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46201.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Jimenez, Yelitza</td>
+      <td>73543</td>
+      <td>3.0</td>
+      <td>0.80</td>
+      <td><a href="http://psd1.net/physicsgrades/73543.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/73543.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/73543.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Rodriguez Villegas, Julianna</td>
+      <td>64971</td>
+      <td>3.0</td>
+      <td>0.80</td>
+      <td><a href="http://psd1.net/physicsgrades/64971.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/64971.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/64971.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Cervantes, Axel A.</td>
+      <td>44188</td>
+      <td>3.0</td>
+      <td>0.81</td>
+      <td><a href="http://psd1.net/physicsgrades/44188.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/44188.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/44188.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Cardenas, Alexis L.</td>
+      <td>39407</td>
+      <td>3.0</td>
+      <td>0.81</td>
+      <td><a href="http://psd1.net/physicsgrades/39407.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/39407.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/39407.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Johnson, Jordyn</td>
+      <td>66003</td>
+      <td>3.0</td>
+      <td>0.81</td>
+      <td><a href="http://psd1.net/physicsgrades/66003.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/66003.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/66003.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Macias, Edgar</td>
+      <td>45525</td>
+      <td>3.0</td>
+      <td>0.81</td>
+      <td><a href="http://psd1.net/physicsgrades/45525.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45525.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45525.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Nikitenko, Veronika V.</td>
+      <td>49496</td>
+      <td>3.0</td>
+      <td>0.81</td>
+      <td><a href="http://psd1.net/physicsgrades/49496.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/49496.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/49496.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Rodriguez, Irvin Y.</td>
+      <td>62780</td>
+      <td>3.0</td>
+      <td>0.82</td>
+      <td><a href="http://psd1.net/physicsgrades/62780.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/62780.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/62780.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Arroyo, Samuel</td>
+      <td>41702</td>
+      <td>3.0</td>
+      <td>0.82</td>
+      <td><a href="http://psd1.net/physicsgrades/41702.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/41702.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/41702.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Gis, Nathan A.</td>
+      <td>46796</td>
+      <td>3.0</td>
+      <td>0.82</td>
+      <td><a href="http://psd1.net/physicsgrades/46796.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46796.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46796.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Jaimes, Joselyn</td>
+      <td>45678</td>
+      <td>3.0</td>
+      <td>0.82</td>
+      <td><a href="http://psd1.net/physicsgrades/45678.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45678.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45678.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Martinez, Mailee</td>
+      <td>44207</td>
+      <td>3.0</td>
+      <td>0.83</td>
+      <td><a href="http://psd1.net/physicsgrades/44207.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/44207.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/44207.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Martinez, Arnold J.</td>
+      <td>53564</td>
+      <td>3.0</td>
+      <td>0.83</td>
+      <td><a href="http://psd1.net/physicsgrades/53564.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/53564.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/53564.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Meise, Carter J.</td>
+      <td>60437</td>
+      <td>3.0</td>
+      <td>0.83</td>
+      <td><a href="http://psd1.net/physicsgrades/60437.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/60437.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/60437.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Barajas, Edel A.</td>
+      <td>45898</td>
+      <td>3.0</td>
+      <td>0.84</td>
+      <td><a href="http://psd1.net/physicsgrades/45898.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45898.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45898.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Villanueva Alcaraz, Edgar S.</td>
+      <td>53094</td>
+      <td>3.0</td>
+      <td>0.84</td>
+      <td><a href="http://psd1.net/physicsgrades/53094.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/53094.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/53094.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Gonzalez, Alani</td>
+      <td>33272</td>
+      <td>3.0</td>
+      <td>0.84</td>
+      <td><a href="http://psd1.net/physicsgrades/33272.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/33272.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/33272.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Ochoa Bustos, Aaron I.</td>
+      <td>68331</td>
+      <td>3.0</td>
+      <td>0.84</td>
+      <td><a href="http://psd1.net/physicsgrades/68331.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/68331.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/68331.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Gomez Chavez, Ruby</td>
+      <td>38915</td>
+      <td>3.0</td>
+      <td>0.84</td>
+      <td><a href="http://psd1.net/physicsgrades/38915.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/38915.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/38915.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Silva Mora, Karen</td>
+      <td>45576</td>
+      <td>3.0</td>
+      <td>0.84</td>
+      <td><a href="http://psd1.net/physicsgrades/45576.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45576.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45576.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Rimmasch, Bedryn R.</td>
+      <td>46687</td>
+      <td>3.3</td>
+      <td>0.85</td>
+      <td><a href="http://psd1.net/physicsgrades/46687.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46687.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46687.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Chacon, Karley A.</td>
+      <td>46003</td>
+      <td>3.3</td>
+      <td>0.85</td>
+      <td><a href="http://psd1.net/physicsgrades/46003.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46003.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46003.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Moon, Julia</td>
+      <td>47274</td>
+      <td>3.3</td>
+      <td>0.85</td>
+      <td><a href="http://psd1.net/physicsgrades/47274.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/47274.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/47274.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Ortiz Cruz, Ixayana</td>
+      <td>46855</td>
+      <td>3.3</td>
+      <td>0.85</td>
+      <td><a href="http://psd1.net/physicsgrades/46855.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46855.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46855.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Tapia Sanchez, Kevin E.</td>
+      <td>46042</td>
+      <td>3.3</td>
+      <td>0.85</td>
+      <td><a href="http://psd1.net/physicsgrades/46042.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46042.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46042.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Polomsky, Raphael</td>
+      <td>49071</td>
+      <td>3.3</td>
+      <td>0.85</td>
+      <td><a href="http://psd1.net/physicsgrades/49071.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/49071.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/49071.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Vazquez, Axel F.</td>
+      <td>37060</td>
+      <td>3.3</td>
+      <td>0.85</td>
+      <td><a href="http://psd1.net/physicsgrades/37060.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/37060.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/37060.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Duran Hernandez, Angel D.</td>
+      <td>52629</td>
+      <td>3.3</td>
+      <td>0.86</td>
+      <td><a href="http://psd1.net/physicsgrades/52629.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/52629.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/52629.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Lawty, Kaleb</td>
+      <td>47139</td>
+      <td>3.3</td>
+      <td>0.86</td>
+      <td><a href="http://psd1.net/physicsgrades/47139.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/47139.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/47139.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Stigum, Hoyt D.</td>
+      <td>66984</td>
+      <td>3.3</td>
+      <td>0.86</td>
+      <td><a href="http://psd1.net/physicsgrades/66984.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/66984.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/66984.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Gonzalez, Adrian</td>
+      <td>65525</td>
+      <td>3.3</td>
+      <td>0.86</td>
+      <td><a href="http://psd1.net/physicsgrades/65525.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/65525.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/65525.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Lara Chavez, Salvador A.</td>
+      <td>48086</td>
+      <td>3.3</td>
+      <td>0.86</td>
+      <td><a href="http://psd1.net/physicsgrades/48086.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/48086.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/48086.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Calderon Moran, Santiago</td>
+      <td>45838</td>
+      <td>3.3</td>
+      <td>0.86</td>
+      <td><a href="http://psd1.net/physicsgrades/45838.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45838.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45838.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Gonzalez Acevedo, Alan A.</td>
+      <td>45881</td>
+      <td>3.3</td>
+      <td>0.87</td>
+      <td><a href="http://psd1.net/physicsgrades/45881.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45881.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45881.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Barajas Rivera, Monserat</td>
+      <td>45600</td>
+      <td>3.3</td>
+      <td>0.87</td>
+      <td><a href="http://psd1.net/physicsgrades/45600.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45600.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45600.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Valencia, Alan N.</td>
+      <td>45627</td>
+      <td>3.3</td>
+      <td>0.87</td>
+      <td><a href="http://psd1.net/physicsgrades/45627.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45627.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45627.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Cabrera Esparza, Alexis</td>
+      <td>45819</td>
+      <td>3.3</td>
+      <td>0.88</td>
+      <td><a href="http://psd1.net/physicsgrades/45819.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45819.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45819.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Stanley Dickhaut, Zyrian I.</td>
+      <td>47289</td>
+      <td>3.3</td>
+      <td>0.88</td>
+      <td><a href="http://psd1.net/physicsgrades/47289.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/47289.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/47289.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Contreras Alvarez, Lizeth</td>
+      <td>45989</td>
+      <td>3.3</td>
+      <td>0.88</td>
+      <td><a href="http://psd1.net/physicsgrades/45989.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45989.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45989.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Marichal, Yasiel</td>
+      <td>46464</td>
+      <td>3.3</td>
+      <td>0.88</td>
+      <td><a href="http://psd1.net/physicsgrades/46464.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46464.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46464.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Guzman, Jose A.</td>
+      <td>47377</td>
+      <td>3.3</td>
+      <td>0.88</td>
+      <td><a href="http://psd1.net/physicsgrades/47377.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/47377.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/47377.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Trujillo Torres, Rafael</td>
+      <td>46834</td>
+      <td>3.3</td>
+      <td>0.88</td>
+      <td><a href="http://psd1.net/physicsgrades/46834.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46834.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46834.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Viramontes Salas, Andres</td>
+      <td>46133</td>
+      <td>3.3</td>
+      <td>0.88</td>
+      <td><a href="http://psd1.net/physicsgrades/46133.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46133.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46133.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Sandoval, Nayeli</td>
+      <td>46050</td>
+      <td>3.3</td>
+      <td>0.89</td>
+      <td><a href="http://psd1.net/physicsgrades/46050.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46050.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46050.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Cervantes, Angel O.</td>
+      <td>42006</td>
+      <td>3.3</td>
+      <td>0.89</td>
+      <td><a href="http://psd1.net/physicsgrades/42006.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/42006.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/42006.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Patterson, Kristin A.</td>
+      <td>45929</td>
+      <td>3.3</td>
+      <td>0.89</td>
+      <td><a href="http://psd1.net/physicsgrades/45929.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45929.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45929.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Rivera, Alejandra V.</td>
+      <td>47055</td>
+      <td>3.3</td>
+      <td>0.89</td>
+      <td><a href="http://psd1.net/physicsgrades/47055.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/47055.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/47055.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Olivares, Jocelyn</td>
+      <td>45933</td>
+      <td>3.3</td>
+      <td>0.89</td>
+      <td><a href="http://psd1.net/physicsgrades/45933.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45933.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45933.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Bravo Balbuena, Jenedy I.</td>
+      <td>44123</td>
+      <td>3.3</td>
+      <td>0.89</td>
+      <td><a href="http://psd1.net/physicsgrades/44123.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/44123.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/44123.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Duarte Aguilar, Carlos E.</td>
+      <td>44714</td>
+      <td>3.3</td>
+      <td>0.89</td>
+      <td><a href="http://psd1.net/physicsgrades/44714.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/44714.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/44714.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Gutierrez Rivera, Natalia G.</td>
+      <td>54871</td>
+      <td>3.3</td>
+      <td>0.89</td>
+      <td><a href="http://psd1.net/physicsgrades/54871.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/54871.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/54871.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Miranda, Santiago X.</td>
+      <td>45429</td>
+      <td>3.7</td>
+      <td>0.90</td>
+      <td><a href="http://psd1.net/physicsgrades/45429.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45429.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45429.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Ramirez, Eduardo G.</td>
+      <td>47369</td>
+      <td>3.7</td>
+      <td>0.90</td>
+      <td><a href="http://psd1.net/physicsgrades/47369.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/47369.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/47369.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Oo, May Thin</td>
+      <td>55712</td>
+      <td>3.7</td>
+      <td>0.90</td>
+      <td><a href="http://psd1.net/physicsgrades/55712.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/55712.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/55712.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Hughes, Lincoln M.</td>
+      <td>41473</td>
+      <td>3.7</td>
+      <td>0.90</td>
+      <td><a href="http://psd1.net/physicsgrades/41473.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/41473.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/41473.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Arroyo, Antonio</td>
+      <td>41701</td>
+      <td>3.7</td>
+      <td>0.90</td>
+      <td><a href="http://psd1.net/physicsgrades/41701.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/41701.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/41701.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Farias Sanchez, Joel A.</td>
+      <td>45857</td>
+      <td>3.7</td>
+      <td>0.90</td>
+      <td><a href="http://psd1.net/physicsgrades/45857.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45857.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45857.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Ramirez, Aryanna</td>
+      <td>46183</td>
+      <td>3.7</td>
+      <td>0.91</td>
+      <td><a href="http://psd1.net/physicsgrades/46183.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46183.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46183.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Jaimes Carrillo, Isela Itzayana</td>
+      <td>52927</td>
+      <td>3.7</td>
+      <td>0.91</td>
+      <td><a href="http://psd1.net/physicsgrades/52927.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/52927.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/52927.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Garcia Aviles, Violeta G.</td>
+      <td>47137</td>
+      <td>3.7</td>
+      <td>0.91</td>
+      <td><a href="http://psd1.net/physicsgrades/47137.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/47137.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/47137.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Chavez Pantoja, Javier</td>
+      <td>45813</td>
+      <td>3.7</td>
+      <td>0.91</td>
+      <td><a href="http://psd1.net/physicsgrades/45813.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45813.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45813.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Garcia Gonzalez, Luis A.</td>
+      <td>46058</td>
+      <td>3.7</td>
+      <td>0.91</td>
+      <td><a href="http://psd1.net/physicsgrades/46058.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46058.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46058.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Gamboa Magana, Giovanni</td>
+      <td>46383</td>
+      <td>3.7</td>
+      <td>0.92</td>
+      <td><a href="http://psd1.net/physicsgrades/46383.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46383.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46383.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Fajardo Inzunza, Ariana M.</td>
+      <td>45866</td>
+      <td>3.7</td>
+      <td>0.92</td>
+      <td><a href="http://psd1.net/physicsgrades/45866.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45866.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45866.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Gutierrez Flores, Mirka</td>
+      <td>45745</td>
+      <td>3.7</td>
+      <td>0.92</td>
+      <td><a href="http://psd1.net/physicsgrades/45745.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45745.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45745.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Rodriguez Figueroa, Kimberly G.</td>
+      <td>46444</td>
+      <td>3.7</td>
+      <td>0.92</td>
+      <td><a href="http://psd1.net/physicsgrades/46444.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46444.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46444.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Vasquez, Gage R.</td>
+      <td>45508</td>
+      <td>3.7</td>
+      <td>0.92</td>
+      <td><a href="http://psd1.net/physicsgrades/45508.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45508.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45508.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Ortiz Guzman, Christian</td>
+      <td>46795</td>
+      <td>3.7</td>
+      <td>0.92</td>
+      <td><a href="http://psd1.net/physicsgrades/46795.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46795.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46795.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Weerakkody, Olivia S.</td>
+      <td>46909</td>
+      <td>3.7</td>
+      <td>0.92</td>
+      <td><a href="http://psd1.net/physicsgrades/46909.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46909.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46909.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Gomez, Jose</td>
+      <td>45771</td>
+      <td>3.7</td>
+      <td>0.93</td>
+      <td><a href="http://psd1.net/physicsgrades/45771.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45771.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45771.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Gutierrez, Cesar S.</td>
+      <td>64700</td>
+      <td>3.7</td>
+      <td>0.93</td>
+      <td><a href="http://psd1.net/physicsgrades/64700.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/64700.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/64700.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Jimenez Garcia, Bayden Ariel</td>
+      <td>68381</td>
+      <td>3.7</td>
+      <td>0.93</td>
+      <td><a href="http://psd1.net/physicsgrades/68381.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/68381.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/68381.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Salazar, Rosaelia</td>
+      <td>47887</td>
+      <td>3.7</td>
+      <td>0.93</td>
+      <td><a href="http://psd1.net/physicsgrades/47887.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/47887.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/47887.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Garcia, Lupe C.</td>
+      <td>45832</td>
+      <td>3.7</td>
+      <td>0.93</td>
+      <td><a href="http://psd1.net/physicsgrades/45832.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45832.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45832.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Maldonado, Elijah C.</td>
+      <td>46615</td>
+      <td>3.7</td>
+      <td>0.93</td>
+      <td><a href="http://psd1.net/physicsgrades/46615.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46615.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46615.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Ramos Roque, Jose R.</td>
+      <td>51465</td>
+      <td>3.7</td>
+      <td>0.94</td>
+      <td><a href="http://psd1.net/physicsgrades/51465.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/51465.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/51465.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Garibay Alvarado, Jairo F.</td>
+      <td>45377</td>
+      <td>4.0</td>
+      <td>0.96</td>
+      <td><a href="http://psd1.net/physicsgrades/45377.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45377.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45377.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Quinton, Jackson G.</td>
+      <td>45930</td>
+      <td>4.0</td>
+      <td>0.96</td>
+      <td><a href="http://psd1.net/physicsgrades/45930.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45930.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45930.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Rivard, Eliyah M.</td>
+      <td>46991</td>
+      <td>4.0</td>
+      <td>0.96</td>
+      <td><a href="http://psd1.net/physicsgrades/46991.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46991.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46991.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Armijo, Laila D.</td>
+      <td>45333</td>
+      <td>4.0</td>
+      <td>0.96</td>
+      <td><a href="http://psd1.net/physicsgrades/45333.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45333.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45333.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Olmos, Giovanni I.</td>
+      <td>51144</td>
+      <td>4.0</td>
+      <td>0.96</td>
+      <td><a href="http://psd1.net/physicsgrades/51144.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/51144.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/51144.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Hernandez, Adrian T.</td>
+      <td>46412</td>
+      <td>4.0</td>
+      <td>0.96</td>
+      <td><a href="http://psd1.net/physicsgrades/46412.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46412.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46412.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Gutierrez Felix, Camila J.</td>
+      <td>48181</td>
+      <td>4.0</td>
+      <td>0.96</td>
+      <td><a href="http://psd1.net/physicsgrades/48181.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/48181.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/48181.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Guzman Rios, Kevin I.</td>
+      <td>45836</td>
+      <td>4.0</td>
+      <td>0.96</td>
+      <td><a href="http://psd1.net/physicsgrades/45836.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45836.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45836.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Valencia Moreno, Jacqueline G.</td>
+      <td>65425</td>
+      <td>4.0</td>
+      <td>0.96</td>
+      <td><a href="http://psd1.net/physicsgrades/65425.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/65425.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/65425.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Austin, Jason Jr C.</td>
+      <td>46037</td>
+      <td>4.0</td>
+      <td>0.96</td>
+      <td><a href="http://psd1.net/physicsgrades/46037.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46037.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46037.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Jimenez Valdivia, Valeria E.</td>
+      <td>62762</td>
+      <td>4.0</td>
+      <td>0.96</td>
+      <td><a href="http://psd1.net/physicsgrades/62762.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/62762.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/62762.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Martinez, Julian A.</td>
+      <td>56718</td>
+      <td>4.0</td>
+      <td>0.96</td>
+      <td><a href="http://psd1.net/physicsgrades/56718.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/56718.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/56718.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Tun, Ma Shwe Z.</td>
+      <td>54626</td>
+      <td>4.0</td>
+      <td>0.96</td>
+      <td><a href="http://psd1.net/physicsgrades/54626.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/54626.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/54626.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Ricciardi, Alexis M.</td>
+      <td>66930</td>
+      <td>4.0</td>
+      <td>0.96</td>
+      <td><a href="http://psd1.net/physicsgrades/66930.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/66930.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/66930.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Escobedo Medrano, Evelyn</td>
+      <td>46176</td>
+      <td>4.0</td>
+      <td>0.97</td>
+      <td><a href="http://psd1.net/physicsgrades/46176.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46176.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46176.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Hernandez, Edgar D.</td>
+      <td>46750</td>
+      <td>4.0</td>
+      <td>0.97</td>
+      <td><a href="http://psd1.net/physicsgrades/46750.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46750.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46750.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Pereira, Heydi M.</td>
+      <td>45568</td>
+      <td>4.0</td>
+      <td>0.97</td>
+      <td><a href="http://psd1.net/physicsgrades/45568.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45568.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45568.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Taw, You'ay B.</td>
+      <td>46588</td>
+      <td>4.0</td>
+      <td>0.97</td>
+      <td><a href="http://psd1.net/physicsgrades/46588.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46588.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46588.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Lopez Urbina, Stephanie T.</td>
+      <td>45423</td>
+      <td>4.0</td>
+      <td>0.98</td>
+      <td><a href="http://psd1.net/physicsgrades/45423.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45423.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45423.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Verduzco, Jessica N.</td>
+      <td>46132</td>
+      <td>4.0</td>
+      <td>0.98</td>
+      <td><a href="http://psd1.net/physicsgrades/46132.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/46132.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/46132.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Miranda, Andrea Z.</td>
+      <td>59315</td>
+      <td>4.0</td>
+      <td>0.98</td>
+      <td><a href="http://psd1.net/physicsgrades/59315.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/59315.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/59315.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Montano, Marie</td>
+      <td>44534</td>
+      <td>4.0</td>
+      <td>0.98</td>
+      <td><a href="http://psd1.net/physicsgrades/44534.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/44534.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/44534.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Guzman Frias, Josabet</td>
+      <td>45597</td>
+      <td>4.0</td>
+      <td>0.99</td>
+      <td><a href="http://psd1.net/physicsgrades/45597.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45597.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45597.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Satia, Sakshum (.</td>
+      <td>45957</td>
+      <td>4.0</td>
+      <td>0.99</td>
+      <td><a href="http://psd1.net/physicsgrades/45957.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/45957.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/45957.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Hughes, Griffin P.</td>
+      <td>41474</td>
+      <td>4.0</td>
+      <td>0.99</td>
+      <td><a href="http://psd1.net/physicsgrades/41474.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/41474.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/41474.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+    <tr>
+      <td>Espindola, Valleria</td>
+      <td>44187</td>
+      <td>4.0</td>
+      <td>1.00</td>
+      <td><a href="http://psd1.net/physicsgrades/44187.png" target="_blank" rel="noopener noreferrer">Latest</a>  |  <a href="http://psd1.net/physicsgrades/44187.html" target="_blank" rel="noopener noreferrer">WhatIf</a>  |  <a href="http://psd1.net/physicsgrades/44187.calendar.html" target="_blank" rel="noopener noreferrer">Calendar</a></td>
+    </tr>
+  </tbody>
+</table>
+<script>
+(function () {
+  const table = document.getElementById('gradesTable');
+  if (!table) return;
+
+  const tbody = table.tBodies[0];
+  const COL_NAME = 0;    // "Student Name"
+  const COL_PERCENT = 3; // "Percent"
+
+  let sortState = { key: null, asc: true };
+
+  function nameParts(fullName) {
+    // Expected: "Last, First Middle"
+    const s = (fullName || '').trim();
+    const comma = s.indexOf(',');
+    if (comma >= 0) {
+      const last = s.slice(0, comma).trim().toLowerCase();
+      const firstRest = s.slice(comma + 1).trim();
+      const first = (firstRest.split(/\s+/)[0] || '').toLowerCase();
+      const rest = firstRest.toLowerCase();
+      return { last, first, rest };
+    }
+    // Fallback if no comma:
+    const parts = s.split(/\s+/).filter(Boolean);
+    const first = (parts[0] || '').toLowerCase();
+    const last = (parts[parts.length - 1] || '').toLowerCase();
+    return { last, first, rest: s.toLowerCase() };
+  }
+
+  function percentValue(text) {
+    const t = (text || '').toString().replace('%','').trim();
+    const v = parseFloat(t);
+    return Number.isFinite(v) ? v : Number.POSITIVE_INFINITY;
+  }
+
+  window.sortBy = function (key) {
+    const rows = Array.from(tbody.rows);
+
+    if (sortState.key === key) sortState.asc = !sortState.asc;
+    else { sortState.key = key; sortState.asc = true; }
+
+    rows.sort((a, b) => {
+      const aName = a.cells[COL_NAME]?.innerText || '';
+      const bName = b.cells[COL_NAME]?.innerText || '';
+
+      let cmp = 0;
+
+      if (key === 'percent') {
+        const aP = percentValue(a.cells[COL_PERCENT]?.innerText);
+        const bP = percentValue(b.cells[COL_PERCENT]?.innerText);
+        cmp = aP - bP;
+        if (cmp === 0) {
+          // tie-break by last then first
+          const an = nameParts(aName), bn = nameParts(bName);
+          cmp = an.last.localeCompare(bn.last) || an.first.localeCompare(bn.first);
+        }
+      } else if (key === 'last') {
+        const an = nameParts(aName), bn = nameParts(bName);
+        cmp = an.last.localeCompare(bn.last) || an.first.localeCompare(bn.first) || an.rest.localeCompare(bn.rest);
+      } else if (key === 'first') {
+        const an = nameParts(aName), bn = nameParts(bName);
+        cmp = an.first.localeCompare(bn.first) || an.last.localeCompare(bn.last) || an.rest.localeCompare(bn.rest);
+      }
+
+      return sortState.asc ? cmp : -cmp;
+    });
+
+    // Re-attach rows in new order
+    for (const r of rows) tbody.appendChild(r);
+  };
+
+  // Optional: keep your current default intent (lowest-to-highest) when the page loads
+  // Comment out if you want to preserve whatever order was written into the HTML.
+  sortState = { key: 'percent', asc: true };
+})();
+</script>
+<div class="note"><a href="https://psd1.net/physicsgrades/master.calendar.html" target="_blank"
+    rel="noopener noreferrer">Master Calendar</a> | <a href="https://psd1.net/public/s2.png" target="_blank"
+    rel="noopener noreferrer">S2 Adventures</a> | <a href="https://psd1.net/public/scale.png" target="_blank"
+    rel="noopener noreferrer">SBG Scale</a> | <a href="http://psd1.us/calendar" target="_blank"
+    rel="noopener noreferrer">PSD1 Calendar</a></div>
+</body></html>

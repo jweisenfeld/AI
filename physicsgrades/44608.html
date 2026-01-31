@@ -54,7 +54,7 @@
       The lesson average and constant offset are held fixed so the page starts at your official current grade.
       Your current grade is the average of your assessment grades (the red dots).
     </div>
-    <div class="footnote" style="border-left-color:#666;">Updated 2026-01-30 19:07:51</div>
+    <div class="footnote" style="border-left-color:#666;">Updated 2026-01-30 19:27:47</div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
@@ -90,7 +90,7 @@
     return whatif;
   }
 
-  const margin = {top:20, right:20, bottom:100, left:60};
+  const margin = {top:100, right:50, bottom:100, left:60};
 
   function render(){
     Array.from(wrap.querySelectorAll("svg")).forEach(n => n.remove());
@@ -133,7 +133,14 @@
       .style("text-anchor", "start")
       .style("font-size", "11px");
 
-    g.append("g").call(d3.axisLeft(y).ticks(10));
+    // Left Y-axis with specific tick values
+    const yTickValues = [0, 10, 20, 30, 40, 50, 60, 70, 75, 80, 85, 90, 95, 100];
+    g.append("g").call(d3.axisLeft(y).tickValues(yTickValues));
+
+    // Right Y-axis with same tick values
+    g.append("g")
+      .attr("transform", "translate(" + innerW + ",0)")
+      .call(d3.axisRight(y).tickValues(yTickValues));
 
     // Y-axis label
     g.append("text")
@@ -188,10 +195,21 @@
         .attr("stroke-width", 1)
         .attr("stroke-dasharray", "4,4");
 
+      // Label at bottom (rotated)
       g.append("text")
         .attr("x", xPos)
         .attr("y", innerH + 5)
         .attr("transform", "rotate(90," + xPos + "," + (innerH + 5) + ")")
+        .style("font-size", "9px")
+        .style("fill", "#1d4ed8")
+        .style("text-anchor", "start")
+        .text(m.label);
+
+      // Label at top (rotated, reading upward)
+      g.append("text")
+        .attr("x", xPos)
+        .attr("y", -5)
+        .attr("transform", "rotate(-90," + xPos + "," + (-5) + ")")
         .style("font-size", "9px")
         .style("fill", "#1d4ed8")
         .style("text-anchor", "start")
@@ -208,10 +226,21 @@
         .attr("stroke-width", 1)
         .attr("stroke-dasharray", "4,4");
 
+      // Label at bottom (rotated)
       g.append("text")
         .attr("x", xPos)
         .attr("y", innerH + 5)
         .attr("transform", "rotate(90," + xPos + "," + (innerH + 5) + ")")
+        .style("font-size", "9px")
+        .style("fill", "#1d4ed8")
+        .style("text-anchor", "start")
+        .text(m.label);
+
+      // Label at top (rotated, reading upward)
+      g.append("text")
+        .attr("x", xPos)
+        .attr("y", -5)
+        .attr("transform", "rotate(-90," + xPos + "," + (-5) + ")")
         .style("font-size", "9px")
         .style("fill", "#1d4ed8")
         .style("text-anchor", "start")

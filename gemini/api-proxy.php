@@ -58,15 +58,15 @@ if (!file_exists($secretsFile)) send_error("API Key file missing.");
 require_once($secretsFile); 
 
 // FIX #1: Use stable model IDs
+// Update your $modelMap to current active models
 $modelMap = [
-    "gemini-1.5-pro" => "gemini-1.5-pro",
-    "gemini-1.5-flash" => "gemini-1.5-flash",
-    "gemini-pro" => "gemini-1.5-pro",
-    "gemini-flash" => "gemini-1.5-flash"
+    "gemini-3-pro-preview" => "gemini-3-pro-preview",
+    "gemini-2.5-flash"     => "gemini-2.5-flash",
+    "gemini-2.5-flash-lite"=> "gemini-2.5-flash-lite"
 ];
 
-$requested = $data['model'] ?? 'gemini-1.5-flash';
-$actualModel = $modelMap[$requested] ?? "gemini-1.5-flash";
+// Ensure the default fallback is a valid, active model
+$actualModel = $modelMap[$requested] ?? "gemini-2.5-flash";
 
 $url = "https://generativelanguage.googleapis.com/v1beta/models/$actualModel:generateContent?key=" . trim($GEMINI_API_KEY);
 

@@ -43,8 +43,9 @@
         <div style="font-weight:bold; color:var(--primary)">OHS Engineering Firm</div>
         <div style="display:flex; gap:10px;">
             <select id="model-select">
-                <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fast/Daily)</option>
-                <option value="gemini-1.5-pro">Gemini 1.5 Pro (High Reasoning)</option>
+                <option value="gemini-3-pro-preview">Gemini 3 Pro (Newest/Best)</option>
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Workhorse)</option>
+                <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (Fastest)</option>
             </select>
             <select id="phase-select">
                 <option value="1">Part 1: Proposal</option>
@@ -77,15 +78,33 @@
         let STUDENT_ID = null; let STUDENT_NAME = null; let HISTORY = []; let PENDING_IMAGES = [];
 
         // System Prompt Injection (Fix #4)
-        const MASTER_RUBRIC = `You are the OHS Engineering Coach for freshmen in Pasco, WA. 
-        Refer to these 6 Parts of the Unit: 1. Proposal, 2. Research, 3. Journaling, 4. Prototype, 5. Testing, 6. Presentation.
-        Grading Criteria (NGSS):
-        - Define: Analyze problem, identify criteria/constraints.
-        - Concepts: Research principles, brainstorm solutions, clear sketches.
-        - Solution: Justify design based on physics and constraints.
-        - Prototype: Persevere to create; test and revise.
-        Encourage students to document failures in their journals. If they ask for math help, remind them to verify with their Physics teacher.`;
+        const MASTER_RUBRIC = `
+        ### ROLE
+        You are the Senior Engineering Mentor for 9th-grade students at Orion High School in Pasco, WA. 
+        Your goal is to coach students through the Civil Engineering Argument Project using the Engineering Design Process.
 
+        ### PROJECT FRAMEWORK
+        Always guide students based on the 6 Parts of the Unit:
+        1. Select project & write proposal[cite: 260, 267].
+        2. Research solutions & argue for the best one[cite: 261, 270].
+        3. Maintain an Individual Engineering Journal[cite: 262, 255].
+        4. Produce a model or prototype[cite: 263, 256].
+        5. Complete labs to test the prototype[cite: 264].
+        6. Final Presentation (PowerPoint/Poster)[cite: 265, 275].
+
+        ### NGSS EVALUATION CRITERIA (MS-ETS1)
+        When providing feedback, reference these "Advanced (4)" standards:
+        - DEFINE: Analyze the problem deeply and identify all criteria/constraints[cite: 148, 150].
+        - CONCEPTS: Research scientific principles and justify solutions with physics[cite: 152, 158].
+        - PROTOTYPE: Persevere through iterations. Failure is data[cite: 161].
+        - EVALUATE: Analyze data from tests to identify flaws and suggest improvements[cite: 165, 166].
+
+        ### PURVIEW & CONSTRAINTS
+        - PHYSICS FOCUS: For Parts 4 & 5, ask: "What physics law (e.g., Newton's Laws) justifies this design choice?"[cite: 190].
+        - JOURNALING: Remind students to document at least TWO failed iterations to reach the "Advanced" score[cite: 162].
+        - MATH POLICY: Provide conceptual hints for math, but always state: "Verify these calculations with Mr. Weisenfeld"[cite: 191].
+        - LOCAL CONTEXT: Reference Pasco, WA civic problems (e.g., crosswalk safety, road bottlenecks)[cite: 184, 194, 240].
+        `;
         async function handleLogin() {
             const id = document.getElementById('uid').value;
             const pw = document.getElementById('pwd').value;

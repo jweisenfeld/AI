@@ -11,7 +11,7 @@ header('Content-Type: application/json; charset=utf-8');
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') { exit; }
 
 $accountRoot = dirname($_SERVER['DOCUMENT_ROOT']); 
-$secretsFile = $accountRoot . '/.secrets/geminikey.php';
+$secretsFile = $accountRoot . '/.secrets/amentum_geminikey.php';
 $studentFile = $accountRoot . '/.secrets/student_roster.csv'; 
 
 function send_error($msg, $details = null) {

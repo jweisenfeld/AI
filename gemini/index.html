@@ -1,165 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OHS Engineering Portal</title>
     <style>
-        :root {
-            --primary: #1a73e8;
-            --bg: #f8f9fa;
-            --border: #dadce0;
-            --text: #202124;
-        }
-
-        body {
-            font-family: 'Segoe UI', sans-serif;
-            background: var(--bg);
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            margin: 0;
-            color: var(--text);
-        }
-
-        .login-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.85);
-            z-index: 999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(4px);
-        }
-
-        .login-card {
-            background: white;
-            padding: 40px;
-            border-radius: 12px;
-            width: 320px;
-            text-align: center;
-        }
-
-        .login-input {
-            width: 100%;
-            padding: 12px;
-            margin-bottom: 15px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            box-sizing: border-box;
-        }
-
-        .header {
-            background: white;
-            padding: 10px 20px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .main-container {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-            justify-content: center;
-        }
-
-        .chat-area {
-            width: 100%;
-            max-width: 900px;
-            background: white;
-            display: flex;
-            flex-direction: column;
-            border-inline: 1px solid var(--border);
-        }
-
-        .messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-        }
-
-        .message {
-            margin-bottom: 20px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .bubble {
-            padding: 12px 18px;
-            border-radius: 18px;
-            max-width: 85%;
-            line-height: 1.5;
-            font-size: 0.95rem;
-        }
-
-        .user .bubble {
-            background: var(--primary);
-            color: white;
-            align-self: flex-end;
-            border-bottom-right-radius: 4px;
-        }
-
-        .assistant .bubble {
-            background: #f1f3f4;
-            align-self: flex-start;
-            border-bottom-left-radius: 4px;
-        }
-
-        .input-area {
-            padding: 20px;
-            border-top: 1px solid var(--border);
-        }
-
-        .input-group {
-            display: flex;
-            gap: 10px;
-            align-items: flex-start;
-        }
-
-        textarea {
-            flex: 1;
-            height: 60px;
-            padding: 12px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            resize: none;
-            font-family: inherit;
-        }
-
-        .btn {
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        .clip-btn {
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 1.4rem;
-            padding: 5px;
-        }
-
-        #image-previews img {
-            height: 50px;
-            border-radius: 4px;
-            border: 1px solid var(--border);
-            margin-right: 5px;
-        }
+        /* CSS remains the same as your original file */
+        :root { --primary: #1a73e8; --bg: #f8f9fa; --border: #dadce0; --text: #202124; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); height: 100vh; display: flex; flex-direction: column; margin: 0; color: var(--text); }
+        .login-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); z-index: 999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .login-card { background: white; padding: 40px; border-radius: 12px; width: 320px; text-align: center; }
+        .login-input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
+        .header { background: white; padding: 10px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .main-container { flex: 1; display: flex; overflow: hidden; justify-content: center; }
+        .chat-area { width: 100%; max-width: 900px; background: white; display: flex; flex-direction: column; border-inline: 1px solid var(--border); }
+        .messages { flex: 1; overflow-y: auto; padding: 20px; }
+        .message { margin-bottom: 20px; display: flex; flex-direction: column; }
+        .bubble { padding: 12px 18px; border-radius: 18px; max-width: 85%; line-height: 1.5; font-size: 0.95rem; }
+        .user .bubble { background: var(--primary); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .assistant .bubble { background: #f1f3f4; align-self: flex-start; border-bottom-left-radius: 4px; }
+        .input-area { padding: 20px; border-top: 1px solid var(--border); }
+        .input-group { display: flex; gap: 10px; align-items: flex-start; }
+        textarea { flex: 1; height: 60px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; resize: none; font-family: inherit; }
+        .btn { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .clip-btn { background: none; border: none; cursor: pointer; font-size: 1.4rem; padding: 5px; }
+        #image-previews img { height: 50px; border-radius: 4px; border: 1px solid var(--border); margin-right: 5px; }
     </style>
 </head>
 
 <body>
-
     <div id="login-modal" class="login-overlay">
         <div class="login-card">
             <h2 style="color:var(--primary); margin-top:0;">Engineering Portal</h2>
@@ -173,16 +43,18 @@
         <div style="font-weight:bold; color:var(--primary)">OHS Engineering Firm</div>
         <div style="display:flex; gap:10px;">
             <select id="model-select">
-                <option value="gemini-pro">Gemini Pro</option>
-                <option value="gemini-flash">Gemini Flash</option>
+                <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fast/Daily)</option>
+                <option value="gemini-1.5-pro">Gemini 1.5 Pro (High Reasoning)</option>
             </select>
             <select id="phase-select">
-                <option value="1">Phase 1: Ideation</option>
-                <option value="2" selected>Phase 2: PMC 25 Engineering</option>
-                <option value="6">Phase 6: Presentation</option>
+                <option value="1">Part 1: Proposal</option>
+                <option value="2">Part 2: Research & Argument</option>
+                <option value="3">Part 3: Journaling</option>
+                <option value="4">Part 4: Prototype</option>
+                <option value="5">Part 5: Testing</option>
+                <option value="6">Part 6: Presentation</option>
             </select>
-            <div id="user-tag" style="font-size:0.8em; background:#e8f0fe; padding:4px 10px; border-radius:15px;">Logged
-                Out</div>
+            <div id="user-tag" style="font-size:0.8em; background:#e8f0fe; padding:4px 10px; border-radius:15px;">Logged Out</div>
         </div>
     </header>
 
@@ -194,8 +66,7 @@
                 <div class="input-group">
                     <button class="clip-btn" onclick="document.getElementById('file-input').click()">📎</button>
                     <input type="file" id="file-input" multiple style="display:none" onchange="handleFiles(this)">
-                    <textarea id="user-input" placeholder="Enter your query..."
-                        onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); sendMessage();}"></textarea>
+                    <textarea id="user-input" placeholder="Ask your Engineering Coach..."></textarea>
                     <button class="btn" onclick="sendMessage()">Send</button>
                 </div>
             </div>
@@ -204,6 +75,16 @@
 
     <script>
         let STUDENT_ID = null; let STUDENT_NAME = null; let HISTORY = []; let PENDING_IMAGES = [];
+
+        // System Prompt Injection (Fix #4)
+        const MASTER_RUBRIC = `You are the OHS Engineering Coach for freshmen in Pasco, WA. 
+        Refer to these 6 Parts of the Unit: 1. Proposal, 2. Research, 3. Journaling, 4. Prototype, 5. Testing, 6. Presentation.
+        Grading Criteria (NGSS):
+        - Define: Analyze problem, identify criteria/constraints.
+        - Concepts: Research principles, brainstorm solutions, clear sketches.
+        - Solution: Justify design based on physics and constraints.
+        - Prototype: Persevere to create; test and revise.
+        Encourage students to document failures in their journals. If they ask for math help, remind them to verify with their Physics teacher.`;
 
         async function handleLogin() {
             const id = document.getElementById('uid').value;
@@ -224,7 +105,7 @@
             for (let file of input.files) {
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    PENDING_IMAGES.push({ type: "image", source: { media_type: file.type, data: e.target.result.split(',')[1] } });
+                    PENDING_IMAGES.push({ inline_data: { mime_type: file.type, data: e.target.result.split(',')[1] } });
                     const img = document.createElement('img'); img.src = e.target.result;
                     document.getElementById('image-previews').appendChild(img);
                 };
@@ -237,23 +118,29 @@
             const text = input.value.trim();
             if (!text && PENDING_IMAGES.length === 0) return;
 
-            appendBubble('user', text || "(Image)");
-            const userContent = text ? [{ type: "text", text: text }] : [];
+            appendBubble('user', text || "(Image Uploaded)");
+            
+            // Build the content parts for the Gemini API
+            const userContent = [];
+            if (text) userContent.push({ text: text });
             PENDING_IMAGES.forEach(img => userContent.push(img));
-            HISTORY.push({ role: 'user', content: userContent });
-
+            
+            HISTORY.push({ role: 'user', parts: userContent });
             input.value = ''; document.getElementById('image-previews').innerHTML = '';
             const currentImages = [...PENDING_IMAGES]; PENDING_IMAGES = [];
 
-            const phase = document.getElementById('phase-select').value;
-            const sys = phase == "2" ? "You are a Senior Engineer. Reference PMC Title 25. Focus on Topography, Site Plans, and Setbacks." : "Help students brainstorm.";
+            const phaseIdx = document.getElementById('phase-select').value;
+            const sys = `${MASTER_RUBRIC} The student is currently in Phase ${phaseIdx}.`;
 
             const res = await fetch('api-proxy.php', {
                 method: 'POST',
                 body: JSON.stringify({
-                    student_id: STUDENT_ID, student_name: STUDENT_NAME,
+                    action: 'chat', // Added for proxy routing
+                    student_id: STUDENT_ID,
+                    student_name: STUDENT_NAME,
                     model: document.getElementById('model-select').value,
-                    system: sys, messages: HISTORY
+                    system: sys,
+                    messages: HISTORY
                 })
             });
 
@@ -261,29 +148,35 @@
             if (data.candidates) {
                 const reply = data.candidates[0].content.parts[0].text;
                 appendBubble('assistant', reply);
-                HISTORY.push({ role: 'assistant', content: reply });
+                HISTORY.push({ role: 'model', parts: [{ text: reply }] });
+                
+                // Fix #5: Auto-log interaction to server
+                logToTeacher(text, reply);
             } else {
-                appendBubble('assistant', "⚠️ Error: " + (data.error?.message || "Check Proxy Response"));
+                appendBubble('assistant', "⚠️ Error: " + (data.error?.message || "Connection failed."));
             }
         }
 
-        function appendBubble(role, text) {
-            const div = document.createElement('div');
-            div.className = `message ${role}`;
-            let html = marked.parse(text);
-            let toolbar = role === 'assistant' ? `<div style="margin-top:5px;"><button class="btn" style="padding:2px 5px; font-size:0.7em;" onclick="downloadResponse(this)">💾 Save</button><div class="raw" style="display:none;">${text}</div></div>` : '';
-            div.innerHTML = `<div class="bubble">${html}</div>${toolbar}`;
-            document.getElementById('messages').appendChild(div);
-            div.scrollIntoView({ behavior: 'smooth' });
+        // Fix #5: Logging Function
+        async function logToTeacher(userText, botReply) {
+            fetch('api-proxy.php', {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'log_interaction',
+                    student_id: STUDENT_ID,
+                    log: `USER: ${userText}\nBOT: ${botReply}\n---\n`
+                })
+            });
         }
 
-        function downloadResponse(btn) {
-            const rawText = btn.nextElementSibling.textContent;
-            const blob = new Blob([rawText], { type: 'text/markdown' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = 'Engineering_Note.md'; a.click();
+        function appendBubble(role, text) {
+            const messagesDiv = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = `message ${role === 'model' ? 'assistant' : 'user'}`;
+            div.innerHTML = `<div class="bubble">${marked.parse(text)}</div>`;
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
     </script>
 </body>
-
 </html>

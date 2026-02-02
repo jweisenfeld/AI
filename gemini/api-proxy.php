@@ -1,6 +1,6 @@
 <?php
 /**
- * OHS Gemini Proxy - Baseline Stability Version
+ * OHS Gemini Proxy - Updated for Student Logging and Stable Models
  */
 set_time_limit(300);
 header('Access-Control-Allow-Origin: *');
@@ -36,39 +36,66 @@ if (isset($data['action']) && $data['action'] === 'verify_login') {
     send_error("Invalid credentials.");
 }
 
-// --- 2. CHAT ROUTE ---
+// --- 2. STUDENT INTERACTION LOGGING (New Action) ---
+if (isset($data['action']) && $data['action'] === 'log_interaction') {
+    $studentId = $data['student_id'] ?? 'unknown_student';
+    $logContent = $data['log'] ?? '';
+    
+    // Create a per-student log file in a 'logs' directory
+    if (!is_dir('student_logs')) { mkdir('student_logs', 0777, true); }
+    $logFilename = "student_logs/" . preg_replace('/[^a-z0-9]/i', '_', $studentId) . ".txt";
+    
+    $timestamp = date('Y-m-d H:i:s');
+    $formattedLog = "--- Entry: $timestamp ---\n" . $logContent . "\n";
+    
+    file_put_contents($logFilename, $formattedLog, FILE_APPEND);
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// --- 3. CHAT ROUTE ---
 if (!file_exists($secretsFile)) send_error("API Key file missing.");
 require_once($secretsFile); 
 
-// Model Mapping: Mapping "friendly" names to "pinned" Google IDs
+// FIX #1: Use stable model IDs
 $modelMap = [
-    "gemini-pro" => "gemini-1.5-pro-002",
-    "gemini-flash" => "gemini-1.5-flash-002"
+    "gemini-1.5-pro" => "gemini-1.5-pro",
+    "gemini-1.5-flash" => "gemini-1.5-flash",
+    "gemini-pro" => "gemini-1.5-pro",
+    "gemini-flash" => "gemini-1.5-flash"
 ];
-$requested = $data['model'] ?? 'gemini-pro';
-$actualModel = $modelMap[$requested] ?? "gemini-1.5-pro-002";
 
-// Use V1BETA to support systemInstruction
+$requested = $data['model'] ?? 'gemini-1.5-flash';
+$actualModel = $modelMap[$requested] ?? "gemini-1.5-flash";
+
 $url = "https://generativelanguage.googleapis.com/v1beta/models/$actualModel:generateContent?key=" . trim($GEMINI_API_KEY);
 
 $contents = [];
-$lastPrompt = "";
 if (isset($data['messages'])) {
     foreach ($data['messages'] as $m) {
-        $role = ($m['role'] === 'assistant') ? 'model' : 'user';
+        // Handle both 'model' and 'assistant' keys for flexibility
+        $role = ($m['role'] === 'assistant' || $m['role'] === 'model') ? 'model' : 'user';
         $parts = [];
-        if (is_string($m['content'])) {
-            $parts[] = ["text" => $m['content']];
-            if ($role === 'user') $lastPrompt = $m['content'];
-        } else {
-            foreach ($m['content'] as $p) {
-                if (isset($p['text'])) { $parts[] = ["text" => $p['text']]; if($role==='user')$lastPrompt=$p['text']; }
-                if (isset($p['source'])) {
-                    $parts[] = ["inlineData" => ["mimeType" => $p['source']['media_type'], "data" => $p['source']['data']]];
+        
+        // Handle array-based parts from the new index.html
+        if (is_array($m['parts'])) {
+            foreach ($m['parts'] as $p) {
+                if (isset($p['text'])) {
+                    $parts[] = ["text" => $p['text']];
+                }
+                if (isset($p['inline_data'])) {
+                    $parts[] = ["inlineData" => $p['inline_data']];
                 }
             }
+        } 
+        // Backward compatibility for string-based content
+        elseif (isset($m['content']) && is_string($m['content'])) {
+            $parts[] = ["text" => $m['content']];
         }
-        $contents[] = ["role" => $role, "parts" => $parts];
+        
+        if (!empty($parts)) {
+            $contents[] = ["role" => $role, "parts" => $parts];
+        }
     }
 }
 
@@ -86,14 +113,12 @@ $response = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
 
-// --- 3. LOGGING ---
+// --- 4. USAGE LOGGING (Teacher Dashboard Data) ---
 $responseData = json_decode($response, true);
 $usage = $responseData['usageMetadata'] ?? ['promptTokenCount' => 0, 'candidatesTokenCount' => 0];
 $studentName = $data['student_name'] ?? 'Unknown';
-$cleanPrompt = str_replace(["\r", "\n", "|"], " ", substr($lastPrompt, 0, 100));
 
-// Log format for amentum_report.php
-$logLine = date('Y-m-d H:i:s') . " | $studentName | $actualModel | In:{$usage['promptTokenCount']} | Out:{$usage['candidatesTokenCount']} | PROMPT: $cleanPrompt\n";
+$logLine = date('Y-m-d H:i:s') . " | $studentName | $actualModel | In:{$usage['promptTokenCount']} | Out:{$usage['candidatesTokenCount']}\n";
 file_put_contents('gemini_usage.log', $logLine, FILE_APPEND);
 
 http_response_code($httpCode);

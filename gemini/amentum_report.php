@@ -9,34 +9,31 @@ $logFile = __DIR__ . '/gemini_usage.log';
 $logDir = __DIR__ . '/student_logs/';
 $grantAmount = 1000.00; // Your Amentum Grant Total
 
-// 1. Data Processing
-$lines = file_exists($logFile) ? file($logFile) : [];
-$lines = array_reverse($lines);
-
-$stats = [
-    'total_in' => 0,
-    'total_out' => 0,
-    'students' => [],
-    'models' => []
-];
-
+// 1. UPDATED DATA PROCESSING
+$recentActivity = [];
 foreach ($lines as $line) {
     $parts = explode('|', $line);
+    // Ensure we have all necessary parts including Student ID if added to proxy
     if (count($parts) < 5) continue;
 
-    $student = trim($parts[1]);
-    $model = trim($parts[2]);
-    
-    preg_match('/In:(\d+)/', $parts[3], $inM);
-    preg_match('/Out:(\d+)/', $parts[4], $outM);
-    
-    $in = (int)($inM[1] ?? 0);
-    $out = (int)($outM[1] ?? 0);
+    $timestamp = trim($parts[0]);
+    $studentName = trim($parts[1]);
+    $modelUsed = trim($parts[2]);
+    $tokens = trim($parts[3]) . " / " . trim($parts[4]);
+    $intent = isset($parts[5]) ? htmlspecialchars(substr($parts[5], 8)) : '-';
 
-    $stats['total_in'] += $in;
-    $stats['total_out'] += $out;
-    $stats['students'][$student] = ($stats['students'][$student] ?? 0) + ($in + $out);
-    $stats['models'][$model] = ($stats['models'][$model] ?? 0) + 1;
+    // RECOMMENDATION: Update proxy to log StudentID. 
+    // If ID is not in usage log, we'll use a placeholder logic below.
+    $studentID = "STU_" . preg_replace('/[^a-z0-9]/i', '', $studentName); 
+
+    $recentActivity[] = [
+        'time' => $timestamp,
+        'name' => $studentName,
+        'id'   => $studentID, 
+        'model'=> $modelUsed,
+        'tokens'=> $tokens,
+        'intent'=> $intent
+    ];
 }
 
 // 2. Financials (Gemini 2.5/3 Estimated Pricing)
@@ -101,20 +98,21 @@ $remaining = $grantAmount - $estCost;
                 </tr>
             </thead>
             <tbody>
-                <?php foreach (array_slice($lines, 0, 50) as $line): 
-                    $parts = explode('|', $line);
-                    if (count($parts) < 6) continue;
+                <?php 
+                // Display all interactions to correctly show different students
+                foreach (array_slice($recentActivity, 0, 50) as $entry): 
                 ?>
                 <tr>
-                    <td><?php echo trim($parts[0]); ?></td>
+                    <td><?php echo $entry['time']; ?></td>
                     <td>
-                        <a href="student_logs/<?php echo urlencode(trim($parts[1])); ?>.txt" class="student-link" target="_blank">
-                            <?php echo trim($parts[1]); ?>
+                        <a href="student_logs/<?php echo urlencode($entry['id']); ?>.txt" 
+                        class="student-link" target="_blank">
+                            <?php echo htmlspecialchars($entry['name']); ?>
                         </a>
                     </td>
-                    <td><small><?php echo trim($parts[2]); ?></small></td>
-                    <td><?php echo trim($parts[3]) . " / " . trim($parts[4]); ?></td>
-                    <td class="prompt-text"><?php echo htmlspecialchars(substr($parts[5], 8)); ?></td>
+                    <td><small><?php echo htmlspecialchars($entry['model']); ?></small></td>
+                    <td><?php echo htmlspecialchars($entry['tokens']); ?></td>
+                    <td class="prompt-text"><?php echo $entry['intent']; ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>

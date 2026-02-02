@@ -1,5 +1,135 @@
-<html>
-<h1>
-  Hi Erik !
-</h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Erik’s Physics</title>
+    
+    <style>
+        :root {
+            --bg: #0f172a;         /* slate-900 */
+            --card: #111827;       /* gray-900 */
+            --text: #e5e7eb;       /* gray-200 */
+            --muted: #9ca3af;      /* gray-400 */
+            --accent: #3b82f6;     /* blue-500 */
+            --accent-hover: #2563eb;
+            --radius: 14px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #020617, var(--bg));
+            color: var(--text);
+            display: grid;
+            place-items: center;
+            padding: 24px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 420px;
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 28px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        p {
+            margin: 0 0 24px;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            gap: 12px;
+        }
+
+        nav a {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text);
+            text-decoration: none;
+            font-size: 1rem;
+            transition: background 0.2s ease, transform 0.1s ease, color 0.2s ease;
+        }
+
+        nav a:hover {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent);
+            transform: translateY(-1px);
+        }
+
+        footer {
+            margin-top: 24px;
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg: #f1f5f9;
+                --card: #ffffff;
+                --text: #0f172a;
+                --muted: #475569;
+            }
+
+            body {
+                background: linear-gradient(135deg, #e2e8f0, var(--bg));
+            }
+        }
+    </style>
+</head>
+<body>
+<main class="container">
+    <h1>Hi Erik 👋</h1>
+    <p>Welcome to your physics hub.</p>
+
+    <nav aria-label="Main navigation">
+        <ul>
+            <li>
+                <a href="46049.html">
+                    <span>📊 Physics Grades</span>
+                    <span aria-hidden="true">→</span>
+                </a>
+            </li>
+            <li>
+                <a href="46049.calendar.html">
+                    <span>🗓️ Assignment Calendar</span>
+                    <span aria-hidden="true">→</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <footer>
+        © <span id="year"></span> Erik
+    </footer>
+</main>
+
+<script>
+    // Auto-update year
+    document.getElementById("year").textContent = new Date().getFullYear();
+</script>
+</body>
 </html>

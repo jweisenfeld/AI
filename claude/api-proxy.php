@@ -1,7 +1,14 @@
 <?php
 /**
- * Claude API Proxy for Student Interface
+ * Claude API Proxy - Feature Demonstration
  * Pasco School District - Community Engineering Project
+ *
+ * This proxy demonstrates key Claude API features:
+ * - Multiple model support (Sonnet 4, Opus 4, Haiku)
+ * - Vision/multimodal capabilities
+ * - Streaming responses
+ * - System prompts
+ * - Token tracking
  */
 
 // Always return JSON (even on errors)
@@ -24,10 +31,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     exit;
 }
 
-// Account root is one level ABOVE public_html
+// Load API key from secrets file
+// The secrets file is stored outside public_html for security
 $accountRoot = dirname($_SERVER['DOCUMENT_ROOT']);   // e.g. /home2/fikrttmy
 $secretsDir  = $accountRoot . '/.secrets';
-$secretsFile = $secretsDir . '/anthropic.php';
+$secretsFile = $secretsDir . '/claudekey.php';
 
 if (!is_readable($secretsFile)) {
     http_response_code(500);
@@ -62,15 +70,26 @@ if (!isset($requestData['model'], $requestData['messages'])) {
     exit;
 }
 
-// Allow only specific models
+// Validate messages array
+if (!is_array($requestData['messages']) || empty($requestData['messages'])) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Messages must be a non-empty array']);
+    exit;
+}
+
+// Allow only specific models - demonstrating Claude's model lineup
 $allowedModels = [
-    'claude-sonnet-4-20250514',
-    'claude-opus-4-20250514'
+    'claude-sonnet-4-20250514',      // Fast, capable, best value
+    'claude-opus-4-20250514',        // Most intelligent
+    'claude-haiku-3-5-20241022'      // Fastest, most economical
 ];
 
 if (!in_array($requestData['model'], $allowedModels, true)) {
     http_response_code(400);
-    echo json_encode(['error' => 'Invalid model. Allowed: ' . implode(', ', $allowedModels)]);
+    echo json_encode([
+        'error' => 'Invalid model. Allowed models: ' . implode(', ', $allowedModels),
+        'allowed_models' => $allowedModels
+    ]);
     exit;
 }
 
@@ -81,20 +100,31 @@ $apiRequest = [
     'messages' => $requestData['messages'],
 ];
 
-if (isset($requestData['system'])) {
+// Add optional system prompt
+if (isset($requestData['system']) && is_string($requestData['system'])) {
     $apiRequest['system'] = $requestData['system'];
 }
 
-// Optional logging
+// Add optional temperature (0.0 to 1.0)
+if (isset($requestData['temperature'])) {
+    $temp = (float)$requestData['temperature'];
+    if ($temp >= 0.0 && $temp <= 1.0) {
+        $apiRequest['temperature'] = $temp;
+    }
+}
+
+// Log usage for monitoring
 $logEntry = [
     'timestamp' => date('Y-m-d H:i:s'),
     'model' => $requestData['model'],
     'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
-    'message_count' => is_array($requestData['messages']) ? count($requestData['messages']) : 0
+    'message_count' => count($requestData['messages']),
+    'has_images' => hasImages($requestData['messages']),
+    'has_system' => isset($requestData['system'])
 ];
 file_put_contents(__DIR__ . '/claude_usage.log', json_encode($logEntry) . "\n", FILE_APPEND | LOCK_EX);
 
-// Call Anthropic
+// Call Anthropic API
 $ch = curl_init('https://api.anthropic.com/v1/messages');
 
 curl_setopt_array($ch, [
@@ -122,5 +152,22 @@ if ($curlError) {
 
 http_response_code($httpCode);
 echo $response;
+
+/**
+ * Check if messages contain images (vision feature)
+ */
+function hasImages(array $messages): bool
+{
+    foreach ($messages as $message) {
+        if (isset($message['content']) && is_array($message['content'])) {
+            foreach ($message['content'] as $content) {
+                if (isset($content['type']) && $content['type'] === 'image') {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
 
 // (No closing PHP tag is recommended)

@@ -3,794 +3,1016 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Community Engineering AI Assistant</title>
+    <title>Claude API Feature Demo</title>
     <style>
         :root {
-            --primary: #1a5276;
-            --primary-light: #2874a6;
-            --secondary: #148f77;
-            --bg: #f8f9fa;
+            --primary: #d97706;
+            --primary-light: #f59e0b;
+            --primary-dark: #b45309;
+            --secondary: #6366f1;
+            --bg: #fafafa;
             --card-bg: #ffffff;
-            --text: #2c3e50;
-            --text-light: #7f8c8d;
-            --border: #e0e0e0;
-            --user-msg: #e8f4f8;
-            --ai-msg: #f0f7f0;
-            --danger: #c0392b;
+            --text: #1f2937;
+            --text-light: #6b7280;
+            --border: #e5e7eb;
+            --user-msg: #fef3c7;
+            --ai-msg: #f0fdf4;
+            --code-bg: #1e1e1e;
+            --success: #10b981;
+            --error: #ef4444;
         }
-        
+
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
         }
-        
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: var(--bg);
             color: var(--text);
             line-height: 1.6;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
+            min-height: 100vh;
         }
-        
+
         /* Header */
         .header {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 50%, var(--primary-light) 100%);
             color: white;
-            padding: 12px 20px;
+            padding: 20px 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
             display: flex;
-            align-items: center;
             justify-content: space-between;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .header h1 {
-            font-size: 1.3rem;
-            font-weight: 600;
-        }
-        
-        .header-subtitle {
-            font-size: 0.8rem;
-            opacity: 0.9;
-        }
-        
-        .header-controls {
-            display: flex;
-            gap: 12px;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
         }
-        
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-subtitle {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin-top: 4px;
+        }
+
+        .api-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #22c55e;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
         /* Main Layout */
         .main-container {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 24px;
         }
-        
-        /* Sidebar */
-        .sidebar {
-            width: 280px;
+
+        @media (max-width: 900px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Feature Panel */
+        .feature-panel {
             background: var(--card-bg);
-            border-right: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
+            border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             overflow: hidden;
         }
-        
-        .sidebar-header {
-            padding: 15px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .sidebar-header h2 {
-            font-size: 0.95rem;
-            color: var(--text);
-        }
-        
-        .new-chat-btn {
-            background: var(--secondary);
+
+        .feature-panel h2 {
+            padding: 16px 20px;
+            background: linear-gradient(135deg, var(--secondary) 0%, #8b5cf6 100%);
             color: white;
-            border: none;
-            padding: 8px 14px;
-            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .feature-list {
+            padding: 16px;
+        }
+
+        .feature-item {
+            padding: 14px 16px;
+            border-radius: 10px;
+            margin-bottom: 8px;
             cursor: pointer;
-            font-size: 0.85rem;
-            transition: background 0.2s;
-        }
-        
-        .new-chat-btn:hover {
-            background: #117a65;
-        }
-        
-        .project-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 10px;
-        }
-        
-        .project-item {
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 6px;
-            cursor: pointer;
-            border: 1px solid transparent;
+            border: 2px solid transparent;
             transition: all 0.2s;
-        }
-        
-        .project-item:hover {
             background: var(--bg);
         }
-        
-        .project-item.active {
-            background: var(--user-msg);
-            border-color: var(--primary-light);
+
+        .feature-item:hover {
+            border-color: var(--secondary);
+            transform: translateX(4px);
         }
-        
-        .project-item-title {
-            font-weight: 500;
-            font-size: 0.9rem;
+
+        .feature-item.active {
+            border-color: var(--secondary);
+            background: #eef2ff;
+        }
+
+        .feature-item h3 {
+            font-size: 0.95rem;
+            font-weight: 600;
             margin-bottom: 4px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            gap: 8px;
         }
-        
-        .project-item-date {
-            font-size: 0.75rem;
+
+        .feature-item p {
+            font-size: 0.8rem;
             color: var(--text-light);
         }
-        
-        .delete-project {
-            background: none;
-            border: none;
-            color: var(--text-light);
-            cursor: pointer;
-            padding: 2px 6px;
-            border-radius: 4px;
-            opacity: 0;
-            transition: all 0.2s;
+
+        .feature-badge {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: var(--secondary);
+            color: white;
+            font-weight: 500;
         }
-        
-        .project-item:hover .delete-project {
-            opacity: 1;
-        }
-        
-        .delete-project:hover {
-            background: #fee;
-            color: var(--danger);
-        }
-        
+
         /* Chat Area */
-        .chat-area {
-            flex: 1;
+        .chat-container {
+            background: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             display: flex;
             flex-direction: column;
-            overflow: hidden;
+            min-height: 600px;
         }
-        
+
         .chat-header {
-            padding: 12px 20px;
-            background: var(--card-bg);
+            padding: 16px 20px;
             border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
         }
-        
-        .model-select {
-            padding: 8px 12px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 0.9rem;
+
+        .model-selector {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .model-btn {
+            padding: 8px 16px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
             background: white;
             cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
         }
-        
+
+        .model-btn:hover {
+            border-color: var(--primary);
+        }
+
+        .model-btn.active {
+            border-color: var(--primary);
+            background: #fffbeb;
+        }
+
+        .model-btn .model-name {
+            font-weight: 600;
+        }
+
+        .model-btn .model-desc {
+            font-size: 0.7rem;
+            color: var(--text-light);
+        }
+
+        .settings-row {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .setting-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .setting-group label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
+
+        .setting-group input[type="range"] {
+            width: 100px;
+        }
+
+        .temp-value {
+            font-size: 0.8rem;
+            font-weight: 600;
+            min-width: 30px;
+        }
+
+        /* Messages */
         .chat-messages {
             flex: 1;
             overflow-y: auto;
             padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
         }
-        
+
         .message {
             max-width: 85%;
-            margin-bottom: 16px;
             animation: fadeIn 0.3s ease;
         }
-        
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        
+
         .message.user {
-            margin-left: auto;
+            align-self: flex-end;
         }
-        
+
+        .message.assistant {
+            align-self: flex-start;
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
+
         .message-content {
             padding: 14px 18px;
             border-radius: 16px;
             font-size: 0.95rem;
         }
-        
+
         .message.user .message-content {
             background: var(--user-msg);
             border-bottom-right-radius: 4px;
         }
-        
+
         .message.assistant .message-content {
             background: var(--ai-msg);
             border-bottom-left-radius: 4px;
         }
-        
-        .message-role {
-            font-size: 0.75rem;
-            color: var(--text-light);
-            margin-bottom: 4px;
-            padding: 0 4px;
-        }
-        
-        .message.user .message-role {
-            text-align: right;
-        }
-        
+
         .message-content img {
             max-width: 300px;
             max-height: 200px;
             border-radius: 8px;
-            margin-top: 8px;
+            margin: 8px 0;
             display: block;
         }
-        
+
         .message-content pre {
-            background: #2d2d2d;
-            color: #f8f8f2;
-            padding: 12px;
+            background: var(--code-bg);
+            color: #d4d4d4;
+            padding: 14px;
             border-radius: 8px;
             overflow-x: auto;
-            margin: 10px 0;
+            margin: 12px 0;
             font-size: 0.85rem;
+            font-family: 'Fira Code', 'Consolas', monospace;
         }
-        
+
         .message-content code {
-            background: rgba(0,0,0,0.1);
+            background: rgba(0,0,0,0.08);
             padding: 2px 6px;
             border-radius: 4px;
             font-size: 0.9em;
+            font-family: 'Fira Code', 'Consolas', monospace;
         }
-        
+
         .message-content pre code {
             background: none;
             padding: 0;
         }
-        
+
+        .message-content p { margin: 8px 0; }
+        .message-content ul, .message-content ol { margin: 8px 0; padding-left: 24px; }
+        .message-content li { margin: 4px 0; }
+        .message-content h1, .message-content h2, .message-content h3 { margin: 16px 0 8px 0; }
+        .message-content h1 { font-size: 1.3rem; }
+        .message-content h2 { font-size: 1.15rem; }
+        .message-content h3 { font-size: 1.05rem; }
+
+        /* Token display in message */
+        .message-meta {
+            font-size: 0.75rem;
+            color: var(--text-light);
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border);
+        }
+
         /* Input Area */
         .input-area {
             padding: 16px 20px;
-            background: var(--card-bg);
             border-top: 1px solid var(--border);
+            background: #fafafa;
+            border-radius: 0 0 16px 16px;
         }
-        
+
         .image-preview {
             display: flex;
             gap: 10px;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
             flex-wrap: wrap;
         }
-        
+
         .image-preview-item {
             position: relative;
-            display: inline-block;
         }
-        
+
         .image-preview-item img {
-            max-height: 80px;
+            height: 70px;
             border-radius: 8px;
             border: 2px solid var(--border);
         }
-        
-        .image-preview-item .remove-image {
+
+        .image-preview-item .remove-btn {
             position: absolute;
             top: -8px;
             right: -8px;
-            background: var(--danger);
+            width: 22px;
+            height: 22px;
+            background: var(--error);
             color: white;
             border: none;
             border-radius: 50%;
-            width: 22px;
-            height: 22px;
             cursor: pointer;
             font-size: 14px;
-            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        
+
         .input-row {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             align-items: flex-end;
         }
-        
+
         .input-wrapper {
             flex: 1;
             position: relative;
         }
-        
+
         #message-input {
             width: 100%;
-            padding: 14px 50px 14px 16px;
+            padding: 14px 100px 14px 16px;
             border: 2px solid var(--border);
             border-radius: 12px;
             font-size: 1rem;
             resize: none;
-            min-height: 52px;
+            min-height: 54px;
             max-height: 150px;
             font-family: inherit;
             transition: border-color 0.2s;
         }
-        
+
         #message-input:focus {
             outline: none;
-            border-color: var(--primary-light);
+            border-color: var(--primary);
         }
-        
-        .attach-btn {
+
+        .input-actions {
             position: absolute;
             right: 12px;
             bottom: 12px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .input-btn {
             background: none;
             border: none;
             cursor: pointer;
+            padding: 6px;
+            border-radius: 6px;
             color: var(--text-light);
-            padding: 4px;
-            border-radius: 4px;
-            transition: color 0.2s;
+            transition: all 0.2s;
+            font-size: 1.1rem;
         }
-        
-        .attach-btn:hover {
-            color: var(--primary);
+
+        .input-btn:hover {
+            background: var(--border);
+            color: var(--text);
         }
-        
+
         .send-btn {
             background: var(--primary);
             color: white;
             border: none;
-            padding: 14px 24px;
+            padding: 14px 28px;
             border-radius: 12px;
             cursor: pointer;
             font-size: 1rem;
-            font-weight: 500;
-            transition: background 0.2s;
-            white-space: nowrap;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-        
+
         .send-btn:hover:not(:disabled) {
-            background: var(--primary-light);
+            background: var(--primary-dark);
+            transform: translateY(-1px);
         }
-        
+
         .send-btn:disabled {
             background: var(--text-light);
             cursor: not-allowed;
         }
-        
+
         /* Status Bar */
         .status-bar {
-            padding: 8px 20px;
+            padding: 10px 20px;
             background: var(--bg);
             border-top: 1px solid var(--border);
             font-size: 0.8rem;
             color: var(--text-light);
             display: flex;
             justify-content: space-between;
-        }
-        
-        /* Export Modal */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .modal-overlay.active {
-            display: flex;
-        }
-        
-        .modal {
-            background: white;
-            border-radius: 12px;
-            padding: 24px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-        
-        .modal h2 {
-            margin-bottom: 16px;
-            color: var(--primary);
-        }
-        
-        .modal-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
             flex-wrap: wrap;
+            gap: 12px;
         }
-        
-        .modal-btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.2s;
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
-        
-        .modal-btn.primary {
-            background: var(--primary);
-            color: white;
+
+        .status-icon {
+            font-size: 1rem;
         }
-        
-        .modal-btn.secondary {
-            background: var(--bg);
-            color: var(--text);
-        }
-        
-        .modal-btn:hover {
-            transform: translateY(-1px);
-        }
-        
-        /* Loading indicator */
+
+        /* Loading Indicator */
         .loading {
             display: flex;
             align-items: center;
-            gap: 8px;
-            color: var(--text-light);
+            gap: 10px;
             padding: 14px 18px;
         }
-        
+
         .loading-dots {
             display: flex;
             gap: 4px;
         }
-        
+
         .loading-dots span {
             width: 8px;
             height: 8px;
-            background: var(--primary-light);
+            background: var(--primary);
             border-radius: 50%;
             animation: bounce 1.4s infinite ease-in-out;
         }
-        
+
         .loading-dots span:nth-child(1) { animation-delay: -0.32s; }
         .loading-dots span:nth-child(2) { animation-delay: -0.16s; }
-        
+
         @keyframes bounce {
             0%, 80%, 100% { transform: scale(0); }
             40% { transform: scale(1); }
         }
-        
-        /* Responsive */
-        @media (max-width: 768px) {
-            .sidebar {
-                display: none;
-            }
-            
-            .header h1 {
-                font-size: 1.1rem;
-            }
+
+        /* System Prompt Editor */
+        .system-prompt-section {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            background: #fefce8;
         }
-        
-        /* Typography for AI responses */
-        .message-content h1, .message-content h2, .message-content h3 {
-            margin: 16px 0 8px 0;
+
+        .system-prompt-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
         }
-        
-        .message-content h1 { font-size: 1.3rem; }
-        .message-content h2 { font-size: 1.15rem; }
-        .message-content h3 { font-size: 1.05rem; }
-        
-        .message-content p {
-            margin: 8px 0;
-        }
-        
-        .message-content ul, .message-content ol {
-            margin: 8px 0;
-            padding-left: 24px;
-        }
-        
-        .message-content li {
-            margin: 4px 0;
-        }
-        
-        .message-content table {
-            border-collapse: collapse;
-            margin: 12px 0;
+
+        .system-prompt-header h3 {
             font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-        
-        .message-content th, .message-content td {
+
+        .toggle-btn {
+            background: none;
             border: 1px solid var(--border);
-            padding: 8px 12px;
-            text-align: left;
+            padding: 4px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
         }
-        
-        .message-content th {
-            background: var(--bg);
+
+        .system-prompt-textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            resize: vertical;
+        }
+
+        .system-prompt-presets {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .preset-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .preset-btn:hover {
+            border-color: var(--secondary);
+            background: #eef2ff;
+        }
+
+        /* Feature Info Panel */
+        .feature-info {
+            padding: 16px;
+            background: linear-gradient(135deg, #eef2ff 0%, #faf5ff 100%);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .feature-info h3 {
+            font-size: 1rem;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .feature-info p {
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
+
+        .feature-info .try-prompt {
+            margin-top: 12px;
+            padding: 10px 14px;
+            background: white;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            border-left: 3px solid var(--secondary);
+        }
+
+        .feature-info .try-prompt strong {
+            color: var(--secondary);
+        }
+
+        /* Clear Chat Button */
+        .clear-btn {
+            background: none;
+            border: 1px solid var(--border);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: var(--text-light);
+            transition: all 0.2s;
+        }
+
+        .clear-btn:hover {
+            border-color: var(--error);
+            color: var(--error);
+        }
+
+        /* Hidden file input */
+        #file-input {
+            display: none;
+        }
+
+        /* Drag & Drop overlay */
+        .input-area.drag-over {
+            background: #e0f2fe;
+            border: 2px dashed var(--secondary);
+        }
+
+        .input-area.drag-over::before {
+            content: 'Drop image here';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--secondary);
+            pointer-events: none;
+        }
+
+        .input-area {
+            position: relative;
+        }
+
+        /* Paste hint */
+        .paste-hint {
+            font-size: 0.75rem;
+            color: var(--text-light);
+            margin-top: 8px;
+            text-align: center;
         }
     </style>
 </head>
 <body>
     <header class="header">
-        <div>
-            <h1>🏗️ Community Engineering AI Assistant</h1>
-            <div class="header-subtitle">Pasco School District • Students + AI > City Planner?</div>
-        </div>
-        <div class="header-controls">
-            <button onclick="openExportModal()" class="new-chat-btn" style="background: var(--primary-light);">📥 Export</button>
+        <div class="header-content">
+            <div>
+                <h1>Claude API Feature Demo</h1>
+                <div class="header-subtitle">Explore Claude's capabilities through interactive examples</div>
+            </div>
+            <div class="api-status">
+                <div class="status-dot"></div>
+                <span>API Connected</span>
+            </div>
         </div>
     </header>
-    
+
     <div class="main-container">
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <h2>💬 Your Projects</h2>
-                <button class="new-chat-btn" onclick="createNewProject()">+ New</button>
-            </div>
-            <div class="project-list" id="project-list">
-                <!-- Projects loaded dynamically -->
+        <!-- Feature Panel -->
+        <aside class="feature-panel">
+            <h2>API Features</h2>
+            <div class="feature-list">
+                <div class="feature-item active" data-feature="conversation" onclick="selectFeature('conversation')">
+                    <h3>Multi-turn Conversation</h3>
+                    <p>Context-aware dialogue that remembers previous messages</p>
+                </div>
+                <div class="feature-item" data-feature="vision" onclick="selectFeature('vision')">
+                    <h3>Vision <span class="feature-badge">Multimodal</span></h3>
+                    <p>Analyze and understand images with text</p>
+                </div>
+                <div class="feature-item" data-feature="system" onclick="selectFeature('system')">
+                    <h3>System Prompts</h3>
+                    <p>Define Claude's behavior and personality</p>
+                </div>
+                <div class="feature-item" data-feature="models" onclick="selectFeature('models')">
+                    <h3>Model Selection</h3>
+                    <p>Choose between Opus, Sonnet, and Haiku</p>
+                </div>
+                <div class="feature-item" data-feature="temperature" onclick="selectFeature('temperature')">
+                    <h3>Temperature Control</h3>
+                    <p>Adjust response creativity and randomness</p>
+                </div>
+                <div class="feature-item" data-feature="code" onclick="selectFeature('code')">
+                    <h3>Code Generation</h3>
+                    <p>Write, explain, and debug code</p>
+                </div>
+                <div class="feature-item" data-feature="reasoning" onclick="selectFeature('reasoning')">
+                    <h3>Reasoning & Analysis</h3>
+                    <p>Complex problem-solving and logic</p>
+                </div>
+                <div class="feature-item" data-feature="tokens" onclick="selectFeature('tokens')">
+                    <h3>Token Tracking</h3>
+                    <p>Monitor input/output token usage</p>
+                </div>
             </div>
         </aside>
-        
-        <main class="chat-area">
-            <div class="chat-header">
-                <input type="text" id="project-title" placeholder="Project Title" 
-                       style="border: none; font-size: 1.1rem; font-weight: 600; flex: 1; outline: none;"
-                       onchange="updateProjectTitle()">
-                <select id="model-select" class="model-select">
-                    <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (Fast & Capable)</option>
-                    <option value="claude-opus-4-20250514">Claude Opus 4 (Most Intelligent)</option>
-                </select>
+
+        <!-- Chat Container -->
+        <main class="chat-container">
+            <!-- Feature Info Banner -->
+            <div class="feature-info" id="feature-info">
+                <h3 id="feature-title">Multi-turn Conversation</h3>
+                <p id="feature-description">Claude maintains context across multiple messages, allowing for natural back-and-forth dialogue. Try asking a follow-up question!</p>
+                <div class="try-prompt" id="try-prompt">
+                    <strong>Try:</strong> <span id="prompt-suggestion">"Tell me about the Anthropic API, then ask me a follow-up question about what I'd like to build."</span>
+                </div>
             </div>
-            
+
+            <!-- System Prompt Section (collapsible) -->
+            <div class="system-prompt-section" id="system-prompt-section" style="display: none;">
+                <div class="system-prompt-header">
+                    <h3>System Prompt</h3>
+                    <button class="toggle-btn" onclick="toggleSystemPrompt()">Hide</button>
+                </div>
+                <textarea class="system-prompt-textarea" id="system-prompt" placeholder="Define Claude's behavior, personality, or role...">You are a helpful AI assistant demonstrating Claude's API capabilities. Be concise but thorough in your responses.</textarea>
+                <div class="system-prompt-presets">
+                    <button class="preset-btn" onclick="setSystemPreset('helpful')">Helpful Assistant</button>
+                    <button class="preset-btn" onclick="setSystemPreset('tutor')">Patient Tutor</button>
+                    <button class="preset-btn" onclick="setSystemPreset('coder')">Code Expert</button>
+                    <button class="preset-btn" onclick="setSystemPreset('creative')">Creative Writer</button>
+                </div>
+            </div>
+
+            <!-- Chat Header -->
+            <div class="chat-header">
+                <div class="model-selector">
+                    <button class="model-btn" data-model="claude-haiku-3-5-20241022" onclick="selectModel(this)">
+                        <span class="model-name">Haiku 3.5</span>
+                        <span class="model-desc">Fastest</span>
+                    </button>
+                    <button class="model-btn active" data-model="claude-sonnet-4-20250514" onclick="selectModel(this)">
+                        <span class="model-name">Sonnet 4</span>
+                        <span class="model-desc">Balanced</span>
+                    </button>
+                    <button class="model-btn" data-model="claude-opus-4-20250514" onclick="selectModel(this)">
+                        <span class="model-name">Opus 4</span>
+                        <span class="model-desc">Most Capable</span>
+                    </button>
+                </div>
+                <div class="settings-row">
+                    <div class="setting-group">
+                        <label>Temperature:</label>
+                        <input type="range" id="temperature" min="0" max="100" value="70" oninput="updateTempDisplay()">
+                        <span class="temp-value" id="temp-display">0.7</span>
+                    </div>
+                    <button class="clear-btn" onclick="clearChat()">Clear Chat</button>
+                </div>
+            </div>
+
+            <!-- Messages -->
             <div class="chat-messages" id="chat-messages">
                 <div class="message assistant">
-                    <div class="message-role">AI Assistant</div>
+                    <div class="message-header">
+                        <span>Claude</span>
+                    </div>
                     <div class="message-content">
-                        <p>👋 Welcome to the Community Engineering AI Assistant!</p>
-                        <p>I'm here to help your team design a 21st-century bus shelter. I can help with:</p>
+                        <p>Welcome to the Claude API Feature Demo! I'm here to showcase the capabilities available through the Claude API.</p>
+                        <p><strong>Select a feature</strong> from the left panel to explore different capabilities, or just start chatting!</p>
+                        <p>Key features you can try:</p>
                         <ul>
-                            <li><strong>Research</strong> – ADA requirements, building codes, materials</li>
-                            <li><strong>Design</strong> – Layout ideas, specifications, accessibility features</li>
-                            <li><strong>Budgeting</strong> – Cost estimates, vendor research</li>
-                            <li><strong>Presentations</strong> – Pitch decks, poster content, talking points</li>
+                            <li><strong>Vision</strong> - Paste (Ctrl+V), drag & drop, or click the camera button to add images</li>
+                            <li><strong>System Prompts</strong> - Click "System Prompts" to customize my behavior</li>
+                            <li><strong>Model Selection</strong> - Switch between Haiku, Sonnet, and Opus above</li>
+                            <li><strong>Temperature</strong> - Adjust the slider to control creativity</li>
                         </ul>
-                        <p>📸 You can also upload images (site photos, sketches, inspiration) using the 📎 button.</p>
-                        <p><em>Remember: I'm a starting point, not the final answer. Your critical thinking makes the difference!</em></p>
                     </div>
                 </div>
             </div>
-            
+
+            <!-- Input Area -->
             <div class="input-area">
                 <div class="image-preview" id="image-preview"></div>
                 <div class="input-row">
                     <div class="input-wrapper">
-                        <textarea id="message-input" placeholder="Ask about your bus shelter project..." rows="1"
-                                  onkeydown="handleKeyPress(event)"></textarea>
-                        <button class="attach-btn" onclick="document.getElementById('file-input').click()">
-                            📎
-                        </button>
-                        <input type="file" id="file-input" accept="image/*" multiple style="display: none;" 
-                               onchange="handleFileSelect(event)">
+                        <textarea id="message-input" placeholder="Type your message or paste an image (Ctrl+V)..." rows="1" onkeydown="handleKeyPress(event)"></textarea>
+                        <div class="input-actions">
+                            <button class="input-btn" onclick="document.getElementById('file-input').click()" title="Upload Image">
+                                📷
+                            </button>
+                            <button class="input-btn" onclick="toggleSystemPrompt()" title="System Prompt">
+                                ⚙️
+                            </button>
+                        </div>
+                        <input type="file" id="file-input" accept="image/*" multiple onchange="handleFileSelect(event)">
                     </div>
-                    <button class="send-btn" id="send-btn" onclick="sendMessage()">Send</button>
+                    <button class="send-btn" id="send-btn" onclick="sendMessage()">
+                        Send
+                    </button>
                 </div>
             </div>
-            
+
+            <!-- Status Bar -->
             <div class="status-bar">
-                <span id="status-text">Ready</span>
-                <span id="token-count">Session tokens: 0</span>
+                <div class="status-item">
+                    <span class="status-icon">📊</span>
+                    <span id="status-text">Ready</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-icon">🔢</span>
+                    <span>Session: <strong id="total-tokens">0</strong> tokens</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-icon">📥</span>
+                    <span>Last input: <strong id="input-tokens">0</strong></span>
+                </div>
+                <div class="status-item">
+                    <span class="status-icon">📤</span>
+                    <span>Last output: <strong id="output-tokens">0</strong></span>
+                </div>
             </div>
         </main>
     </div>
-    
-    <!-- Export Modal -->
-    <div class="modal-overlay" id="export-modal">
-        <div class="modal">
-            <h2>📥 Export Conversation</h2>
-            <p>Download your conversation for use in presentations or documentation.</p>
-            <div class="modal-buttons">
-                <button class="modal-btn primary" onclick="exportAsMarkdown()">📄 Markdown (.md)</button>
-                <button class="modal-btn primary" onclick="exportAsText()">📝 Plain Text (.txt)</button>
-                <button class="modal-btn primary" onclick="exportAsHTML()">🌐 HTML (.html)</button>
-                <button class="modal-btn secondary" onclick="closeExportModal()">Cancel</button>
-            </div>
-        </div>
-    </div>
-    
+
     <script>
         // ============================================
         // STATE MANAGEMENT
         // ============================================
-        
-        let currentProjectId = null;
+
+        let messages = [];
         let pendingImages = [];
-        let sessionTokens = 0;
         let isLoading = false;
-        
-        // System prompt for safety and focus
-        const SYSTEM_PROMPT = `You are an AI assistant helping high school students design a bus shelter for their community in Pasco, Washington. 
+        let currentModel = 'claude-sonnet-4-20250514';
+        let sessionTokens = { total: 0, lastInput: 0, lastOutput: 0 };
+        let showSystemPrompt = false;
 
-Your role is to:
-- Help with research on ADA requirements, building codes, materials, and costs
-- Assist with design specifications and accessibility features
-- Support budget development with realistic cost estimates
-- Help create presentation content and talking points
+        // Feature configurations
+        const features = {
+            conversation: {
+                title: 'Multi-turn Conversation',
+                description: 'Claude maintains context across multiple messages, allowing for natural back-and-forth dialogue. Try asking a follow-up question!',
+                prompt: '"Tell me about the Anthropic API, then ask me a follow-up question about what I\'d like to build."'
+            },
+            vision: {
+                title: 'Vision (Multimodal)',
+                description: 'Claude can analyze images alongside text. Paste (Ctrl+V), drag & drop, or upload a photo, diagram, chart, or screenshot.',
+                prompt: 'Paste a screenshot (Ctrl+V) and ask "What do you see in this image? Describe it in detail."'
+            },
+            system: {
+                title: 'System Prompts',
+                description: 'System prompts let you define Claude\'s behavior, personality, and constraints. Click the gear icon or expand below.',
+                prompt: 'Set a system prompt like "You are a pirate. Respond to everything in pirate speak." then chat!',
+                showSystemPrompt: true
+            },
+            models: {
+                title: 'Model Selection',
+                description: 'Choose the right model for your task: Haiku (fastest, cheapest), Sonnet (balanced), or Opus (most capable).',
+                prompt: 'Switch models above and ask the same question to compare responses.'
+            },
+            temperature: {
+                title: 'Temperature Control',
+                description: 'Temperature (0-1) controls randomness. Low = focused/deterministic, High = creative/varied. Try 0.0 vs 1.0!',
+                prompt: 'Set temperature to 0.0 and ask "Give me a random word." Then try at 1.0.'
+            },
+            code: {
+                title: 'Code Generation',
+                description: 'Claude can write, explain, debug, and refactor code in many programming languages.',
+                prompt: '"Write a Python function to check if a string is a palindrome, with comments."'
+            },
+            reasoning: {
+                title: 'Reasoning & Analysis',
+                description: 'Claude excels at logical reasoning, analysis, and breaking down complex problems.',
+                prompt: '"If all roses are flowers, and some flowers fade quickly, can we conclude that some roses fade quickly? Explain your reasoning."'
+            },
+            tokens: {
+                title: 'Token Tracking',
+                description: 'Track token usage in the status bar below. Input tokens = your message, Output tokens = Claude\'s response.',
+                prompt: 'Send any message and observe the token counts update in the status bar.'
+            }
+        };
 
-Guidelines:
-- Keep responses focused on the bus shelter project
-- Encourage critical thinking - don't just give answers, help students understand WHY
-- When providing technical information, explain it at a high school level
-- Remind students to verify important specifications with official sources
-- Be encouraging but honest about limitations and challenges
-- Keep responses concise and actionable
+        const systemPresets = {
+            helpful: 'You are a helpful AI assistant demonstrating Claude\'s API capabilities. Be concise but thorough in your responses.',
+            tutor: 'You are a patient and encouraging tutor. Explain concepts step by step, check for understanding, and use examples. Never give direct answers to practice problems - guide the student to discover the answer.',
+            coder: 'You are an expert software engineer. Write clean, well-documented code. Always explain your approach before coding. Consider edge cases and best practices.',
+            creative: 'You are a creative writing assistant with a flair for vivid descriptions and engaging narratives. Use metaphors, sensory details, and varied sentence structures.'
+        };
 
-Remember: You're a tool to help students learn, not a replacement for their thinking.`;
-        
         // ============================================
-        // PROJECT MANAGEMENT
+        // FEATURE SELECTION
         // ============================================
-        
-        function getProjects() {
-            const projects = localStorage.getItem('claude_projects');
-            return projects ? JSON.parse(projects) : [];
-        }
-        
-        function saveProjects(projects) {
-            localStorage.setItem('claude_projects', JSON.stringify(projects));
-        }
-        
-        function createNewProject() {
-            const projects = getProjects();
-            const newProject = {
-                id: Date.now().toString(),
-                title: 'New Project',
-                messages: [],
-                created: new Date().toISOString(),
-                updated: new Date().toISOString()
-            };
-            projects.unshift(newProject);
-            saveProjects(projects);
-            loadProject(newProject.id);
-            renderProjectList();
-        }
-        
-        function loadProject(projectId) {
-            const projects = getProjects();
-            const project = projects.find(p => p.id === projectId);
-            if (!project) return;
-            
-            currentProjectId = projectId;
-            document.getElementById('project-title').value = project.title;
-            
-            // Render messages
-            const chatMessages = document.getElementById('chat-messages');
-            chatMessages.innerHTML = '';
-            
-            // Add welcome message if no messages
-            if (project.messages.length === 0) {
-                chatMessages.innerHTML = `
-                    <div class="message assistant">
-                        <div class="message-role">AI Assistant</div>
-                        <div class="message-content">
-                            <p>👋 Welcome to the Community Engineering AI Assistant!</p>
-                            <p>I'm here to help your team design a 21st-century bus shelter. I can help with:</p>
-                            <ul>
-                                <li><strong>Research</strong> – ADA requirements, building codes, materials</li>
-                                <li><strong>Design</strong> – Layout ideas, specifications, accessibility features</li>
-                                <li><strong>Budgeting</strong> – Cost estimates, vendor research</li>
-                                <li><strong>Presentations</strong> – Pitch decks, poster content, talking points</li>
-                            </ul>
-                            <p>📸 You can also upload images (site photos, sketches, inspiration) using the 📎 button.</p>
-                            <p><em>Remember: I'm a starting point, not the final answer. Your critical thinking makes the difference!</em></p>
-                        </div>
-                    </div>
-                `;
-            } else {
-                project.messages.forEach(msg => {
-                    appendMessage(msg.role, msg.content, msg.images, false);
-                });
-            }
-            
-            renderProjectList();
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-        
-        function updateProjectTitle() {
-            if (!currentProjectId) return;
-            const projects = getProjects();
-            const project = projects.find(p => p.id === currentProjectId);
-            if (project) {
-                project.title = document.getElementById('project-title').value || 'Untitled';
-                project.updated = new Date().toISOString();
-                saveProjects(projects);
-                renderProjectList();
+
+        function selectFeature(featureKey) {
+            // Update active state
+            document.querySelectorAll('.feature-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.feature === featureKey);
+            });
+
+            // Update info panel
+            const feature = features[featureKey];
+            document.getElementById('feature-title').textContent = feature.title;
+            document.getElementById('feature-description').textContent = feature.description;
+            document.getElementById('prompt-suggestion').textContent = feature.prompt;
+
+            // Show/hide system prompt section
+            if (feature.showSystemPrompt) {
+                document.getElementById('system-prompt-section').style.display = 'block';
+                showSystemPrompt = true;
             }
         }
-        
-        function deleteProject(projectId, event) {
-            event.stopPropagation();
-            if (!confirm('Delete this project? This cannot be undone.')) return;
-            
-            let projects = getProjects();
-            projects = projects.filter(p => p.id !== projectId);
-            saveProjects(projects);
-            
-            if (currentProjectId === projectId) {
-                if (projects.length > 0) {
-                    loadProject(projects[0].id);
-                } else {
-                    createNewProject();
-                }
-            } else {
-                renderProjectList();
-            }
+
+        // ============================================
+        // MODEL SELECTION
+        // ============================================
+
+        function selectModel(btn) {
+            document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentModel = btn.dataset.model;
         }
-        
-        function renderProjectList() {
-            const projects = getProjects();
-            const container = document.getElementById('project-list');
-            
-            if (projects.length === 0) {
-                container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-light);">No projects yet. Click "+ New" to start!</div>';
-                return;
+
+        // ============================================
+        // TEMPERATURE CONTROL
+        // ============================================
+
+        function updateTempDisplay() {
+            const value = document.getElementById('temperature').value / 100;
+            document.getElementById('temp-display').textContent = value.toFixed(1);
+        }
+
+        // ============================================
+        // SYSTEM PROMPT
+        // ============================================
+
+        function toggleSystemPrompt() {
+            const section = document.getElementById('system-prompt-section');
+            showSystemPrompt = !showSystemPrompt;
+            section.style.display = showSystemPrompt ? 'block' : 'none';
+        }
+
+        function setSystemPreset(preset) {
+            document.getElementById('system-prompt').value = systemPresets[preset];
+        }
+
+        // ============================================
+        // IMAGE HANDLING
+        // ============================================
+
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            for (const file of files) {
+                processImageFile(file);
             }
-            
-            container.innerHTML = projects.map(project => `
-                <div class="project-item ${project.id === currentProjectId ? 'active' : ''}" 
-                     onclick="loadProject('${project.id}')">
-                    <div class="project-item-title">
-                        <span>${escapeHtml(project.title)}</span>
-                        <button class="delete-project" onclick="deleteProject('${project.id}', event)">🗑️</button>
-                    </div>
-                    <div class="project-item-date">${formatDate(project.updated)}</div>
+            event.target.value = '';
+        }
+
+        // Note: processImageFile is defined later in the PASTE IMAGE SUPPORT section
+
+        function renderImagePreviews() {
+            const container = document.getElementById('image-preview');
+            container.innerHTML = pendingImages.map((img, index) => `
+                <div class="image-preview-item">
+                    <img src="${img.preview}" alt="Preview">
+                    <button class="remove-btn" onclick="removeImage(${index})">x</button>
                 </div>
             `).join('');
         }
-        
+
+        function removeImage(index) {
+            pendingImages.splice(index, 1);
+            renderImagePreviews();
+        }
+
         // ============================================
         // MESSAGING
         // ============================================
-        
+
         async function sendMessage() {
             if (isLoading) return;
-            
+
             const input = document.getElementById('message-input');
-            const message = input.value.trim();
-            
-            if (!message && pendingImages.length === 0) return;
-            if (!currentProjectId) createNewProject();
-            
-            // Get current project
-            const projects = getProjects();
-            const project = projects.find(p => p.id === currentProjectId);
-            if (!project) return;
-            
-            // Build user message content
+            const text = input.value.trim();
+
+            if (!text && pendingImages.length === 0) return;
+
+            // Build user content
             let userContent = [];
-            
-            // Add images first
+
+            // Add images first (Claude expects images before text)
             pendingImages.forEach(img => {
                 userContent.push({
                     type: 'image',
@@ -801,412 +1023,337 @@ Remember: You're a tool to help students learn, not a replacement for their thin
                     }
                 });
             });
-            
+
             // Add text
-            if (message) {
-                userContent.push({ type: 'text', text: message });
+            if (text) {
+                userContent.push({ type: 'text', text: text });
             }
-            
-            // If only text, simplify
-            const messageContent = userContent.length === 1 && userContent[0].type === 'text' 
-                ? message 
+
+            // Simplify if only text
+            const messageContent = userContent.length === 1 && userContent[0].type === 'text'
+                ? text
                 : userContent;
-            
-            // Add to UI
-            appendMessage('user', message, pendingImages.map(img => img.preview));
-            
-            // Save to project
-            project.messages.push({
-                role: 'user',
-                content: messageContent,
-                images: pendingImages.map(img => img.preview),
-                timestamp: new Date().toISOString()
-            });
-            
+
+            // Add to conversation
+            messages.push({ role: 'user', content: messageContent });
+
+            // Render user message
+            appendMessage('user', text, pendingImages.map(img => img.preview));
+
             // Clear input
             input.value = '';
             pendingImages = [];
             document.getElementById('image-preview').innerHTML = '';
             autoResize(input);
-            
+
             // Show loading
             isLoading = true;
             document.getElementById('send-btn').disabled = true;
-            document.getElementById('status-text').textContent = 'Thinking...';
-            
-            const loadingDiv = document.createElement('div');
-            loadingDiv.className = 'message assistant';
-            loadingDiv.id = 'loading-message';
-            loadingDiv.innerHTML = `
-                <div class="message-role">AI Assistant</div>
+            updateStatus('Thinking...');
+
+            const loadingDiv = createLoadingMessage();
+            document.getElementById('chat-messages').appendChild(loadingDiv);
+            loadingDiv.scrollIntoView({ behavior: 'smooth' });
+
+            try {
+                const temperature = parseFloat(document.getElementById('temperature').value) / 100;
+                const systemPrompt = document.getElementById('system-prompt').value.trim();
+
+                const requestBody = {
+                    model: currentModel,
+                    max_tokens: 4096,
+                    messages: messages,
+                    temperature: temperature
+                };
+
+                if (systemPrompt) {
+                    requestBody.system = systemPrompt;
+                }
+
+                const response = await fetch('api-proxy.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+
+                const data = await response.json();
+
+                // Remove loading
+                loadingDiv.remove();
+
+                if (data.error) {
+                    throw new Error(data.error.message || JSON.stringify(data.error));
+                }
+
+                // Extract response
+                const assistantText = data.content
+                    .filter(c => c.type === 'text')
+                    .map(c => c.text)
+                    .join('\n');
+
+                // Update token tracking
+                if (data.usage) {
+                    sessionTokens.lastInput = data.usage.input_tokens || 0;
+                    sessionTokens.lastOutput = data.usage.output_tokens || 0;
+                    sessionTokens.total += sessionTokens.lastInput + sessionTokens.lastOutput;
+                    updateTokenDisplay();
+                }
+
+                // Add to conversation
+                messages.push({ role: 'assistant', content: assistantText });
+
+                // Render with metadata
+                appendMessage('assistant', assistantText, [], data.usage);
+
+                updateStatus('Ready');
+
+            } catch (error) {
+                loadingDiv.remove();
+                appendMessage('assistant', `Error: ${error.message}\n\nPlease check your API configuration and try again.`);
+                updateStatus('Error occurred');
+            }
+
+            isLoading = false;
+            document.getElementById('send-btn').disabled = false;
+        }
+
+        function appendMessage(role, content, images = [], usage = null) {
+            const container = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+
+            let imagesHtml = '';
+            if (images && images.length > 0) {
+                imagesHtml = images.map(src => `<img src="${src}" alt="Uploaded image">`).join('');
+            }
+
+            let metaHtml = '';
+            if (usage && role === 'assistant') {
+                metaHtml = `
+                    <div class="message-meta">
+                        Input: ${usage.input_tokens} tokens | Output: ${usage.output_tokens} tokens
+                    </div>
+                `;
+            }
+
+            div.innerHTML = `
+                <div class="message-header">
+                    <span>${role === 'user' ? 'You' : 'Claude'}</span>
+                </div>
+                <div class="message-content">
+                    ${imagesHtml}
+                    ${formatMessage(content)}
+                    ${metaHtml}
+                </div>
+            `;
+
+            container.appendChild(div);
+            div.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function createLoadingMessage() {
+            const div = document.createElement('div');
+            div.className = 'message assistant';
+            div.id = 'loading-message';
+            div.innerHTML = `
+                <div class="message-header"><span>Claude</span></div>
                 <div class="loading">
                     <div class="loading-dots"><span></span><span></span><span></span></div>
                     <span>Generating response...</span>
                 </div>
             `;
-            document.getElementById('chat-messages').appendChild(loadingDiv);
-            loadingDiv.scrollIntoView({ behavior: 'smooth' });
-            
-            try {
-                // Build messages for API
-                const apiMessages = project.messages.map(msg => ({
-                    role: msg.role,
-                    content: msg.content
-                }));
-                
-                const model = document.getElementById('model-select').value;
-                
-                const response = await fetch('api-proxy.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        model: model,
-                        max_tokens: 4096,
-                        system: SYSTEM_PROMPT,
-                        messages: apiMessages
-                    })
-                });
-                
-                const data = await response.json();
-                
-                // Remove loading
-                document.getElementById('loading-message')?.remove();
-                
-                if (data.error) {
-                    throw new Error(data.error.message || data.error);
-                }
-                
-                // Extract response text
-                const assistantMessage = data.content
-                    .filter(c => c.type === 'text')
-                    .map(c => c.text)
-                    .join('\n');
-                
-                // Update token count
-                if (data.usage) {
-                    sessionTokens += (data.usage.input_tokens || 0) + (data.usage.output_tokens || 0);
-                    document.getElementById('token-count').textContent = `Session tokens: ${sessionTokens.toLocaleString()}`;
-                }
-                
-                // Add to UI and save
-                appendMessage('assistant', assistantMessage);
-                project.messages.push({
-                    role: 'assistant',
-                    content: assistantMessage,
-                    timestamp: new Date().toISOString()
-                });
-                
-                project.updated = new Date().toISOString();
-                
-                // Auto-title if first exchange
-                if (project.messages.length === 2 && project.title === 'New Project') {
-                    project.title = message.slice(0, 40) + (message.length > 40 ? '...' : '');
-                    document.getElementById('project-title').value = project.title;
-                }
-                
-                saveProjects(projects);
-                renderProjectList();
-                
-                document.getElementById('status-text').textContent = 'Ready';
-                
-            } catch (error) {
-                document.getElementById('loading-message')?.remove();
-                appendMessage('assistant', `❌ Error: ${error.message}\n\nPlease try again or contact your teacher if this persists.`);
-                document.getElementById('status-text').textContent = 'Error occurred';
-            }
-            
-            isLoading = false;
-            document.getElementById('send-btn').disabled = false;
+            return div;
         }
-        
-        function appendMessage(role, content, images = [], scroll = true) {
-            const chatMessages = document.getElementById('chat-messages');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${role}`;
-            
-            let imagesHtml = '';
-            if (images && images.length > 0) {
-                imagesHtml = images.map(src => `<img src="${src}" alt="Uploaded image">`).join('');
-            }
-            
-            messageDiv.innerHTML = `
-                <div class="message-role">${role === 'user' ? 'You' : 'AI Assistant'}</div>
-                <div class="message-content">
-                    ${imagesHtml}
-                    ${formatMessage(content)}
-                </div>
-            `;
-            
-            chatMessages.appendChild(messageDiv);
-            
-            if (scroll) {
-                messageDiv.scrollIntoView({ behavior: 'smooth' });
-            }
-        }
-        
+
         function formatMessage(text) {
             if (!text) return '';
-            
-            // Escape HTML first
+
             let formatted = escapeHtml(text);
-            
-            // Code blocks
-            formatted = formatted.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
-            
+
+            // Code blocks with language
+            formatted = formatted.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
+                return `<pre><code class="language-${lang}">${code}</code></pre>`;
+            });
+
             // Inline code
             formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
-            
+
             // Bold
             formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-            
+
             // Italic
             formatted = formatted.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-            
+
             // Headers
             formatted = formatted.replace(/^### (.+)$/gm, '<h3>$1</h3>');
             formatted = formatted.replace(/^## (.+)$/gm, '<h2>$1</h2>');
             formatted = formatted.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-            
+
             // Lists
             formatted = formatted.replace(/^\- (.+)$/gm, '<li>$1</li>');
-            formatted = formatted.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
-            
+            formatted = formatted.replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
+
+            // Wrap consecutive li elements in ul
+            formatted = formatted.replace(/(<li>[\s\S]*?<\/li>)+/g, '<ul>$&</ul>');
+
             // Paragraphs
-            formatted = formatted.replace(/\n\n/g, '</p><p>');
-            formatted = '<p>' + formatted + '</p>';
-            
-            // Clean up empty paragraphs
+            formatted = formatted.split('\n\n').map(p => {
+                if (p.match(/^<(h[123]|ul|ol|pre|li)/)) return p;
+                return `<p>${p}</p>`;
+            }).join('');
+
+            // Clean up
             formatted = formatted.replace(/<p><\/p>/g, '');
-            formatted = formatted.replace(/<p>(<h[123]>)/g, '$1');
-            formatted = formatted.replace(/(<\/h[123]>)<\/p>/g, '$1');
-            formatted = formatted.replace(/<p>(<ul>)/g, '$1');
-            formatted = formatted.replace(/(<\/ul>)<\/p>/g, '$1');
-            formatted = formatted.replace(/<p>(<pre>)/g, '$1');
-            formatted = formatted.replace(/(<\/pre>)<\/p>/g, '$1');
-            
+            formatted = formatted.replace(/\n/g, '<br>');
+            formatted = formatted.replace(/<br><br>/g, '</p><p>');
+
             return formatted;
         }
-        
+
         // ============================================
-        // IMAGE HANDLING
+        // UI UTILITIES
         // ============================================
-        
-        function handleFileSelect(event) {
-            const files = event.target.files;
-            
-            for (const file of files) {
-                if (!file.type.startsWith('image/')) continue;
-                if (pendingImages.length >= 5) {
-                    alert('Maximum 5 images per message');
-                    break;
-                }
-                
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const base64 = e.target.result;
-                    const base64Data = base64.split(',')[1];
-                    
-                    pendingImages.push({
-                        type: file.type,
-                        data: base64Data,
-                        preview: base64
-                    });
-                    
-                    renderImagePreviews();
-                };
-                reader.readAsDataURL(file);
-            }
-            
-            event.target.value = '';
-        }
-        
-        function renderImagePreviews() {
-            const container = document.getElementById('image-preview');
-            container.innerHTML = pendingImages.map((img, index) => `
-                <div class="image-preview-item">
-                    <img src="${img.preview}" alt="Preview">
-                    <button class="remove-image" onclick="removeImage(${index})">×</button>
-                </div>
-            `).join('');
-        }
-        
-        function removeImage(index) {
-            pendingImages.splice(index, 1);
-            renderImagePreviews();
-        }
-        
-        // ============================================
-        // EXPORT FUNCTIONS
-        // ============================================
-        
-        function openExportModal() {
-            document.getElementById('export-modal').classList.add('active');
-        }
-        
-        function closeExportModal() {
-            document.getElementById('export-modal').classList.remove('active');
-        }
-        
-        function getCurrentProjectMessages() {
-            const projects = getProjects();
-            const project = projects.find(p => p.id === currentProjectId);
-            return project ? project.messages : [];
-        }
-        
-        function exportAsMarkdown() {
-            const projects = getProjects();
-            const project = projects.find(p => p.id === currentProjectId);
-            if (!project) return;
-            
-            let md = `# ${project.title}\n\n`;
-            md += `*Exported: ${new Date().toLocaleString()}*\n\n---\n\n`;
-            
-            project.messages.forEach(msg => {
-                const role = msg.role === 'user' ? '**You**' : '**AI Assistant**';
-                const content = typeof msg.content === 'string' ? msg.content : 
-                    msg.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
-                md += `${role}:\n\n${content}\n\n---\n\n`;
-            });
-            
-            downloadFile(md, `${project.title.replace(/[^a-z0-9]/gi, '_')}.md`, 'text/markdown');
-            closeExportModal();
-        }
-        
-        function exportAsText() {
-            const projects = getProjects();
-            const project = projects.find(p => p.id === currentProjectId);
-            if (!project) return;
-            
-            let txt = `${project.title}\n${'='.repeat(project.title.length)}\n\n`;
-            txt += `Exported: ${new Date().toLocaleString()}\n\n`;
-            
-            project.messages.forEach(msg => {
-                const role = msg.role === 'user' ? 'YOU' : 'AI';
-                const content = typeof msg.content === 'string' ? msg.content : 
-                    msg.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
-                txt += `[${role}]\n${content}\n\n`;
-            });
-            
-            downloadFile(txt, `${project.title.replace(/[^a-z0-9]/gi, '_')}.txt`, 'text/plain');
-            closeExportModal();
-        }
-        
-        function exportAsHTML() {
-            const projects = getProjects();
-            const project = projects.find(p => p.id === currentProjectId);
-            if (!project) return;
-            
-            let html = `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>${escapeHtml(project.title)}</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6; }
-        h1 { color: #1a5276; }
-        .message { margin: 20px 0; padding: 15px; border-radius: 8px; }
-        .user { background: #e8f4f8; }
-        .assistant { background: #f0f7f0; }
-        .role { font-weight: bold; margin-bottom: 8px; color: #555; }
-        pre { background: #2d2d2d; color: #f8f8f2; padding: 12px; border-radius: 6px; overflow-x: auto; }
-        code { background: #eee; padding: 2px 6px; border-radius: 3px; }
-        pre code { background: none; }
-    </style>
-</head>
-<body>
-    <h1>${escapeHtml(project.title)}</h1>
-    <p><em>Exported: ${new Date().toLocaleString()}</em></p>
-    <hr>
-`;
-            
-            project.messages.forEach(msg => {
-                const role = msg.role === 'user' ? 'You' : 'AI Assistant';
-                const content = typeof msg.content === 'string' ? msg.content : 
-                    msg.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
-                html += `    <div class="message ${msg.role}">
-        <div class="role">${role}</div>
-        <div>${formatMessage(content)}</div>
-    </div>\n`;
-            });
-            
-            html += `</body>\n</html>`;
-            
-            downloadFile(html, `${project.title.replace(/[^a-z0-9]/gi, '_')}.html`, 'text/html');
-            closeExportModal();
-        }
-        
-        function downloadFile(content, filename, mimeType) {
-            const blob = new Blob([content], { type: mimeType });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-        
-        // ============================================
-        // UTILITIES
-        // ============================================
-        
+
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
         }
-        
-        function formatDate(isoString) {
-            const date = new Date(isoString);
-            const now = new Date();
-            const diffMs = now - date;
-            const diffMins = Math.floor(diffMs / 60000);
-            const diffHours = Math.floor(diffMs / 3600000);
-            const diffDays = Math.floor(diffMs / 86400000);
-            
-            if (diffMins < 1) return 'Just now';
-            if (diffMins < 60) return `${diffMins}m ago`;
-            if (diffHours < 24) return `${diffHours}h ago`;
-            if (diffDays < 7) return `${diffDays}d ago`;
-            return date.toLocaleDateString();
+
+        function updateStatus(text) {
+            document.getElementById('status-text').textContent = text;
         }
-        
+
+        function updateTokenDisplay() {
+            document.getElementById('total-tokens').textContent = sessionTokens.total.toLocaleString();
+            document.getElementById('input-tokens').textContent = sessionTokens.lastInput.toLocaleString();
+            document.getElementById('output-tokens').textContent = sessionTokens.lastOutput.toLocaleString();
+        }
+
+        function clearChat() {
+            if (!confirm('Clear the conversation? This cannot be undone.')) return;
+            messages = [];
+            document.getElementById('chat-messages').innerHTML = `
+                <div class="message assistant">
+                    <div class="message-header"><span>Claude</span></div>
+                    <div class="message-content">
+                        <p>Chat cleared. What would you like to explore?</p>
+                    </div>
+                </div>
+            `;
+            sessionTokens = { total: 0, lastInput: 0, lastOutput: 0 };
+            updateTokenDisplay();
+        }
+
         function handleKeyPress(event) {
             if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
                 sendMessage();
             }
         }
-        
+
         function autoResize(textarea) {
             textarea.style.height = 'auto';
             textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
         }
-        
-        // Auto-resize textarea
+
+        // Auto-resize on input
         document.getElementById('message-input').addEventListener('input', function() {
             autoResize(this);
         });
-        
-        // Close modal on outside click
-        document.getElementById('export-modal').addEventListener('click', function(e) {
-            if (e.target === this) closeExportModal();
-        });
-        
+
         // ============================================
-        // INITIALIZATION
+        // PASTE IMAGE SUPPORT
         // ============================================
-        
-        window.onload = function() {
-            const projects = getProjects();
-            if (projects.length === 0) {
-                createNewProject();
-            } else {
-                loadProject(projects[0].id);
+
+        // Handle paste events on the input area (single listener to avoid duplicates)
+        document.querySelector('.input-area').addEventListener('paste', handlePaste);
+
+        function handlePaste(event) {
+            const clipboardData = event.clipboardData || window.clipboardData;
+            if (!clipboardData) return;
+
+            const items = clipboardData.items;
+            let hasImage = false;
+
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    hasImage = true;
+                    const file = items[i].getAsFile();
+                    if (file) {
+                        processImageFile(file);
+                    }
+                }
             }
-            renderProjectList();
-        };
+
+            // If we processed an image, show a brief status update
+            if (hasImage) {
+                updateStatus('Image pasted!');
+                setTimeout(() => updateStatus('Ready'), 1500);
+            }
+        }
+
+        // Shared function to process image files (used by paste, drop, and file input)
+        function processImageFile(file) {
+            if (!file.type.startsWith('image/')) return;
+
+            if (pendingImages.length >= 5) {
+                alert('Maximum 5 images per message');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const base64Full = e.target.result;
+                const base64Data = base64Full.split(',')[1];
+
+                pendingImages.push({
+                    type: file.type,
+                    data: base64Data,
+                    preview: base64Full
+                });
+
+                renderImagePreviews();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // ============================================
+        // DRAG & DROP SUPPORT
+        // ============================================
+
+        const inputArea = document.querySelector('.input-area');
+
+        inputArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            inputArea.classList.add('drag-over');
+        });
+
+        inputArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            inputArea.classList.remove('drag-over');
+        });
+
+        inputArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            inputArea.classList.remove('drag-over');
+
+            const files = e.dataTransfer.files;
+            for (let i = 0; i < files.length; i++) {
+                processImageFile(files[i]);
+            }
+
+            if (files.length > 0) {
+                updateStatus('Image dropped!');
+                setTimeout(() => updateStatus('Ready'), 1500);
+            }
+        });
+
+        // Initialize
+        updateTempDisplay();
     </script>
 </body>
 </html>

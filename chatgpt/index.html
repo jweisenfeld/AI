@@ -26,6 +26,7 @@
           <select id="model">
             <option value="gpt-4.1-mini">gpt-4.1-mini (fast)</option>
             <option value="gpt-4.1">gpt-4.1 (quality)</option>
+            <option value="gpt-4.1-nano">gpt-4.1-nano (small/cheap)</option>
           </select>
         </label>
         <label>
@@ -63,10 +64,11 @@
       <ol class="notes">
         <li>The browser collects your messages and stores them in memory (and localStorage).</li>
         <li>On send, it posts JSON to <code>chat_api.php</code>.</li>
-        <li>The PHP file loads your API key from <code>/.secrets/chatgptkey.php</code>.</li>
+        <li>The PHP file loads your API key from <code>/home2/&lt;account&gt;/.secrets/chatgptkey.php</code>.</li>
         <li>The response is appended to the chat log and saved for later refreshes.</li>
       </ol>
       <p class="notes">Open <code>tests.html</code> to run the unit tests.</p>
+      <p class="notes">Note: model availability depends on your API project and billing tier.</p>
     </section>
   </main>
 

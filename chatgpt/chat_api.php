@@ -8,6 +8,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/chat_api_utils.php';
+
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -16,15 +18,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$secretsPath = getenv('CHATGPT_SECRETS_PATH');
-if (!$secretsPath) {
-    $secretsPath = dirname(__DIR__) . '/.secrets/chatgptkey.php';
-}
+$secretsPath = resolveSecretsPath(__DIR__, getenv('CHATGPT_SECRETS_PATH') ?: null);
 
 if (!file_exists($secretsPath)) {
     http_response_code(500);
     echo json_encode([
-        'error' => 'Secrets file not found. Update CHATGPT_SECRETS_PATH or place chatgptkey.php in /.secrets.',
+        'error' => 'Secrets file not found. Update CHATGPT_SECRETS_PATH or place chatgptkey.php in /home2/<account>/.secrets.',
     ]);
     exit;
 }

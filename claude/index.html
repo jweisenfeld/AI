@@ -1266,10 +1266,7 @@
         // PASTE IMAGE SUPPORT
         // ============================================
 
-        // Handle paste events on the input area
-        document.getElementById('message-input').addEventListener('paste', handlePaste);
-
-        // Also listen on the whole input area for paste
+        // Handle paste events on the input area (single listener to avoid duplicates)
         document.querySelector('.input-area').addEventListener('paste', handlePaste);
 
         function handlePaste(event) {

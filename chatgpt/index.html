@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sample ChatGPT Classroom Chatbot</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="page">
+    <header class="header">
+      <div>
+        <h1>Sample ChatGPT Classroom Chatbot</h1>
+        <p class="subtitle">
+          A fully commented example that uses a PHP proxy and a simple unit-testable JS core.
+        </p>
+      </div>
+      <button id="themeToggle" class="secondary" type="button">Toggle Theme</button>
+    </header>
+
+    <section class="card">
+      <h2>Settings</h2>
+      <div class="grid">
+        <label>
+          Model
+          <select id="model">
+            <option value="gpt-4.1-mini">gpt-4.1-mini (fast)</option>
+            <option value="gpt-4.1">gpt-4.1 (quality)</option>
+            <option value="gpt-4.1-nano">gpt-4.1-nano (small/cheap)</option>
+          </select>
+        </label>
+        <label>
+          Temperature
+          <input id="temperature" type="number" min="0" max="2" step="0.1" value="0.7" />
+        </label>
+        <label>
+          Max Output Tokens
+          <input id="maxTokens" type="number" min="64" max="2048" step="32" value="512" />
+        </label>
+      </div>
+      <label class="full">
+        System Message (instructions for the assistant)
+        <textarea id="systemMessage" rows="3">You are a friendly tutoring assistant. Use simple language and ask clarifying questions.</textarea>
+      </label>
+    </section>
+
+    <section class="card chat">
+      <div id="chatLog" class="chat-log" aria-live="polite"></div>
+      <form id="chatForm" class="composer">
+        <label class="full">
+          Your message
+          <textarea id="userMessage" rows="3" placeholder="Ask a question..."></textarea>
+        </label>
+        <div class="actions">
+          <button type="submit">Send</button>
+          <button id="clearChat" class="secondary" type="button">Clear Chat</button>
+        </div>
+      </form>
+      <p id="status" class="status" role="status"></p>
+    </section>
+
+    <section class="card">
+      <h2>How it works</h2>
+      <ol class="notes">
+        <li>The browser collects your messages and stores them in memory (and localStorage).</li>
+        <li>On send, it posts JSON to <code>chat_api.php</code>.</li>
+        <li>The PHP file loads your API key from <code>/home2/&lt;account&gt;/.secrets/chatgptkey.php</code>.</li>
+        <li>The response is appended to the chat log and saved for later refreshes.</li>
+      </ol>
+      <p class="notes">Open <code>tests.html</code> to run the unit tests.</p>
+      <p class="notes">Note: model availability depends on your API project and billing tier.</p>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

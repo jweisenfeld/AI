@@ -646,6 +646,36 @@
         #file-input {
             display: none;
         }
+
+        /* Drag & Drop overlay */
+        .input-area.drag-over {
+            background: #e0f2fe;
+            border: 2px dashed var(--secondary);
+        }
+
+        .input-area.drag-over::before {
+            content: 'Drop image here';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--secondary);
+            pointer-events: none;
+        }
+
+        .input-area {
+            position: relative;
+        }
+
+        /* Paste hint */
+        .paste-hint {
+            font-size: 0.75rem;
+            color: var(--text-light);
+            margin-top: 8px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -765,7 +795,7 @@
                         <p><strong>Select a feature</strong> from the left panel to explore different capabilities, or just start chatting!</p>
                         <p>Key features you can try:</p>
                         <ul>
-                            <li><strong>Vision</strong> - Upload an image using the camera button</li>
+                            <li><strong>Vision</strong> - Paste (Ctrl+V), drag & drop, or click the camera button to add images</li>
                             <li><strong>System Prompts</strong> - Click "System Prompts" to customize my behavior</li>
                             <li><strong>Model Selection</strong> - Switch between Haiku, Sonnet, and Opus above</li>
                             <li><strong>Temperature</strong> - Adjust the slider to control creativity</li>
@@ -779,7 +809,7 @@
                 <div class="image-preview" id="image-preview"></div>
                 <div class="input-row">
                     <div class="input-wrapper">
-                        <textarea id="message-input" placeholder="Type your message..." rows="1" onkeydown="handleKeyPress(event)"></textarea>
+                        <textarea id="message-input" placeholder="Type your message or paste an image (Ctrl+V)..." rows="1" onkeydown="handleKeyPress(event)"></textarea>
                         <div class="input-actions">
                             <button class="input-btn" onclick="document.getElementById('file-input').click()" title="Upload Image">
                                 📷
@@ -839,8 +869,8 @@
             },
             vision: {
                 title: 'Vision (Multimodal)',
-                description: 'Claude can analyze images alongside text. Upload a photo, diagram, chart, or screenshot and ask questions about it.',
-                prompt: 'Upload an image and ask "What do you see in this image? Describe it in detail."'
+                description: 'Claude can analyze images alongside text. Paste (Ctrl+V), drag & drop, or upload a photo, diagram, chart, or screenshot.',
+                prompt: 'Paste a screenshot (Ctrl+V) and ask "What do you see in this image? Describe it in detail."'
             },
             system: {
                 title: 'System Prompts',
@@ -944,32 +974,13 @@
 
         function handleFileSelect(event) {
             const files = event.target.files;
-
             for (const file of files) {
-                if (!file.type.startsWith('image/')) continue;
-                if (pendingImages.length >= 5) {
-                    alert('Maximum 5 images per message');
-                    break;
-                }
-
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const base64Full = e.target.result;
-                    const base64Data = base64Full.split(',')[1];
-
-                    pendingImages.push({
-                        type: file.type,
-                        data: base64Data,
-                        preview: base64Full
-                    });
-
-                    renderImagePreviews();
-                };
-                reader.readAsDataURL(file);
+                processImageFile(file);
             }
-
             event.target.value = '';
         }
+
+        // Note: processImageFile is defined later in the PASTE IMAGE SUPPORT section
 
         function renderImagePreviews() {
             const container = document.getElementById('image-preview');
@@ -1249,6 +1260,99 @@
         // Auto-resize on input
         document.getElementById('message-input').addEventListener('input', function() {
             autoResize(this);
+        });
+
+        // ============================================
+        // PASTE IMAGE SUPPORT
+        // ============================================
+
+        // Handle paste events on the input area
+        document.getElementById('message-input').addEventListener('paste', handlePaste);
+
+        // Also listen on the whole input area for paste
+        document.querySelector('.input-area').addEventListener('paste', handlePaste);
+
+        function handlePaste(event) {
+            const clipboardData = event.clipboardData || window.clipboardData;
+            if (!clipboardData) return;
+
+            const items = clipboardData.items;
+            let hasImage = false;
+
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    hasImage = true;
+                    const file = items[i].getAsFile();
+                    if (file) {
+                        processImageFile(file);
+                    }
+                }
+            }
+
+            // If we processed an image, show a brief status update
+            if (hasImage) {
+                updateStatus('Image pasted!');
+                setTimeout(() => updateStatus('Ready'), 1500);
+            }
+        }
+
+        // Shared function to process image files (used by paste, drop, and file input)
+        function processImageFile(file) {
+            if (!file.type.startsWith('image/')) return;
+
+            if (pendingImages.length >= 5) {
+                alert('Maximum 5 images per message');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const base64Full = e.target.result;
+                const base64Data = base64Full.split(',')[1];
+
+                pendingImages.push({
+                    type: file.type,
+                    data: base64Data,
+                    preview: base64Full
+                });
+
+                renderImagePreviews();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // ============================================
+        // DRAG & DROP SUPPORT
+        // ============================================
+
+        const inputArea = document.querySelector('.input-area');
+
+        inputArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            inputArea.classList.add('drag-over');
+        });
+
+        inputArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            inputArea.classList.remove('drag-over');
+        });
+
+        inputArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            inputArea.classList.remove('drag-over');
+
+            const files = e.dataTransfer.files;
+            for (let i = 0; i < files.length; i++) {
+                processImageFile(files[i]);
+            }
+
+            if (files.length > 0) {
+                updateStatus('Image dropped!');
+                setTimeout(() => updateStatus('Ready'), 1500);
+            }
         });
 
         // Initialize

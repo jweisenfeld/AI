@@ -9,6 +9,27 @@ $logFile = __DIR__ . '/gemini_usage.log';
 $logDir = __DIR__ . '/student_logs/';
 $grantAmount = 1000.00; // Your Amentum Grant Total
 
+// Read log file
+$lines = [];
+if (file_exists($logFile)) {
+    $lines = file($logFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+}
+
+// Compute stats from log data
+$stats = ['total_in' => 0, 'total_out' => 0, 'students' => []];
+foreach ($lines as $line) {
+    $parts = explode('|', $line);
+    if (count($parts) < 5) continue;
+
+    $studentName = trim($parts[1]);
+    $stats['students'][$studentName] = true;
+
+    preg_match('/In:(\d+)/', trim($parts[3]), $inMatch);
+    preg_match('/Out:(\d+)/', trim($parts[4]), $outMatch);
+    $stats['total_in'] += intval($inMatch[1] ?? 0);
+    $stats['total_out'] += intval($outMatch[1] ?? 0);
+}
+
 // 1. UPDATED DATA PROCESSING
 $recentActivity = [];
 foreach ($lines as $line) {

@@ -676,6 +676,50 @@
             margin-top: 8px;
             text-align: center;
         }
+
+        /* Student ID bar */
+        .student-id-bar {
+            padding: 12px 20px;
+            background: #fef3c7;
+            border-bottom: 2px solid #f59e0b;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .student-id-bar label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #92400e;
+            white-space: nowrap;
+        }
+
+        .student-id-bar input {
+            padding: 8px 14px;
+            border: 2px solid #d97706;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            width: 200px;
+            transition: border-color 0.2s;
+        }
+
+        .student-id-bar input:focus {
+            outline: none;
+            border-color: #b45309;
+        }
+
+        .student-id-bar input.invalid {
+            border-color: var(--error);
+            background: #fef2f2;
+        }
+
+        .student-id-bar .student-hint {
+            font-size: 0.8rem;
+            color: #92400e;
+            opacity: 0.8;
+        }
     </style>
 </head>
 <body>
@@ -734,6 +778,13 @@
 
         <!-- Chat Container -->
         <main class="chat-container">
+            <!-- Student ID Bar -->
+            <div class="student-id-bar">
+                <label for="student-id">Student ID:</label>
+                <input type="text" id="student-id" placeholder="e.g. aaron046" autocomplete="off" spellcheck="false">
+                <span class="student-hint">Required to send messages</span>
+            </div>
+
             <!-- Feature Info Banner -->
             <div class="feature-info" id="feature-info">
                 <h3 id="feature-title">Multi-turn Conversation</h3>
@@ -859,6 +910,27 @@
         let currentModel = 'claude-sonnet-4-20250514';
         let sessionTokens = { total: 0, lastInput: 0, lastOutput: 0 };
         let showSystemPrompt = false;
+
+        // Student ID: read from URL param, then localStorage fallback
+        (function initStudentId() {
+            const params = new URLSearchParams(window.location.search);
+            const urlStudent = params.get('student');
+            const savedStudent = localStorage.getItem('claude_student_id');
+            const input = document.getElementById('student-id');
+
+            if (urlStudent) {
+                input.value = urlStudent;
+                localStorage.setItem('claude_student_id', urlStudent);
+            } else if (savedStudent) {
+                input.value = savedStudent;
+            }
+
+            // Save on change
+            input.addEventListener('input', function() {
+                localStorage.setItem('claude_student_id', this.value.trim());
+                this.classList.remove('invalid');
+            });
+        })();
 
         // Feature configurations
         const features = {
@@ -1004,6 +1076,16 @@
         async function sendMessage() {
             if (isLoading) return;
 
+            // Require student ID
+            const studentInput = document.getElementById('student-id');
+            const studentId = studentInput.value.trim();
+            if (!studentId) {
+                studentInput.classList.add('invalid');
+                studentInput.focus();
+                updateStatus('Please enter your Student ID');
+                return;
+            }
+
             const input = document.getElementById('message-input');
             const text = input.value.trim();
 
@@ -1063,7 +1145,8 @@
                     model: currentModel,
                     max_tokens: 4096,
                     messages: messages,
-                    temperature: temperature
+                    temperature: temperature,
+                    student_id: studentId
                 };
 
                 if (systemPrompt) {

@@ -115,8 +115,12 @@ if (isset($requestData['temperature'])) {
 
 // Log usage for monitoring
 $imageInfo = countImages($requestData['messages']);
+$studentId = isset($requestData['student_id']) && is_string($requestData['student_id'])
+    ? substr(trim($requestData['student_id']), 0, 50)
+    : 'unknown';
 $logEntry = [
     'timestamp' => date('Y-m-d H:i:s'),
+    'student_id' => $studentId,
     'model' => $requestData['model'],
     'temperature' => $apiRequest['temperature'] ?? null,
     'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',

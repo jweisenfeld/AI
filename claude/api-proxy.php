@@ -114,15 +114,21 @@ if (isset($requestData['temperature'])) {
 }
 
 // Log usage for monitoring
+$imageInfo = countImages($requestData['messages']);
 $logEntry = [
     'timestamp' => date('Y-m-d H:i:s'),
     'model' => $requestData['model'],
+    'temperature' => $apiRequest['temperature'] ?? null,
     'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+    'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+    'referer' => $_SERVER['HTTP_REFERER'] ?? 'unknown',
+    'accept_language' => $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? 'unknown',
     'message_count' => count($requestData['messages']),
-    'has_images' => hasImages($requestData['messages']),
-    'has_system' => isset($requestData['system'])
+    'has_system' => isset($requestData['system']),
+    'image_count' => $imageInfo['count'],
+    'image_types' => $imageInfo['types'],
+    'user_text_length' => getUserTextLength($requestData['messages']),
 ];
-file_put_contents(__DIR__ . '/claude_usage.log', json_encode($logEntry) . "\n", FILE_APPEND | LOCK_EX);
 
 // Call Anthropic API
 $ch = curl_init('https://api.anthropic.com/v1/messages');
@@ -150,24 +156,67 @@ if ($curlError) {
     exit;
 }
 
+// Log response token usage
+$responseData = json_decode($response, true);
+if (is_array($responseData) && isset($responseData['usage'])) {
+    $logEntry['input_tokens'] = $responseData['usage']['input_tokens'] ?? 0;
+    $logEntry['output_tokens'] = $responseData['usage']['output_tokens'] ?? 0;
+}
+$logEntry['http_status'] = $httpCode;
+$logFile = __DIR__ . '/claude_usage.log';
+file_put_contents($logFile, json_encode($logEntry) . "\n", FILE_APPEND | LOCK_EX);
+
 http_response_code($httpCode);
 echo $response;
 
 /**
- * Check if messages contain images (vision feature)
+ * Count images and collect their media types from messages
  */
-function hasImages(array $messages): bool
+function countImages(array $messages): array
 {
+    $count = 0;
+    $types = [];
     foreach ($messages as $message) {
         if (isset($message['content']) && is_array($message['content'])) {
             foreach ($message['content'] as $content) {
                 if (isset($content['type']) && $content['type'] === 'image') {
-                    return true;
+                    $count++;
+                    $mediaType = $content['source']['media_type'] ?? 'unknown';
+                    $types[] = $mediaType;
                 }
             }
         }
     }
-    return false;
+    return ['count' => $count, 'types' => array_unique($types)];
+}
+
+/**
+ * Get total text length from the last user message
+ */
+function getUserTextLength(array $messages): int
+{
+    $lastUserMsg = null;
+    foreach (array_reverse($messages) as $msg) {
+        if (($msg['role'] ?? '') === 'user') {
+            $lastUserMsg = $msg;
+            break;
+        }
+    }
+    if (!$lastUserMsg) return 0;
+
+    if (is_string($lastUserMsg['content'])) {
+        return strlen($lastUserMsg['content']);
+    }
+    if (is_array($lastUserMsg['content'])) {
+        $len = 0;
+        foreach ($lastUserMsg['content'] as $part) {
+            if (($part['type'] ?? '') === 'text') {
+                $len += strlen($part['text'] ?? '');
+            }
+        }
+        return $len;
+    }
+    return 0;
 }
 
 // (No closing PHP tag is recommended)

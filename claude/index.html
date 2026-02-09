@@ -812,17 +812,17 @@
             <!-- Chat Header -->
             <div class="chat-header">
                 <div class="model-selector">
-                    <button class="model-btn" data-model="claude-haiku-3-5-20241022" onclick="selectModel(this)">
-                        <span class="model-name">Haiku 3.5</span>
-                        <span class="model-desc">Fastest</span>
+                    <button class="model-btn" data-model="haiku" onclick="selectModel(this)">
+                        <span class="model-name">Haiku</span>
+                        <span class="model-desc">Latest</span>
                     </button>
-                    <button class="model-btn active" data-model="claude-sonnet-4-20250514" onclick="selectModel(this)">
-                        <span class="model-name">Sonnet 4</span>
-                        <span class="model-desc">Balanced</span>
+                    <button class="model-btn active" data-model="sonnet" onclick="selectModel(this)">
+                        <span class="model-name">Sonnet</span>
+                        <span class="model-desc">Current</span>
                     </button>
-                    <button class="model-btn" data-model="claude-opus-4-20250514" onclick="selectModel(this)">
-                        <span class="model-name">Opus 4</span>
-                        <span class="model-desc">Most Capable</span>
+                    <button class="model-btn" data-model="opus" onclick="selectModel(this)">
+                        <span class="model-name">Opus</span>
+                        <span class="model-desc">SOTA</span>
                     </button>
                 </div>
                 <div class="settings-row">
@@ -907,7 +907,7 @@
         let messages = [];
         let pendingImages = [];
         let isLoading = false;
-        let currentModel = 'claude-sonnet-4-20250514';
+        let currentModel = 'sonnet';
         let sessionTokens = { total: 0, lastInput: 0, lastOutput: 0 };
         let showSystemPrompt = false;
 
@@ -1186,7 +1186,7 @@
                 messages.push({ role: 'assistant', content: assistantText });
 
                 // Render with metadata
-                appendMessage('assistant', assistantText, [], data.usage);
+                appendMessage('assistant', assistantText, [], data.usage, data.model);
 
                 updateStatus('Ready');
 
@@ -1200,7 +1200,7 @@
             document.getElementById('send-btn').disabled = false;
         }
 
-        function appendMessage(role, content, images = [], usage = null) {
+        function appendMessage(role, content, images = [], usage = null, modelId = null) {
             const container = document.getElementById('chat-messages');
             const div = document.createElement('div');
             div.className = `message ${role}`;
@@ -1219,9 +1219,11 @@
                 `;
             }
 
+            const label = role === 'user' ? 'You' : formatModelLabel(modelId);
+
             div.innerHTML = `
                 <div class="message-header">
-                    <span>${role === 'user' ? 'You' : 'Claude'}</span>
+                    <span>${label}</span>
                 </div>
                 <div class="message-content">
                     ${imagesHtml}
@@ -1296,6 +1298,22 @@
         // ============================================
         // UI UTILITIES
         // ============================================
+
+        /**
+         * Format an API model ID into a friendly label.
+         * e.g. "claude-sonnet-4-5-20250929" -> "Claude (Sonnet 4.5 20250929)"
+         *      "claude-haiku-4-5"           -> "Claude (Haiku 4.5)"
+         *      "claude-opus-4-20250514"     -> "Claude (Opus 4 20250514)"
+         */
+        function formatModelLabel(modelId) {
+            if (!modelId) return 'Claude';
+            const m = modelId.match(/^claude-(\w+?)-([\d]+(?:-[\d]+)*?)(?:-(\d{8}))?\s*$/);
+            if (!m) return `Claude (${modelId})`;
+            const family = m[1].charAt(0).toUpperCase() + m[1].slice(1);
+            const version = m[2].replace(/-/g, '.');
+            const date = m[3] || '';
+            return `Claude (${family} ${version}${date ? ' ' + date : ''})`;
+        }
 
         function escapeHtml(text) {
             const div = document.createElement('div');

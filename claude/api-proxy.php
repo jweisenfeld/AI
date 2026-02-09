@@ -4,9 +4,9 @@
  * Pasco School District - Community Engineering Project
  *
  * This proxy demonstrates key Claude API features:
- * - Multiple model support (Sonnet 4, Opus 4, Haiku)
+ * - Multiple model support (Haiku, Sonnet, Opus via tier aliases)
+ * - Auto-healing model resolution (fallback on deprecated models)
  * - Vision/multimodal capabilities
- * - Streaming responses
  * - System prompts
  * - Token tracking
  */
@@ -77,25 +77,30 @@ if (!is_array($requestData['messages']) || empty($requestData['messages'])) {
     exit;
 }
 
-// Allow only specific models - demonstrating Claude's model lineup
-$allowedModels = [
-    'claude-sonnet-4-20250514',      // Fast, capable, best value
-    'claude-opus-4-20250514',        // Most intelligent
-    'claude-haiku-3-5-20241022'      // Fastest, most economical
-];
+// Load model config from JSON file (with hardcoded fallback)
+$configPath = __DIR__ . '/model_config.json';
+$config = loadModelConfig($configPath);
 
-if (!in_array($requestData['model'], $allowedModels, true)) {
+// Build tier-to-primary map from config
+$modelMap = [];
+foreach ($config['tiers'] as $tier => $info) {
+    $modelMap[$tier] = $info['primary'];
+}
+
+$requestedModel = $requestData['model'];
+if (!isset($modelMap[$requestedModel])) {
     http_response_code(400);
     echo json_encode([
-        'error' => 'Invalid model. Allowed models: ' . implode(', ', $allowedModels),
-        'allowed_models' => $allowedModels
+        'error' => 'Invalid model tier. Allowed: ' . implode(', ', array_keys($modelMap)),
+        'allowed_models' => array_keys($modelMap)
     ]);
     exit;
 }
+$resolvedModel = $modelMap[$requestedModel];
 
 // Build the API request
 $apiRequest = [
-    'model' => $requestData['model'],
+    'model' => $resolvedModel,
     'max_tokens' => min((int)($requestData['max_tokens'] ?? 4096), 8192),
     'messages' => $requestData['messages'],
 ];
@@ -121,7 +126,8 @@ $studentId = isset($requestData['student_id']) && is_string($requestData['studen
 $logEntry = [
     'timestamp' => date('Y-m-d H:i:s'),
     'student_id' => $studentId,
-    'model' => $requestData['model'],
+    'model_tier' => $requestedModel,
+    'model' => $resolvedModel,
     'temperature' => $apiRequest['temperature'] ?? null,
     'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
     'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
@@ -134,25 +140,8 @@ $logEntry = [
     'user_text_length' => getUserTextLength($requestData['messages']),
 ];
 
-// Call Anthropic API
-$ch = curl_init('https://api.anthropic.com/v1/messages');
-
-curl_setopt_array($ch, [
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_POST => true,
-    CURLOPT_POSTFIELDS => json_encode($apiRequest),
-    CURLOPT_HTTPHEADER => [
-        'Content-Type: application/json',
-        'x-api-key: ' . $ANTHROPIC_API_KEY,
-        'anthropic-version: 2023-06-01'
-    ],
-    CURLOPT_TIMEOUT => 120
-]);
-
-$response = curl_exec($ch);
-$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$curlError = curl_error($ch);
-curl_close($ch);
+// --- Make API call with auto-healing fallback ---
+list($httpCode, $response, $curlError) = callAnthropicApi($apiRequest, $ANTHROPIC_API_KEY);
 
 if ($curlError) {
     http_response_code(500);
@@ -160,18 +149,162 @@ if ($curlError) {
     exit;
 }
 
-// Log response token usage
 $responseData = json_decode($response, true);
+
+// Auto-healing: if model error, try fallbacks from config
+$modelHealed = false;
+if (isModelError($httpCode, $responseData)) {
+    $tierConfig = $config['tiers'][$requestedModel] ?? null;
+    $fallbacks  = $tierConfig['fallbacks'] ?? [];
+
+    // Cooldown: skip fallback if config was updated in last 60 seconds
+    $configMtime = @filemtime($configPath);
+    $cooldownActive = $configMtime && (time() - $configMtime < 60);
+
+    if (!$cooldownActive && !empty($fallbacks)) {
+        error_log("Model healing: primary '{$resolvedModel}' failed for tier '{$requestedModel}', trying fallbacks");
+
+        foreach ($fallbacks as $fallbackModel) {
+            $apiRequest['model'] = $fallbackModel;
+            list($fbHttpCode, $fbResponse, $fbCurlError) = callAnthropicApi($apiRequest, $ANTHROPIC_API_KEY);
+
+            if ($fbCurlError) continue;
+
+            $fbResponseData = json_decode($fbResponse, true);
+
+            if (!isModelError($fbHttpCode, $fbResponseData)) {
+                // This model worked (or failed for a non-model reason)
+                $httpCode      = $fbHttpCode;
+                $response      = $fbResponse;
+                $responseData  = $fbResponseData;
+                $resolvedModel = $fallbackModel;
+                $modelHealed   = true;
+
+                // Update config so future requests use this model
+                if ($fbHttpCode === 200) {
+                    updateModelConfig($configPath, $requestedModel, $fallbackModel);
+                    error_log("Model healing: updated tier '{$requestedModel}' primary to '{$fallbackModel}'");
+                }
+                break;
+            }
+        }
+    }
+}
+
+// Log response token usage
 if (is_array($responseData) && isset($responseData['usage'])) {
     $logEntry['input_tokens'] = $responseData['usage']['input_tokens'] ?? 0;
     $logEntry['output_tokens'] = $responseData['usage']['output_tokens'] ?? 0;
 }
 $logEntry['http_status'] = $httpCode;
+$logEntry['model'] = $resolvedModel;
+$logEntry['model_healed'] = $modelHealed;
 $logFile = __DIR__ . '/claude_usage.log';
 file_put_contents($logFile, json_encode($logEntry) . "\n", FILE_APPEND | LOCK_EX);
 
 http_response_code($httpCode);
 echo $response;
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+/**
+ * Load model configuration from JSON file.
+ * Falls back to hardcoded defaults if file is missing or corrupt.
+ */
+function loadModelConfig(string $configPath): array
+{
+    if (is_readable($configPath)) {
+        $raw = file_get_contents($configPath);
+        $config = json_decode($raw, true);
+        if (is_array($config) && isset($config['tiers'])) {
+            return $config;
+        }
+    }
+    // Hardcoded fallback if JSON is missing/corrupt
+    return [
+        'tiers' => [
+            'haiku'  => ['primary' => 'claude-haiku-4-5',  'fallbacks' => []],
+            'sonnet' => ['primary' => 'claude-sonnet-4-5', 'fallbacks' => []],
+            'opus'   => ['primary' => 'claude-opus-4-6',   'fallbacks' => []],
+        ]
+    ];
+}
+
+/**
+ * Make a single API call to Anthropic.
+ * Returns [httpCode, response, curlError].
+ */
+function callAnthropicApi(array $apiRequest, string $apiKey): array
+{
+    $ch = curl_init('https://api.anthropic.com/v1/messages');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode($apiRequest),
+        CURLOPT_HTTPHEADER     => [
+            'Content-Type: application/json',
+            'x-api-key: ' . $apiKey,
+            'anthropic-version: 2023-06-01',
+        ],
+        CURLOPT_TIMEOUT        => 120,
+    ]);
+    $response  = curl_exec($ch);
+    $httpCode  = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+    return [$httpCode, $response, $curlError];
+}
+
+/**
+ * Check if an API error response indicates an invalid/deprecated model.
+ */
+function isModelError(int $httpCode, ?array $responseData): bool
+{
+    if ($httpCode !== 400) return false;
+    if (!is_array($responseData)) return false;
+    $errorType = $responseData['error']['type'] ?? '';
+    $errorMsg  = strtolower($responseData['error']['message'] ?? '');
+    return $errorType === 'invalid_request_error'
+        && strpos($errorMsg, 'model') !== false;
+}
+
+/**
+ * Update model_config.json with a new primary model for a tier.
+ * Uses file locking to prevent race conditions.
+ */
+function updateModelConfig(string $configPath, string $tier, string $newPrimary): bool
+{
+    $fp = fopen($configPath, 'c+');
+    if (!$fp) return false;
+    if (!flock($fp, LOCK_EX)) {
+        fclose($fp);
+        return false;
+    }
+    // Re-read inside lock to avoid overwriting a concurrent update
+    $raw = stream_get_contents($fp);
+    $config = json_decode($raw, true);
+    if (!is_array($config) || !isset($config['tiers'][$tier])) {
+        flock($fp, LOCK_UN);
+        fclose($fp);
+        return false;
+    }
+    // Only write if the primary actually changed
+    if ($config['tiers'][$tier]['primary'] === $newPrimary) {
+        flock($fp, LOCK_UN);
+        fclose($fp);
+        return true;
+    }
+    $config['tiers'][$tier]['primary'] = $newPrimary;
+    $config['_updated'] = gmdate('Y-m-d\TH:i:s\Z');
+    ftruncate($fp, 0);
+    rewind($fp);
+    fwrite($fp, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+    flock($fp, LOCK_UN);
+    fclose($fp);
+    return true;
+}
 
 /**
  * Count images and collect their media types from messages

@@ -75,15 +75,22 @@ function hasImages(messages) {
 }
 
 /**
- * Validate model against whitelist
+ * Validate model tier name
  */
-function isValidModel(model) {
-    const allowedModels = [
-        'claude-sonnet-4-20250514',
-        'claude-opus-4-20250514',
-        'claude-haiku-3-5-20241022'
-    ];
-    return allowedModels.includes(model);
+function isValidTier(tier) {
+    const validTiers = ['haiku', 'sonnet', 'opus'];
+    return validTiers.includes(tier);
+}
+
+/**
+ * Check if an API error response indicates an invalid/deprecated model.
+ */
+function isModelError(httpCode, responseData) {
+    if (httpCode !== 400) return false;
+    if (!responseData || !responseData.error) return false;
+    const errorType = responseData.error.type || '';
+    const errorMsg = (responseData.error.message || '').toLowerCase();
+    return errorType === 'invalid_request_error' && errorMsg.includes('model');
 }
 
 /**
@@ -94,8 +101,8 @@ function validateRequest(data) {
 
     if (!data.model) {
         errors.push('Missing required field: model');
-    } else if (!isValidModel(data.model)) {
-        errors.push('Invalid model specified');
+    } else if (!isValidTier(data.model)) {
+        errors.push('Invalid model tier specified');
     }
 
     if (!data.messages) {
@@ -154,31 +161,91 @@ console.log('\n======================================');
 console.log('Claude API Proxy - JavaScript Unit Tests');
 console.log('======================================\n');
 
-// --- Model Validation Tests ---
-console.log('Model Validation:');
+// --- Model Tier Validation Tests ---
+console.log('Model Tier Validation:');
 
-runTest('accepts claude-sonnet-4-20250514', () => {
-    assertTrue(isValidModel('claude-sonnet-4-20250514'), 'Sonnet 4 should be valid');
+runTest('accepts haiku tier', () => {
+    assertTrue(isValidTier('haiku'), 'Haiku should be a valid tier');
 });
 
-runTest('accepts claude-opus-4-20250514', () => {
-    assertTrue(isValidModel('claude-opus-4-20250514'), 'Opus 4 should be valid');
+runTest('accepts sonnet tier', () => {
+    assertTrue(isValidTier('sonnet'), 'Sonnet should be a valid tier');
 });
 
-runTest('accepts claude-haiku-3-5-20241022', () => {
-    assertTrue(isValidModel('claude-haiku-3-5-20241022'), 'Haiku 3.5 should be valid');
+runTest('accepts opus tier', () => {
+    assertTrue(isValidTier('opus'), 'Opus should be a valid tier');
 });
 
-runTest('rejects invalid model', () => {
-    assertFalse(isValidModel('gpt-4'), 'GPT-4 should be rejected');
+runTest('rejects invalid tier', () => {
+    assertFalse(isValidTier('gpt-4'), 'GPT-4 should be rejected');
 });
 
-runTest('rejects old claude model', () => {
-    assertFalse(isValidModel('claude-2'), 'Claude 2 should be rejected');
+runTest('rejects full model ID as tier', () => {
+    assertFalse(isValidTier('claude-sonnet-4-5'), 'Full model ID should be rejected as tier');
 });
 
-runTest('rejects empty model string', () => {
-    assertFalse(isValidModel(''), 'Empty string should be rejected');
+runTest('rejects empty tier string', () => {
+    assertFalse(isValidTier(''), 'Empty string should be rejected');
+});
+
+// --- Model Error Detection Tests ---
+console.log('\nModel Error Detection:');
+
+runTest('detects model error (400 + invalid_request_error + model message)', () => {
+    const response = {
+        type: 'error',
+        error: {
+            type: 'invalid_request_error',
+            message: 'The provided model identifier is invalid'
+        }
+    };
+    assertTrue(isModelError(400, response), 'Should detect model error');
+});
+
+runTest('detects model not found error', () => {
+    const response = {
+        type: 'error',
+        error: {
+            type: 'invalid_request_error',
+            message: 'model: claude-haiku-3-5-20241022 is not available'
+        }
+    };
+    assertTrue(isModelError(400, response), 'Should detect model not found');
+});
+
+runTest('does not trigger on non-model 400 error', () => {
+    const response = {
+        type: 'error',
+        error: {
+            type: 'invalid_request_error',
+            message: 'messages: at least one message is required'
+        }
+    };
+    assertFalse(isModelError(400, response), 'Should not trigger on non-model error');
+});
+
+runTest('does not trigger on 429 rate limit', () => {
+    const response = {
+        type: 'error',
+        error: {
+            type: 'rate_limit_error',
+            message: 'Rate limit exceeded'
+        }
+    };
+    assertFalse(isModelError(429, response), 'Should not trigger on rate limit');
+});
+
+runTest('does not trigger on 500 server error', () => {
+    assertFalse(isModelError(500, null), 'Should not trigger on server error with null data');
+});
+
+runTest('does not trigger on 200 success', () => {
+    const response = {
+        content: [{ type: 'text', text: 'Hello' }],
+        model: 'claude-sonnet-4-5',
+        usage: { input_tokens: 10, output_tokens: 20 }
+    };
+    assertFalse(isModelError(200, response), 'Should not trigger on success');
 });
 
 // --- Request Validation Tests ---
@@ -186,7 +253,7 @@ console.log('\nRequest Validation:');
 
 runTest('valid request passes validation', () => {
     const request = {
-        model: 'claude-sonnet-4-20250514',
+        model: 'sonnet',
         messages: [{ role: 'user', content: 'Hello' }]
     };
     const errors = validateRequest(request);
@@ -201,7 +268,7 @@ runTest('missing model is detected', () => {
 });
 
 runTest('missing messages is detected', () => {
-    const request = { model: 'claude-sonnet-4-20250514' };
+    const request = { model: 'sonnet' };
     const errors = validateRequest(request);
     assertTrue(errors.length > 0, 'Should detect missing messages');
     assertContains('messages', errors[0], 'Error should mention messages');
@@ -209,20 +276,20 @@ runTest('missing messages is detected', () => {
 
 runTest('empty messages array is detected', () => {
     const request = {
-        model: 'claude-sonnet-4-20250514',
+        model: 'sonnet',
         messages: []
     };
     const errors = validateRequest(request);
     assertTrue(errors.length > 0, 'Should detect empty messages');
 });
 
-runTest('invalid model is detected', () => {
+runTest('invalid model tier is detected', () => {
     const request = {
         model: 'invalid-model',
         messages: [{ role: 'user', content: 'Hello' }]
     };
     const errors = validateRequest(request);
-    assertTrue(errors.length > 0, 'Should detect invalid model');
+    assertTrue(errors.length > 0, 'Should detect invalid model tier');
 });
 
 // --- Image Detection Tests ---
@@ -269,19 +336,19 @@ console.log('\nAPI Request Building:');
 
 runTest('builds basic request correctly', () => {
     const input = {
-        model: 'claude-sonnet-4-20250514',
+        model: 'sonnet',
         messages: [{ role: 'user', content: 'Hello' }]
     };
     const request = buildApiRequest(input);
 
-    assertEquals('claude-sonnet-4-20250514', request.model, 'Model should be set');
+    assertEquals('sonnet', request.model, 'Model should be set');
     assertEquals(4096, request.max_tokens, 'Default max_tokens should be 4096');
     assertArrayHasKey('messages', request, 'Messages should be present');
 });
 
 runTest('respects custom max_tokens up to limit', () => {
     const input = {
-        model: 'claude-sonnet-4-20250514',
+        model: 'sonnet',
         messages: [{ role: 'user', content: 'Hello' }],
         max_tokens: 2000
     };
@@ -291,7 +358,7 @@ runTest('respects custom max_tokens up to limit', () => {
 
 runTest('caps max_tokens at 8192', () => {
     const input = {
-        model: 'claude-sonnet-4-20250514',
+        model: 'sonnet',
         messages: [{ role: 'user', content: 'Hello' }],
         max_tokens: 100000
     };
@@ -301,7 +368,7 @@ runTest('caps max_tokens at 8192', () => {
 
 runTest('includes system prompt when provided', () => {
     const input = {
-        model: 'claude-sonnet-4-20250514',
+        model: 'sonnet',
         messages: [{ role: 'user', content: 'Hello' }],
         system: 'You are a helpful assistant.'
     };
@@ -312,7 +379,7 @@ runTest('includes system prompt when provided', () => {
 
 runTest('excludes system prompt when not provided', () => {
     const input = {
-        model: 'claude-sonnet-4-20250514',
+        model: 'sonnet',
         messages: [{ role: 'user', content: 'Hello' }]
     };
     const request = buildApiRequest(input);
@@ -321,7 +388,7 @@ runTest('excludes system prompt when not provided', () => {
 
 runTest('includes valid temperature', () => {
     const input = {
-        model: 'claude-sonnet-4-20250514',
+        model: 'sonnet',
         messages: [{ role: 'user', content: 'Hello' }],
         temperature: 0.7
     };
@@ -332,7 +399,7 @@ runTest('includes valid temperature', () => {
 
 runTest('ignores invalid temperature above 1.0', () => {
     const input = {
-        model: 'claude-sonnet-4-20250514',
+        model: 'sonnet',
         messages: [{ role: 'user', content: 'Hello' }],
         temperature: 1.5
     };
@@ -342,7 +409,7 @@ runTest('ignores invalid temperature above 1.0', () => {
 
 runTest('ignores negative temperature', () => {
     const input = {
-        model: 'claude-sonnet-4-20250514',
+        model: 'sonnet',
         messages: [{ role: 'user', content: 'Hello' }],
         temperature: -0.5
     };
@@ -352,7 +419,7 @@ runTest('ignores negative temperature', () => {
 
 runTest('accepts temperature of 0.0', () => {
     const input = {
-        model: 'claude-sonnet-4-20250514',
+        model: 'sonnet',
         messages: [{ role: 'user', content: 'Hello' }],
         temperature: 0.0
     };
@@ -363,7 +430,7 @@ runTest('accepts temperature of 0.0', () => {
 
 runTest('accepts temperature of 1.0', () => {
     const input = {
-        model: 'claude-sonnet-4-20250514',
+        model: 'sonnet',
         messages: [{ role: 'user', content: 'Hello' }],
         temperature: 1.0
     };
@@ -423,7 +490,7 @@ runTest('handles deeply nested content arrays', () => {
 
 runTest('handles unicode in messages', () => {
     const input = {
-        model: 'claude-sonnet-4-20250514',
+        model: 'sonnet',
         messages: [{ role: 'user', content: 'Hello in Japanese' }]
     };
     const request = buildApiRequest(input);
@@ -432,7 +499,7 @@ runTest('handles unicode in messages', () => {
 
 runTest('handles special characters in system prompt', () => {
     const input = {
-        model: 'claude-sonnet-4-20250514',
+        model: 'sonnet',
         messages: [{ role: 'user', content: 'Hi' }],
         system: "You are a helpful assistant.\nBe concise.\n\nUse bullet points."
     };

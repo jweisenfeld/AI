@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Volleyball Highlights</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a2e; color: #eee; padding: 2rem; }
+        h1 { text-align: center; margin-bottom: 2rem; font-size: 2rem; color: #fff; }
+        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 2rem; max-width: 1400px; margin: 0 auto; }
+        .card { background: #16213e; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.3); transition: transform 0.2s; }
+        .card:hover { transform: translateY(-4px); }
+        .card a { display: block; text-decoration: none; color: inherit; }
+        .card img { width: 100%; display: block; }
+        .card .title { padding: 1rem; font-size: 1.1rem; font-weight: 600; text-align: center; color: #e2e2e2; }
+    </style>
+</head>
+<body>
+    <h1>Volleyball Highlights</h1>
+    <div class="gallery">
+
+        <div class="card">
+            <a href="sequence_0508-0540.gif" target="_blank">
+                <img src="sequence_0508-0540.gif" alt="Spike by WSU #4" loading="lazy">
+                <div class="title">Spike by WSU #4</div>
+            </a>
+        </div>
+
+        <div class="card">
+            <a href="sequence_0935-0949.gif" target="_blank">
+                <img src="sequence_0935-0949.gif" alt="Finger on the tape" loading="lazy">
+                <div class="title">Finger on the tape</div>
+            </a>
+        </div>
+
+        <!-- To add more GIFs, copy this template:
+        <div class="card">
+            <a href="FILENAME.gif" target="_blank">
+                <img src="FILENAME.gif" alt="DESCRIPTION" loading="lazy">
+                <div class="title">DESCRIPTION</div>
+            </a>
+        </div>
+        -->
+
+    </div>
+</body>
+</html>

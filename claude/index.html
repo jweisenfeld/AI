@@ -812,13 +812,13 @@
             <!-- Chat Header -->
             <div class="chat-header">
                 <div class="model-selector">
-                    <button class="model-btn" data-model="haiku" onclick="selectModel(this)">
+                    <button class="model-btn active" data-model="haiku" onclick="selectModel(this)">
                         <span class="model-name">Haiku</span>
-                        <span class="model-desc">Latest</span>
+                        <span class="model-desc">Default</span>
                     </button>
-                    <button class="model-btn active" data-model="sonnet" onclick="selectModel(this)">
+                    <button class="model-btn" data-model="sonnet" onclick="selectModel(this)">
                         <span class="model-name">Sonnet</span>
-                        <span class="model-desc">Current</span>
+                        <span class="model-desc">Balanced</span>
                     </button>
                     <button class="model-btn" data-model="opus" onclick="selectModel(this)">
                         <span class="model-name">Opus</span>
@@ -907,7 +907,7 @@
         let messages = [];
         let pendingImages = [];
         let isLoading = false;
-        let currentModel = 'sonnet';
+        let currentModel = 'haiku';
         let sessionTokens = { total: 0, lastInput: 0, lastOutput: 0 };
         let showSystemPrompt = false;
 
@@ -1188,7 +1188,17 @@
                 // Render with metadata
                 appendMessage('assistant', assistantText, [], data.usage, data.model);
 
-                updateStatus('Ready');
+                // Show server notices (e.g. model downgrade outside school hours)
+                if (data._notice) {
+                    updateStatus(data._notice);
+                } else {
+                    updateStatus('Ready');
+                }
+
+                // Warn if conversation is getting long (cap is 50 messages server-side)
+                if (messages.length >= 40) {
+                    updateStatus(`Warning: ${messages.length}/50 messages used. Clear chat soon to avoid hitting the limit.`);
+                }
 
             } catch (error) {
                 loadingDiv.remove();

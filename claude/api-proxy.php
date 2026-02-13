@@ -9,6 +9,9 @@
  * - Vision/multimodal capabilities
  * - System prompts
  * - Token tracking
+ * - Per-student rate limiting
+ * - School-hours throttling
+ * - Conversation length cap
  */
 
 // Always return JSON (even on errors)
@@ -77,6 +80,123 @@ if (!is_array($requestData['messages']) || empty($requestData['messages'])) {
     exit;
 }
 
+// --- Extract student ID early (needed for rate limiting) ---
+$studentId = isset($requestData['student_id']) && is_string($requestData['student_id'])
+    ? substr(trim($requestData['student_id']), 0, 50)
+    : 'unknown';
+
+// ============================================
+// RATE LIMITING (per-student, file-based)
+// ============================================
+
+$rateLimitDir = __DIR__ . '/rate_limits';
+if (!is_dir($rateLimitDir)) {
+    @mkdir($rateLimitDir, 0755, true);
+}
+
+// Configurable limits
+$RATE_LIMIT_REQUESTS_PER_HOUR = 30;   // max requests per student per hour
+$RATE_LIMIT_REQUESTS_PER_DAY  = 150;  // max requests per student per day
+
+if ($studentId !== 'unknown') {
+    $rateLimitFile = $rateLimitDir . '/' . preg_replace('/[^a-zA-Z0-9_-]/', '', $studentId) . '.json';
+    $now = time();
+    $rateData = [];
+
+    if (is_readable($rateLimitFile)) {
+        $rateData = json_decode(file_get_contents($rateLimitFile), true) ?: [];
+    }
+
+    // Clean old timestamps (older than 24 hours)
+    $rateData['requests'] = array_values(array_filter(
+        $rateData['requests'] ?? [],
+        function ($ts) use ($now) { return ($now - $ts) < 86400; }
+    ));
+
+    // Count requests in last hour and last day
+    $lastHour = array_filter($rateData['requests'], function ($ts) use ($now) {
+        return ($now - $ts) < 3600;
+    });
+    $lastDay = $rateData['requests']; // already filtered to 24h
+
+    if (count($lastHour) >= $RATE_LIMIT_REQUESTS_PER_HOUR) {
+        http_response_code(429);
+        $resetIn = min(array_map(function ($ts) use ($now) { return 3600 - ($now - $ts); }, $lastHour));
+        echo json_encode([
+            'error' => [
+                'type' => 'rate_limit_error',
+                'message' => "Rate limit exceeded: $RATE_LIMIT_REQUESTS_PER_HOUR requests per hour. Try again in " . ceil($resetIn / 60) . " minutes."
+            ]
+        ]);
+        exit;
+    }
+
+    if (count($lastDay) >= $RATE_LIMIT_REQUESTS_PER_DAY) {
+        http_response_code(429);
+        echo json_encode([
+            'error' => [
+                'type' => 'rate_limit_error',
+                'message' => "Daily limit exceeded: $RATE_LIMIT_REQUESTS_PER_DAY requests per day. Try again tomorrow."
+            ]
+        ]);
+        exit;
+    }
+
+    // Record this request
+    $rateData['requests'][] = $now;
+    file_put_contents($rateLimitFile, json_encode($rateData), LOCK_EX);
+}
+
+// ============================================
+// SCHOOL HOURS THROTTLING
+// ============================================
+// Pacific time zone for Pasco, WA
+$schoolTz = new DateTimeZone('America/Los_Angeles');
+$nowLocal = new DateTime('now', $schoolTz);
+$hour     = (int)$nowLocal->format('G');  // 0-23
+$dayOfWeek = (int)$nowLocal->format('N'); // 1=Mon, 7=Sun
+
+// School hours: Mon-Fri, 7:00 AM - 5:00 PM Pacific
+$isSchoolHours = ($dayOfWeek >= 1 && $dayOfWeek <= 5 && $hour >= 7 && $hour < 17);
+
+// Outside school hours: only allow Haiku, and reduce rate limit
+if (!$isSchoolHours) {
+    // Force model to haiku outside school hours
+    if ($requestData['model'] !== 'haiku') {
+        $requestData['model'] = 'haiku';
+        // We'll note this in the response so the frontend can inform the user
+        $modelDowngraded = true;
+    }
+    // Tighter rate limit outside school hours: 10/hour
+    if ($studentId !== 'unknown' && isset($lastHour) && count($lastHour) >= 10) {
+        http_response_code(429);
+        echo json_encode([
+            'error' => [
+                'type' => 'rate_limit_error',
+                'message' => 'Outside school hours (Mon-Fri 7AM-5PM Pacific): limited to 10 requests/hour with Haiku model only.'
+            ]
+        ]);
+        exit;
+    }
+}
+
+// ============================================
+// CONVERSATION LENGTH CAP
+// ============================================
+$MAX_MESSAGES = 50;  // max messages in a conversation
+$messageCount = count($requestData['messages']);
+
+if ($messageCount > $MAX_MESSAGES) {
+    http_response_code(400);
+    echo json_encode([
+        'error' => [
+            'type' => 'conversation_too_long',
+            'message' => "Conversation too long ($messageCount messages). Maximum is $MAX_MESSAGES. Please clear your chat and start a new conversation."
+        ]
+    ]);
+    exit;
+}
+
 // Load model config from JSON file (with hardcoded fallback)
 $configPath = __DIR__ . '/model_config.json';
 $config = loadModelConfig($configPath);
@@ -110,19 +230,17 @@ if (isset($requestData['system']) && is_string($requestData['system'])) {
     $apiRequest['system'] = $requestData['system'];
 }
 
-// Add optional temperature (0.0 to 1.0)
+// Add optional temperature (0.0 to 1.0), rounded to 2 decimal places
 if (isset($requestData['temperature'])) {
-    $temp = (float)$requestData['temperature'];
+    $temp = round((float)$requestData['temperature'], 2);
     if ($temp >= 0.0 && $temp <= 1.0) {
         $apiRequest['temperature'] = $temp;
     }
 }
 
-// Log usage for monitoring
+// Build log entry for monitoring (verbose: includes user prompt text)
 $imageInfo = countImages($requestData['messages']);
-$studentId = isset($requestData['student_id']) && is_string($requestData['student_id'])
-    ? substr(trim($requestData['student_id']), 0, 50)
-    : 'unknown';
+$lastUserText = getLastUserText($requestData['messages']);
 $logEntry = [
     'timestamp' => date('Y-m-d H:i:s'),
     'student_id' => $studentId,
@@ -130,15 +248,17 @@ $logEntry = [
     'model' => $resolvedModel,
     'temperature' => $apiRequest['temperature'] ?? null,
     'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
-    'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
-    'referer' => $_SERVER['HTTP_REFERER'] ?? 'unknown',
-    'accept_language' => $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? 'unknown',
-    'message_count' => count($requestData['messages']),
+    'message_count' => $messageCount,
     'has_system' => isset($requestData['system']),
     'image_count' => $imageInfo['count'],
     'image_types' => $imageInfo['types'],
-    'user_text_length' => getUserTextLength($requestData['messages']),
+    'user_text_length' => strlen($lastUserText),
+    'user_text' => mb_substr($lastUserText, 0, 500),  // first 500 chars of user prompt
+    'is_school_hours' => $isSchoolHours,
 ];
+if (isset($modelDowngraded) && $modelDowngraded) {
+    $logEntry['model_downgraded'] = true;
+}
 
 // --- Make API call with auto-healing fallback ---
 list($httpCode, $response, $curlError) = callAnthropicApi($apiRequest, $ANTHROPIC_API_KEY);
@@ -201,6 +321,12 @@ $logEntry['model'] = $resolvedModel;
 $logEntry['model_healed'] = $modelHealed;
 $logFile = __DIR__ . '/claude_usage.log';
 file_put_contents($logFile, json_encode($logEntry) . "\n", FILE_APPEND | LOCK_EX);
+
+// If model was downgraded, inject a note into the response
+if (isset($modelDowngraded) && $modelDowngraded && is_array($responseData)) {
+    $responseData['_notice'] = 'Outside school hours: model downgraded to Haiku. Full model access Mon-Fri 7AM-5PM Pacific.';
+    $response = json_encode($responseData);
+}
 
 http_response_code($httpCode);
 echo $response;
@@ -328,9 +454,9 @@ function countImages(array $messages): array
 }
 
 /**
- * Get total text length from the last user message
+ * Get the full text of the last user message (for verbose logging)
  */
-function getUserTextLength(array $messages): int
+function getLastUserText(array $messages): string
 {
     $lastUserMsg = null;
     foreach (array_reverse($messages) as $msg) {
@@ -339,21 +465,21 @@ function getUserTextLength(array $messages): int
             break;
         }
     }
-    if (!$lastUserMsg) return 0;
+    if (!$lastUserMsg) return '';
 
     if (is_string($lastUserMsg['content'])) {
-        return strlen($lastUserMsg['content']);
+        return $lastUserMsg['content'];
     }
     if (is_array($lastUserMsg['content'])) {
-        $len = 0;
+        $parts = [];
         foreach ($lastUserMsg['content'] as $part) {
             if (($part['type'] ?? '') === 'text') {
-                $len += strlen($part['text'] ?? '');
+                $parts[] = $part['text'] ?? '';
             }
         }
-        return $len;
+        return implode(' ', $parts);
     }
-    return 0;
+    return '';
 }
 
 // (No closing PHP tag is recommended)

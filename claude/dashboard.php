@@ -3,25 +3,69 @@
  * Claude Usage Dashboard (server-side)
  * Reads claude_usage.log directly — no file upload needed.
  *
- * Access control: HTTP Basic Auth.
- * Credentials are stored in ~/.secrets/claudekey.php as
+ * Access control: form-based login with session cookie.
+ * Credentials stored in ~/.secrets/claudekey.php as
  * 'DASHBOARD_USER' and 'DASHBOARD_PASS'.
  */
 
-// --- Access control (HTTP Basic Auth) ---
+session_start();
+
+// --- Load credentials ---
 $accountRoot = dirname($_SERVER['DOCUMENT_ROOT']);
 $secretsFile = $accountRoot . '/.secrets/claudekey.php';
 $secrets = is_readable($secretsFile) ? require $secretsFile : [];
 $validUser = $secrets['DASHBOARD_USER'] ?? 'Admin';
 $validPass = $secrets['DASHBOARD_PASS'] ?? 'Pas99301!';
 
-$authUser = $_SERVER['PHP_AUTH_USER'] ?? '';
-$authPass = $_SERVER['PHP_AUTH_PW'] ?? '';
+// --- Handle logout ---
+if (isset($_GET['logout'])) {
+    session_destroy();
+    header('Location: dashboard.php');
+    exit;
+}
 
-if (!hash_equals($validUser, $authUser) || !hash_equals($validPass, $authPass)) {
-    header('WWW-Authenticate: Basic realm="Claude Dashboard"');
-    http_response_code(401);
-    echo 'Authentication required.';
+// --- Handle login form submission ---
+$loginError = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user'], $_POST['pass'])) {
+    if (hash_equals($validUser, $_POST['user']) && hash_equals($validPass, $_POST['pass'])) {
+        $_SESSION['dashboard_auth'] = true;
+    } else {
+        $loginError = 'Invalid username or password.';
+    }
+}
+
+// --- Show login form if not authenticated ---
+if (empty($_SESSION['dashboard_auth'])) {
+    ?><!DOCTYPE html>
+    <html lang="en"><head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Login</title>
+    <style>
+        body { font-family: -apple-system, system-ui, sans-serif; background: #0f172a; color: #e2e8f0;
+               display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .login-box { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 40px;
+                     width: 360px; max-width: 90vw; }
+        .login-box h2 { margin-bottom: 24px; font-size: 1.3rem; }
+        .login-box label { display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 4px; }
+        .login-box input { width: 100%; padding: 10px 14px; border: 1px solid #334155; border-radius: 8px;
+                           background: #0f172a; color: #e2e8f0; font-size: 1rem; margin-bottom: 16px; }
+        .login-box input:focus { outline: none; border-color: #6366f1; }
+        .login-box button { width: 100%; padding: 12px; background: #6366f1; color: white; border: none;
+                            border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        .login-box button:hover { background: #4f46e5; }
+        .error { color: #ef4444; font-size: 0.9rem; margin-bottom: 12px; }
+    </style>
+    </head><body>
+    <form class="login-box" method="POST">
+        <h2>Claude Dashboard Login</h2>
+        <?php if ($loginError): ?><div class="error"><?php echo htmlspecialchars($loginError); ?></div><?php endif; ?>
+        <label for="user">Username</label>
+        <input type="text" id="user" name="user" autocomplete="username" required autofocus>
+        <label for="pass">Password</label>
+        <input type="password" id="pass" name="pass" autocomplete="current-password" required>
+        <button type="submit">Sign In</button>
+    </form>
+    </body></html><?php
     exit;
 }
 
@@ -250,6 +294,7 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
         Generated: <code><?php echo date('Y-m-d H:i:s T'); ?></code>
     </p>
     <a class="refresh-btn" href="javascript:location.reload()">Refresh Data</a>
+    <a class="refresh-btn" href="dashboard.php?logout" style="background: #475569; margin-left: 8px;">Logout</a>
 
     <!-- Summary Cards -->
     <div class="summary-grid" id="summary-cards"></div>

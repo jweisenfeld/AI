@@ -43,9 +43,13 @@ foreach ($lines as $line) {
     $tokens = trim($parts[3]) . " / " . trim($parts[4]);
     $intent = isset($parts[5]) ? htmlspecialchars(substr($parts[5], 8)) : '-';
 
-    // RECOMMENDATION: Update proxy to log StudentID. 
-    // If ID is not in usage log, we'll use a placeholder logic below.
-    $studentID = "STU_" . preg_replace('/[^a-z0-9]/i', '', $studentName); 
+    // Extract student ID from log (format: "ID:12345")
+    $studentID = 'unknown';
+    if (isset($parts[5]) && strpos(trim($parts[5]), 'ID:') === 0) {
+        $studentID = substr(trim($parts[5]), 3);
+    } elseif (isset($parts[6]) && strpos(trim($parts[6]), 'ID:') === 0) {
+        $studentID = substr(trim($parts[6]), 3);
+    }
 
     $recentActivity[] = [
         'time' => $timestamp,

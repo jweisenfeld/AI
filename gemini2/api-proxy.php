@@ -118,7 +118,8 @@ $responseData = json_decode($response, true);
 $usage = $responseData['usageMetadata'] ?? ['promptTokenCount' => 0, 'candidatesTokenCount' => 0];
 $studentName = $data['student_name'] ?? 'Unknown';
 
-$logLine = date('Y-m-d H:i:s') . " | $studentName | $actualModel | In:{$usage['promptTokenCount']} | Out:{$usage['candidatesTokenCount']}\n";
+$studentID = $data['student_id'] ?? 'unknown';
+$logLine = date('Y-m-d H:i:s') . " | $studentName | $actualModel | In:{$usage['promptTokenCount']} | Out:{$usage['candidatesTokenCount']} | ID:$studentID\n";
 file_put_contents('gemini_usage.log', $logLine, FILE_APPEND);
 
 http_response_code($httpCode);

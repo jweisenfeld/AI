@@ -5,7 +5,9 @@
       "Bash(node:*)",
       "Bash(php:*)",
       "Bash(where:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(py:*)",
+      "Bash(python:*)"
     ]
   }
 }

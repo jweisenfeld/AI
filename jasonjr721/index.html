@@ -7,7 +7,7 @@
   <style>
    body {
             font-family: Arial, sans-serif;
-            max-width: 600px;
+            max-width: 980px;
             margin: 50px auto;
             padding: 20px;
         }
@@ -91,6 +91,20 @@
     </a>
    </li>
   </ul>
+  <!-- DASHBOARDS START -->
+<div style="margin-top:18px;">
+  <div style="display:flex;gap:8px;margin-bottom:6px;">
+    <button onclick="document.getElementById('dash-grades').style.display='block';document.getElementById('dash-cal').style.display='none';this.style.fontWeight='bold';document.getElementById('btn-cal').style.fontWeight='normal';" id="btn-grades" style="flex:1;padding:10px;font-size:1.1em;background:#0066cc;color:white;border:none;border-radius:6px 6px 0 0;cursor:pointer;font-weight:bold;">Physics Grades</button>
+    <button onclick="document.getElementById('dash-cal').style.display='block';document.getElementById('dash-grades').style.display='none';this.style.fontWeight='bold';document.getElementById('btn-grades').style.fontWeight='normal';" id="btn-cal" style="flex:1;padding:10px;font-size:1.1em;background:#4a90a4;color:white;border:none;border-radius:6px 6px 0 0;cursor:pointer;">Assignment Calendar</button>
+  </div>
+  <div id="dash-grades" style="display:block;">
+    <iframe src="46037.html" style="width:100%;height:700px;border:2px solid #0066cc;border-radius:0 0 6px 6px;" frameborder="0"></iframe>
+  </div>
+  <div id="dash-cal" style="display:none;">
+    <iframe src="46037.calendar.html" style="width:100%;height:700px;border:2px solid #4a90a4;border-radius:0 0 6px 6px;" frameborder="0"></iframe>
+  </div>
+</div>
+<!-- DASHBOARDS END -->
   <table class="resources">
    <thead>
     <tr>

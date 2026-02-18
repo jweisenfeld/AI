@@ -30,11 +30,20 @@ if (php_sapi_name() !== 'cli') {
 
 // ── Paths ────────────────────────────────────────────────────────────────────
 $accountRoot   = dirname($_SERVER['DOCUMENT_ROOT'] ?? '/home/fikrttmy/public_html');
-$secretsFile   = $accountRoot . '/.secrets/amentum_geminikey.php';
 $cacheNameFile = $accountRoot . '/.secrets/gemini_cache_name.txt';
 $htmlFile      = __DIR__ . '/Pasco-Municipal-Code.html';
 
 // ── Load API key ─────────────────────────────────────────────────────────────
+// Pass ?key=2 in the URL to test with geminikey2.php instead of the default key.
+$whichKey = $_GET['key'] ?? '1';
+if ($whichKey === '2') {
+    $secretsFile = $accountRoot . '/.secrets/geminikey2.php';
+    echo "Using ALTERNATE key: geminikey2.php\n";
+} else {
+    $secretsFile = $accountRoot . '/.secrets/amentum_geminikey.php';
+    echo "Using DEFAULT key: amentum_geminikey.php\n";
+}
+
 if (!file_exists($secretsFile)) die("ERROR: API key file not found at $secretsFile\n");
 require_once($secretsFile);
 $apiKey = trim($GEMINI_API_KEY);
@@ -56,6 +65,8 @@ if (file_exists($cleanFile)) {
     die("ERROR: Pasco-Municipal-Code.html not found at $htmlFile\n");
 }
 
+echo "API key loaded: " . substr($apiKey, 0, 8) . "...\n";
+echo "Model         : $model\n\n";
 echo "Reading Pasco Municipal Code... ";
 $htmlContent = file_get_contents($inputFile);
 $htmlSize    = strlen($htmlContent);
@@ -65,19 +76,19 @@ echo number_format($htmlSize) . " bytes loaded.\n";
 $encoded = base64_encode($htmlContent);
 
 // ── Build the create-cache request ──────────────────────────────────────────
-// Model must support caching. gemini-2.5-flash supports it.
-// The cachedContent must have at least 1 user turn OR a system instruction
-// that exceeds the minimum token threshold (~4096 tokens for Flash).
-$model = 'models/gemini-2.5-flash';
+// IMPORTANT: The caching API requires a fully-versioned model name.
+// Aliases like "gemini-2.5-flash" are NOT accepted — must use dated versions.
+// gemini-1.5-flash-001 has confirmed caching support on Tier 1.
+$model = 'models/gemini-1.5-flash-001';
 
 $payload = [
-    'model'   => $model,
-    'ttl'     => '3600s',   // 1 hour; cron pings it every 45 min to keep alive
+    'model'       => $model,
+    'ttl'         => '3600s',
     'displayName' => 'Pasco-Municipal-Code',
+    // systemInstruction takes NO role field — just parts
     'systemInstruction' => [
-        'role'  => 'user',
         'parts' => [[
-            'text' => 'You are an expert on the Pasco Municipal Code. The following HTML document contains the full text of the Pasco, WA Municipal Code. Use it as your primary reference when answering engineering and civic questions.'
+            'text' => 'You are an expert on the Pasco Municipal Code. The following document contains the full text of the Pasco, WA Municipal Code. Use it as your primary reference when answering engineering and civic questions.'
         ]]
     ],
     'contents' => [

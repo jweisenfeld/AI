@@ -1,6 +1,6 @@
 <?php
 /**
- * OHS Gemini Proxy - Updated for Student Logging and Stable Models
+ * OHS Gemini Proxy - Updated for Student Logging, Stable Models, and Context Caching
  */
 set_time_limit(300);
 header('Access-Control-Allow-Origin: *');
@@ -10,9 +10,10 @@ header('Content-Type: application/json; charset=utf-8');
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') { exit; }
 
-$accountRoot = dirname($_SERVER['DOCUMENT_ROOT']); 
-$secretsFile = $accountRoot . '/.secrets/amentum_geminikey.php';
-$studentFile = $accountRoot . '/.secrets/student_roster.csv'; 
+$accountRoot   = dirname($_SERVER['DOCUMENT_ROOT']);
+$secretsFile   = $accountRoot . '/.secrets/amentum_geminikey.php';
+$studentFile   = $accountRoot . '/.secrets/student_roster.csv';
+$cacheNameFile = $accountRoot . '/.secrets/gemini_cache_name.txt';
 
 function send_error($msg, $details = null) {
     echo json_encode(['error' => $msg, 'details' => $details]);
@@ -55,18 +56,27 @@ if (isset($data['action']) && $data['action'] === 'log_interaction') {
 
 // --- 3. CHAT ROUTE ---
 if (!file_exists($secretsFile)) send_error("API Key file missing.");
-require_once($secretsFile); 
+require_once($secretsFile);
 
-// FIX #1: Use stable model IDs
-// Update your $modelMap to current active models
 $modelMap = [
-    "gemini-3-pro-preview" => "gemini-3-pro-preview",
-    "gemini-2.5-flash"     => "gemini-2.5-flash",
-    "gemini-2.5-flash-lite"=> "gemini-2.5-flash-lite"
+    "gemini-3-pro-preview"  => "gemini-3-pro-preview",
+    "gemini-2.5-flash"      => "gemini-2.5-flash",
+    "gemini-2.5-flash-lite" => "gemini-2.5-flash-lite"
 ];
 
-// Ensure the default fallback is a valid, active model
+$requested   = $data['model'] ?? 'gemini-2.5-flash';
 $actualModel = $modelMap[$requested] ?? "gemini-2.5-flash";
+
+// ── Context Cache lookup ─────────────────────────────────────────────────────
+// If a cache exists for the Pasco Municipal Code, attach it so we don't have
+// to resend the 9 MB document with every request.
+$cachedContentName = null;
+if (file_exists($cacheNameFile)) {
+    $saved = trim(file_get_contents($cacheNameFile));
+    if (!empty($saved)) {
+        $cachedContentName = $saved;
+    }
+}
 
 $url = "https://generativelanguage.googleapis.com/v1beta/models/$actualModel:generateContent?key=" . trim($GEMINI_API_KEY);
 
@@ -100,9 +110,16 @@ if (isset($data['messages'])) {
 }
 
 $payload = [
-    "contents" => $contents,
+    "contents"         => $contents,
     "systemInstruction" => ["parts" => [["text" => $data['system'] ?? "You are a civil engineer."]]]
 ];
+
+// Attach the cached Pasco Municipal Code if available.
+// When present, Gemini reads tokens from the cache at a much lower cost
+// rather than re-processing the full document each call.
+if ($cachedContentName !== null) {
+    $payload['cachedContent'] = $cachedContentName;
+}
 
 $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -118,8 +135,10 @@ $responseData = json_decode($response, true);
 $usage = $responseData['usageMetadata'] ?? ['promptTokenCount' => 0, 'candidatesTokenCount' => 0];
 $studentName = $data['student_name'] ?? 'Unknown';
 
-$studentID = $data['student_id'] ?? 'unknown';
-$logLine = date('Y-m-d H:i:s') . " | $studentName | $actualModel | In:{$usage['promptTokenCount']} | Out:{$usage['candidatesTokenCount']} | ID:$studentID\n";
+$studentID     = $data['student_id'] ?? 'unknown';
+$cachedTokens  = $usage['cachedContentTokenCount'] ?? 0;
+$cacheFlag     = $cachedContentName ? "CACHED($cachedTokens)" : "NO_CACHE";
+$logLine = date('Y-m-d H:i:s') . " | $studentName | $actualModel | In:{$usage['promptTokenCount']} | Out:{$usage['candidatesTokenCount']} | $cacheFlag | ID:$studentID\n";
 file_put_contents('gemini_usage.log', $logLine, FILE_APPEND);
 
 http_response_code($httpCode);

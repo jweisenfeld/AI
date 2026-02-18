@@ -65,42 +65,34 @@ if (file_exists($cleanFile)) {
     die("ERROR: Pasco-Municipal-Code.html not found at $htmlFile\n");
 }
 
+// ── Build the create-cache request ──────────────────────────────────────────
+// Use gemini-2.5-flash — confirmed available with createCachedContent support.
+// The caching API wants plain TEXT parts, NOT base64 inline_data, for text docs.
+$model = 'models/gemini-2.5-flash';
+
 echo "API key loaded: " . substr($apiKey, 0, 8) . "...\n";
 echo "Model         : $model\n\n";
 echo "Reading Pasco Municipal Code... ";
-$htmlContent = file_get_contents($inputFile);
-$htmlSize    = strlen($htmlContent);
-echo number_format($htmlSize) . " bytes loaded.\n";
-
-// Gemini requires the content to be base64-encoded for inline_data uploads
-$encoded = base64_encode($htmlContent);
-
-// ── Build the create-cache request ──────────────────────────────────────────
-// IMPORTANT: The caching API requires a fully-versioned model name.
-// Aliases like "gemini-2.5-flash" are NOT accepted — must use dated versions.
-// gemini-1.5-flash-001 has confirmed caching support on Tier 1.
-$model = 'models/gemini-1.5-flash-001';
+$textContent = file_get_contents($inputFile);
+$textSize    = strlen($textContent);
+echo number_format($textSize) . " bytes loaded.\n";
 
 $payload = [
     'model'       => $model,
     'ttl'         => '3600s',
     'displayName' => 'Pasco-Municipal-Code',
-    // systemInstruction takes NO role field — just parts
     'systemInstruction' => [
         'parts' => [[
             'text' => 'You are an expert on the Pasco Municipal Code. The following document contains the full text of the Pasco, WA Municipal Code. Use it as your primary reference when answering engineering and civic questions.'
         ]]
     ],
+    // Pass the document as a plain text part — NOT base64 inline_data.
+    // The caching API tokenises text parts directly; inline_data is for images/audio.
     'contents' => [
         [
             'role'  => 'user',
             'parts' => [
-                [
-                    'inline_data' => [
-                        'mime_type' => $mimeType,
-                        'data'      => $encoded
-                    ]
-                ]
+                ['text' => $textContent]
             ]
         ]
     ]

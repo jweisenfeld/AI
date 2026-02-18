@@ -40,16 +40,29 @@ require_once($secretsFile);
 $apiKey = trim($GEMINI_API_KEY);
 
 // ── Load the municipal code ──────────────────────────────────────────────────
-if (!file_exists($htmlFile)) die("ERROR: Pasco-Municipal-Code.html not found at $htmlFile\n");
+// Prefer the cleaned HTML version (junk stripped, structure preserved).
+// Fall back to raw HTML if the cleaned version hasn't been generated yet.
+$cleanFile = __DIR__ . '/Pasco-Municipal-Code-clean.html';
+if (file_exists($cleanFile)) {
+    $inputFile = $cleanFile;
+    $mimeType  = 'text/html';
+    echo "Using cleaned HTML version (junk stripped, structure preserved).\n";
+} elseif (file_exists($htmlFile)) {
+    $inputFile = $htmlFile;
+    $mimeType  = 'text/html';
+    echo "WARNING: Cleaned version not found. Using raw HTML (very large).\n";
+    echo "         Run strip-html.php first for best results.\n";
+} else {
+    die("ERROR: Pasco-Municipal-Code.html not found at $htmlFile\n");
+}
 
 echo "Reading Pasco Municipal Code... ";
-$htmlContent = file_get_contents($htmlFile);
+$htmlContent = file_get_contents($inputFile);
 $htmlSize    = strlen($htmlContent);
 echo number_format($htmlSize) . " bytes loaded.\n";
 
 // Gemini requires the content to be base64-encoded for inline_data uploads
-$encoded  = base64_encode($htmlContent);
-$mimeType = 'text/html';
+$encoded = base64_encode($htmlContent);
 
 // ── Build the create-cache request ──────────────────────────────────────────
 // Model must support caching. gemini-2.5-flash supports it.

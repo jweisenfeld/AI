@@ -56,16 +56,23 @@ echo "API key loaded: " . substr($apiKey, 0, 8) . "...\n\n";
 $rawFile   = __DIR__ . '/Pasco-Municipal-Code.html';
 $cleanFile = __DIR__ . '/Pasco-Municipal-Code-clean.html';
 
-if (file_exists($rawFile)) {
+// NOTE: The full raw HTML (9MB / ~3.3M tokens) exceeds Gemini's 1M token
+// context window — it uploads fine via Files API but fails at inference time.
+// Use the stripped plain-text version (~875k tokens) instead.
+// Re-run strip-html.php any time the source HTML is updated.
+$mimeHint = __DIR__ . '/Pasco-Municipal-Code-clean.mime';
+
+if (file_exists($cleanFile)) {
+    $inputFile = $cleanFile;
+    $mimeType  = file_exists($mimeHint) ? trim(file_get_contents($mimeHint)) : 'text/html';
+    echo "Using cleaned file: Pasco-Municipal-Code-clean.html (mime: $mimeType)\n";
+} elseif (file_exists($rawFile)) {
     $inputFile = $rawFile;
     $mimeType  = 'text/html';
-    echo "Using full original HTML: Pasco-Municipal-Code.html\n";
-} elseif (file_exists($cleanFile)) {
-    $inputFile = $cleanFile;
-    $mimeType  = 'text/html';
-    echo "Using cleaned HTML: Pasco-Municipal-Code-clean.html\n";
+    echo "WARNING: No cleaned version found — raw HTML may exceed 1M token limit.\n";
+    echo "         Run strip-html.php first!\n";
 } else {
-    die("ERROR: No input file found. Expected Pasco-Municipal-Code.html\n");
+    die("ERROR: No input file found. Expected Pasco-Municipal-Code-clean.html\n");
 }
 
 echo "Reading file... ";

@@ -2,15 +2,14 @@
 /**
  * strip-html.php
  *
- * Produces Pasco-Municipal-Code-clean.html from the raw scraped file.
+ * Converts Pasco-Municipal-Code.html to a lean plain-text file that fits
+ * within Gemini's 1M token context window.
  *
- * Strategy: KEEP structural HTML (headings, paragraphs, lists, tables)
- *           because Gemini reads HTML well and structure aids comprehension.
- *           REMOVE everything that burns tokens without adding meaning:
- *             - <script>, <style>, <head>, <nav>, <header>, <footer>
- *             - All HTML attributes (class, id, style, onclick, data-*, etc.)
- *             - HTML comments
- *             - Excess blank lines
+ * Strategy: strip ALL HTML — output pure text with lightweight markdown-style
+ * section headers (### Title) so Gemini understands document structure without
+ * any tag overhead. Tables are converted to simple text rows.
+ *
+ * Target: under 3.5MB / ~875k tokens (leaving headroom for conversation).
  *
  * Run via browser: https://yoursite.com/gemini3/strip-html.php?secret=amentum2025
  * Run via CLI:     php strip-html.php
@@ -27,8 +26,8 @@ if (php_sapi_name() !== 'cli') {
     }
 }
 
-$inputFile  = __DIR__ . '/Pasco-Municipal-Code.html';
-$outputFile = __DIR__ . '/Pasco-Municipal-Code-clean.html';
+$inputFile   = __DIR__ . '/Pasco-Municipal-Code.html';
+$outputFile  = __DIR__ . '/Pasco-Municipal-Code-clean.html';  // kept as .html for mime_type compatibility
 
 if (!file_exists($inputFile)) die("ERROR: Input file not found: $inputFile\n");
 
@@ -36,62 +35,96 @@ echo "Reading HTML file...\n";
 $html = file_get_contents($inputFile);
 echo "  Raw size: " . number_format(strlen($html)) . " bytes\n\n";
 
-// ── Step 1: Nuke entire junk blocks ──────────────────────────────────────────
-echo "Step 1: Removing scripts, styles, head, nav, header, footer...\n";
-$remove_blocks = ['script', 'style', 'head', 'nav', 'header', 'footer', 'aside', 'noscript', 'iframe', 'form', 'button', 'input', 'select', 'textarea'];
+// ── Step 1: Nuke entire non-content blocks ────────────────────────────────────
+echo "Step 1: Removing scripts, styles, nav, head, footer...\n";
+$remove_blocks = [
+    'script', 'style', 'head', 'nav', 'header', 'footer', 'aside',
+    'noscript', 'iframe', 'form', 'button', 'input', 'select', 'textarea',
+    'svg', 'canvas', 'map', 'object', 'embed'
+];
 foreach ($remove_blocks as $tag) {
     $html = preg_replace('/<' . $tag . '\b[^>]*>[\s\S]*?<\/' . $tag . '>/i', '', $html);
-    // Also remove self-closing variants
-    $html = preg_replace('/<' . $tag . '\b[^>]*\/>/i', '', $html);
+    $html = preg_replace('/<' . $tag . '\b[^>]*\/?>/i', '', $html);
 }
 
-// ── Step 2: Remove HTML comments ─────────────────────────────────────────────
+// ── Step 2: Remove comments ───────────────────────────────────────────────────
 echo "Step 2: Removing comments...\n";
 $html = preg_replace('/<!--[\s\S]*?-->/', '', $html);
 
-// ── Step 3: Strip ALL attributes from ALL remaining tags ─────────────────────
-// Keeps tag names but removes class="...", id="...", style="...", data-*, onclick, etc.
-// This is the big token saver — attributes are pure noise for an AI reading content.
-echo "Step 3: Stripping all HTML attributes...\n";
-$html = preg_replace('/<([a-z][a-z0-9]*)\s+[^>]*?(\/?)\s*>/i', '<$1$2>', $html);
+// ── Step 3: Convert headings to plain-text section markers ───────────────────
+echo "Step 3: Converting headings to text markers...\n";
+$html = preg_replace_callback('/<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>/i', function($m) {
+    $level = (int)$m[1];
+    $text  = trim(strip_tags($m[2]));
+    if (empty($text)) return '';
+    $prefix = str_repeat('#', $level);
+    return "\n\n$prefix $text\n";
+}, $html);
 
-// ── Step 4: Remove tags that add zero meaning without their attributes ────────
-// <div>, <span> without class/id are structural noise; collapse them
-echo "Step 4: Collapsing meaningless wrappers...\n";
-$html = preg_replace('/<\/?(?:div|span|section|article|main|figure|figcaption|label)>/i', '', $html);
+// ── Step 4: Convert table cells to pipe-separated text ───────────────────────
+echo "Step 4: Flattening tables...\n";
+$html = preg_replace('/<th\b[^>]*>([\s\S]*?)<\/th>/i', ' | $1', $html);
+$html = preg_replace('/<td\b[^>]*>([\s\S]*?)<\/td>/i', ' | $1', $html);
+$html = preg_replace('/<tr\b[^>]*>/i', "\n", $html);
+$html = preg_replace('/<\/tr>/i', '', $html);
+$html = preg_replace('/<\/?(table|thead|tbody|tfoot)\b[^>]*>/i', "\n", $html);
 
-// ── Step 5: Collapse whitespace ───────────────────────────────────────────────
-echo "Step 5: Collapsing whitespace...\n";
-// Normalize line endings
-$html = str_replace(["\r\n", "\r"], "\n", $html);
-// Collapse runs of spaces/tabs to single space
-$html = preg_replace('/[ \t]+/', ' ', $html);
-// No more than 2 consecutive blank lines
-$html = preg_replace('/\n{3,}/', "\n\n", $html);
-$html = trim($html);
+// ── Step 5: Convert list items to dashes ─────────────────────────────────────
+echo "Step 5: Converting lists...\n";
+$html = preg_replace('/<li\b[^>]*>([\s\S]*?)<\/li>/i', "\n- $1", $html);
+$html = preg_replace('/<\/?(ul|ol)\b[^>]*>/i', "\n", $html);
 
-// ── Step 6: Wrap in minimal valid HTML ───────────────────────────────────────
-echo "Step 6: Wrapping in minimal HTML shell...\n";
-$html = "<!DOCTYPE html>\n<html>\n<body>\n" . $html . "\n</body>\n</html>";
+// ── Step 6: Add line breaks at block-level elements ───────────────────────────
+echo "Step 6: Adding newlines at block boundaries...\n";
+$html = preg_replace('/<\/?(p|div|section|article|main|blockquote|pre|br)\b[^>]*>/i', "\n", $html);
 
-// ── Step 7: Save ─────────────────────────────────────────────────────────────
-file_put_contents($outputFile, $html);
+// ── Step 7: Strip all remaining tags ─────────────────────────────────────────
+echo "Step 7: Stripping remaining tags...\n";
+$text = strip_tags($html);
 
-$outSize  = strlen($html);
-$inSize   = filesize($inputFile);
-$pct      = round((1 - $outSize / $inSize) * 100);
-$estTok   = (int)($outSize / 3.5); // HTML tokens ~3.5 chars each (denser than prose)
+// ── Step 8: Decode HTML entities ─────────────────────────────────────────────
+echo "Step 8: Decoding HTML entities...\n";
+$text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+// ── Step 9: Normalize whitespace ─────────────────────────────────────────────
+echo "Step 9: Normalizing whitespace...\n";
+$text = str_replace(["\r\n", "\r"], "\n", $text);
+$text = preg_replace('/[ \t]+/', ' ', $text);           // collapse horizontal space
+$text = preg_replace('/^ /m', '', $text);                // trim leading space per line
+$text = preg_replace('/\n{4,}/', "\n\n\n", $text);      // max 3 blank lines
+// Remove lines that are only whitespace or 1-2 meaningless chars
+$lines = explode("\n", $text);
+$lines = array_filter($lines, function($line) {
+    $t = trim($line);
+    return strlen($t) > 2 || $t === '' || $t[0] === '#' || $t[0] === '-';
+});
+$text = implode("\n", $lines);
+$text = preg_replace('/\n{4,}/', "\n\n\n", $text);
+$text = trim($text);
+
+// ── Step 10: Save ─────────────────────────────────────────────────────────────
+file_put_contents($outputFile, $text);
+
+$outSize = strlen($text);
+$inSize  = filesize($inputFile);
+$pct     = round((1 - $outSize / $inSize) * 100);
+// Plain text tokenizes at ~4 chars/token
+$estTok  = (int)($outSize / 4);
 
 echo "\n=== RESULTS ===\n";
-echo "  Input  : " . number_format($inSize)   . " bytes\n";
-echo "  Output : " . number_format($outSize)  . " bytes  ($pct% reduction)\n";
-echo "  Saved  : $outputFile\n";
-echo "  Est. tokens: ~" . number_format($estTok) . "\n\n";
+echo "  Input      : " . number_format($inSize)   . " bytes (raw HTML)\n";
+echo "  Output     : " . number_format($outSize)  . " bytes ($pct% reduction)\n";
+echo "  Saved to   : $outputFile\n";
+echo "  Est. tokens: ~" . number_format($estTok) . " (target: <1,000,000)\n\n";
 
 if ($estTok > 1_000_000) {
-    echo "WARN: Still estimated over 1M tokens.\n";
-    echo "      The actual Gemini tokenizer may differ — try cache-create.php anyway.\n";
-    echo "      If it fails, we'll switch to the Files API approach.\n";
+    echo "WARN: Still over 1M tokens (~$estTok estimated).\n";
+    echo "      Consider trimming appendices or boilerplate sections from the source HTML.\n";
 } else {
-    echo "Looks promising! Now run cache-create.php to attempt the upload.\n";
+    echo "SUCCESS: Estimated " . number_format($estTok) . " tokens — fits in 1M context window.\n";
+    echo "Now re-run cache-create.php to upload the new version.\n";
 }
+
+// Also update mime_type hint file so cache-create knows to send as text/plain
+file_put_contents(__DIR__ . '/Pasco-Municipal-Code-clean.mime', 'text/plain');
+echo "\nMime type set to text/plain (saved hint file).\n";

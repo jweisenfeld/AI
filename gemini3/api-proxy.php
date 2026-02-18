@@ -68,13 +68,14 @@ $requested   = $data['model'] ?? 'gemini-2.5-flash';
 $actualModel = $modelMap[$requested] ?? "gemini-2.5-flash";
 
 // ── Files API URI lookup ──────────────────────────────────────────────────────
-// If the Pasco Municipal Code has been uploaded via cache-create.php, we have
-// a file URI stored in the secrets file. We'll inject it as the first turn of
-// the conversation so Gemini reads the document server-side — no re-upload needed.
-$fileUri = null;
+$fileUri      = null;
+$fileMimeType = 'text/plain'; // default; overridden by hint file if present
+$mimeHintFile = __DIR__ . '/Pasco-Municipal-Code-clean.mime';
+if (file_exists($mimeHintFile)) {
+    $fileMimeType = trim(file_get_contents($mimeHintFile)) ?: 'text/plain';
+}
 if (file_exists($cacheNameFile)) {
     $saved = trim(file_get_contents($cacheNameFile));
-    // Validate it looks like a Files API URI, not an old cachedContents name
     if (!empty($saved) && strpos($saved, 'generativelanguage.googleapis.com') !== false) {
         $fileUri = $saved;
     }
@@ -120,7 +121,7 @@ if ($fileUri !== null) {
         'role'  => 'user',
         'parts' => [[
             'file_data' => [
-                'mime_type' => 'text/html',
+                'mime_type' => $fileMimeType,
                 'file_uri'  => $fileUri
             ]
         ]]

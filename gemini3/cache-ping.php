@@ -48,14 +48,17 @@ $apiKey = trim($GEMINI_API_KEY);
 $rawFile   = __DIR__ . '/Pasco-Municipal-Code.html';
 $cleanFile = __DIR__ . '/Pasco-Municipal-Code-clean.html';
 
-if (file_exists($rawFile)) {
+$mimeHint = __DIR__ . '/Pasco-Municipal-Code-clean.mime';
+
+if (file_exists($cleanFile)) {
+    $inputFile = $cleanFile;
+    $mimeType  = file_exists($mimeHint) ? trim(file_get_contents($mimeHint)) : 'text/html';
+} elseif (file_exists($rawFile)) {
     $inputFile = $rawFile;
     $mimeType  = 'text/html';
-} elseif (file_exists($cleanFile)) {
-    $inputFile = $cleanFile;
-    $mimeType  = 'text/html';
+    log_msg("WARN: Using raw HTML — may exceed 1M token limit. Run strip-html.php!");
 } else {
-    log_msg("ERROR: No municipal code file found. Expected Pasco-Municipal-Code.html");
+    log_msg("ERROR: No municipal code file found. Expected Pasco-Municipal-Code-clean.html");
     exit(1);
 }
 

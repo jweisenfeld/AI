@@ -1,6 +1,6 @@
 <?php 
 // 1. Pull the key from your secret folder
-require_once __DIR__ . '/.secrets/geminikey2.php'; 
+require_once dirname(dirname(__DIR__)) . '/.secrets/geminikey2.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">

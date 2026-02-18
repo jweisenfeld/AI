@@ -51,19 +51,21 @@ $apiKey = trim($GEMINI_API_KEY);
 echo "API key loaded: " . substr($apiKey, 0, 8) . "...\n\n";
 
 // ── Choose input file ─────────────────────────────────────────────────────────
-$cleanFile = __DIR__ . '/Pasco-Municipal-Code-clean.html';
+// Files API stores raw bytes with no token limit, so we use the full original
+// HTML — better structure, original formatting, complete ordinance numbering.
 $rawFile   = __DIR__ . '/Pasco-Municipal-Code.html';
+$cleanFile = __DIR__ . '/Pasco-Municipal-Code-clean.html';
 
-if (file_exists($cleanFile)) {
+if (file_exists($rawFile)) {
+    $inputFile = $rawFile;
+    $mimeType  = 'text/html';
+    echo "Using full original HTML: Pasco-Municipal-Code.html\n";
+} elseif (file_exists($cleanFile)) {
     $inputFile = $cleanFile;
     $mimeType  = 'text/html';
     echo "Using cleaned HTML: Pasco-Municipal-Code-clean.html\n";
-} elseif (file_exists($rawFile)) {
-    $inputFile = $rawFile;
-    $mimeType  = 'text/html';
-    echo "WARNING: Using raw HTML (run strip-html.php first for a smaller file).\n";
 } else {
-    die("ERROR: No input file found. Expected Pasco-Municipal-Code-clean.html\n");
+    die("ERROR: No input file found. Expected Pasco-Municipal-Code.html\n");
 }
 
 echo "Reading file... ";

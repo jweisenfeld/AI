@@ -44,17 +44,18 @@ require_once($secretsFile);
 $apiKey = trim($GEMINI_API_KEY);
 
 // ── Choose input file ─────────────────────────────────────────────────────────
-$cleanFile = __DIR__ . '/Pasco-Municipal-Code-clean.html';
+// Use the full original HTML — Files API has no token limit.
 $rawFile   = __DIR__ . '/Pasco-Municipal-Code.html';
+$cleanFile = __DIR__ . '/Pasco-Municipal-Code-clean.html';
 
-if (file_exists($cleanFile)) {
-    $inputFile = $cleanFile;
-    $mimeType  = 'text/html';
-} elseif (file_exists($rawFile)) {
+if (file_exists($rawFile)) {
     $inputFile = $rawFile;
     $mimeType  = 'text/html';
+} elseif (file_exists($cleanFile)) {
+    $inputFile = $cleanFile;
+    $mimeType  = 'text/html';
 } else {
-    log_msg("ERROR: No municipal code file found. Expected Pasco-Municipal-Code-clean.html");
+    log_msg("ERROR: No municipal code file found. Expected Pasco-Municipal-Code.html");
     exit(1);
 }
 

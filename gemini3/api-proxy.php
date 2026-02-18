@@ -1,6 +1,6 @@
 <?php
 /**
- * OHS Gemini Proxy - Updated for Student Logging, Stable Models, and Context Caching
+ * OHS Gemini Proxy - Updated for Student Logging, Stable Models, and Files API
  */
 set_time_limit(300);
 header('Access-Control-Allow-Origin: *');
@@ -67,14 +67,16 @@ $modelMap = [
 $requested   = $data['model'] ?? 'gemini-2.5-flash';
 $actualModel = $modelMap[$requested] ?? "gemini-2.5-flash";
 
-// ── Context Cache lookup ─────────────────────────────────────────────────────
-// If a cache exists for the Pasco Municipal Code, attach it so we don't have
-// to resend the 9 MB document with every request.
-$cachedContentName = null;
+// ── Files API URI lookup ──────────────────────────────────────────────────────
+// If the Pasco Municipal Code has been uploaded via cache-create.php, we have
+// a file URI stored in the secrets file. We'll inject it as the first turn of
+// the conversation so Gemini reads the document server-side — no re-upload needed.
+$fileUri = null;
 if (file_exists($cacheNameFile)) {
     $saved = trim(file_get_contents($cacheNameFile));
-    if (!empty($saved)) {
-        $cachedContentName = $saved;
+    // Validate it looks like a Files API URI, not an old cachedContents name
+    if (!empty($saved) && strpos($saved, 'generativelanguage.googleapis.com') !== false) {
+        $fileUri = $saved;
     }
 }
 
@@ -109,17 +111,26 @@ if (isset($data['messages'])) {
     }
 }
 
+// ── Prepend the municipal code file as the first user turn ───────────────────
+// When a Files API URI is available, inject it at the start of the conversation.
+// Gemini reads the file server-side — the 4.4MB document is never re-sent by
+// the client. This is functionally equivalent to context caching for our purposes.
+if ($fileUri !== null) {
+    array_unshift($contents, [
+        'role'  => 'user',
+        'parts' => [[
+            'file_data' => [
+                'mime_type' => 'text/html',
+                'file_uri'  => $fileUri
+            ]
+        ]]
+    ]);
+}
+
 $payload = [
-    "contents"         => $contents,
+    "contents"          => $contents,
     "systemInstruction" => ["parts" => [["text" => $data['system'] ?? "You are a civil engineer."]]]
 ];
-
-// Attach the cached Pasco Municipal Code if available.
-// When present, Gemini reads tokens from the cache at a much lower cost
-// rather than re-processing the full document each call.
-if ($cachedContentName !== null) {
-    $payload['cachedContent'] = $cachedContentName;
-}
 
 $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -135,10 +146,9 @@ $responseData = json_decode($response, true);
 $usage = $responseData['usageMetadata'] ?? ['promptTokenCount' => 0, 'candidatesTokenCount' => 0];
 $studentName = $data['student_name'] ?? 'Unknown';
 
-$studentID     = $data['student_id'] ?? 'unknown';
-$cachedTokens  = $usage['cachedContentTokenCount'] ?? 0;
-$cacheFlag     = $cachedContentName ? "CACHED($cachedTokens)" : "NO_CACHE";
-$logLine = date('Y-m-d H:i:s') . " | $studentName | $actualModel | In:{$usage['promptTokenCount']} | Out:{$usage['candidatesTokenCount']} | $cacheFlag | ID:$studentID\n";
+$studentID = $data['student_id'] ?? 'unknown';
+$fileFlag  = $fileUri ? "FILE_URI" : "NO_FILE";
+$logLine   = date('Y-m-d H:i:s') . " | $studentName | $actualModel | In:{$usage['promptTokenCount']} | Out:{$usage['candidatesTokenCount']} | $fileFlag | ID:$studentID\n";
 file_put_contents('gemini_usage.log', $logLine, FILE_APPEND);
 
 http_response_code($httpCode);

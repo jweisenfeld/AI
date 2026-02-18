@@ -2,39 +2,40 @@
 /**
  * cache-create.php
  *
- * Run this ONCE (via browser or CLI) to upload the Pasco Municipal Code
- * to Gemini's Context Cache. Saves the cache resource name to a secrets
- * file so api-proxy.php and cache-ping.php can reference it.
+ * Uploads the Pasco Municipal Code to the Gemini Files API and saves the
+ * returned file URI to /.secrets/gemini_cache_name.txt for use by
+ * api-proxy.php and cache-ping.php.
  *
- * The cache TTL is set to 3600 seconds (1 hour). The cron job (cache-ping.php)
- * must run every ~45 minutes to keep it alive indefinitely.
+ * WHY Files API instead of Context Caching:
+ *   - Context caching has a known Google bug (max_total_token_count=0) that
+ *     affects some Tier 1 projects with no ETA on a fix.
+ *   - The Files API works on all tiers, supports up to 2GB, and the
+ *     1.36M-token document exceeds the 1M cache token limit anyway.
+ *   - Files live 48 hours; we re-upload daily via cron (cache-ping.php).
+ *   - Gemini reads the file server-side — students never re-send 4.4MB.
  *
  * USAGE:
- *   Browser: https://yoursite.com/gemini3/cache-create.php?secret=YOURPASSWORD
+ *   Browser: https://yoursite.com/gemini3/cache-create.php?secret=amentum2025
  *   CLI:     php cache-create.php
  */
 
 set_time_limit(300);
 header('Content-Type: text/plain; charset=utf-8');
 
-// ── Simple access guard ──────────────────────────────────────────────────────
-// Set a password here so this script can't be triggered by anyone on the web.
+// ── Access guard ─────────────────────────────────────────────────────────────
 define('CREATE_SECRET', 'amentum2025');
-
 if (php_sapi_name() !== 'cli') {
     if (($_GET['secret'] ?? '') !== CREATE_SECRET) {
         http_response_code(403);
-        die("403 Forbidden – pass ?secret=... to run this script.\n");
+        die("403 Forbidden – pass ?secret=amentum2025 to run this script.\n");
     }
 }
 
 // ── Paths ────────────────────────────────────────────────────────────────────
 $accountRoot   = dirname($_SERVER['DOCUMENT_ROOT'] ?? '/home/fikrttmy/public_html');
 $cacheNameFile = $accountRoot . '/.secrets/gemini_cache_name.txt';
-$htmlFile      = __DIR__ . '/Pasco-Municipal-Code.html';
 
-// ── Load API key ─────────────────────────────────────────────────────────────
-// Pass ?key=2 in the URL to test with geminikey2.php instead of the default key.
+// Key selection: pass ?key=2 to use geminikey2.php
 $whichKey = $_GET['key'] ?? '1';
 if ($whichKey === '2') {
     $secretsFile = $accountRoot . '/.secrets/geminikey2.php';
@@ -47,68 +48,57 @@ if ($whichKey === '2') {
 if (!file_exists($secretsFile)) die("ERROR: API key file not found at $secretsFile\n");
 require_once($secretsFile);
 $apiKey = trim($GEMINI_API_KEY);
+echo "API key loaded: " . substr($apiKey, 0, 8) . "...\n\n";
 
-// ── Load the municipal code ──────────────────────────────────────────────────
-// Prefer the cleaned HTML version (junk stripped, structure preserved).
-// Fall back to raw HTML if the cleaned version hasn't been generated yet.
+// ── Choose input file ─────────────────────────────────────────────────────────
 $cleanFile = __DIR__ . '/Pasco-Municipal-Code-clean.html';
+$rawFile   = __DIR__ . '/Pasco-Municipal-Code.html';
+
 if (file_exists($cleanFile)) {
     $inputFile = $cleanFile;
     $mimeType  = 'text/html';
-    echo "Using cleaned HTML version (junk stripped, structure preserved).\n";
-} elseif (file_exists($htmlFile)) {
-    $inputFile = $htmlFile;
+    echo "Using cleaned HTML: Pasco-Municipal-Code-clean.html\n";
+} elseif (file_exists($rawFile)) {
+    $inputFile = $rawFile;
     $mimeType  = 'text/html';
-    echo "WARNING: Cleaned version not found. Using raw HTML (very large).\n";
-    echo "         Run strip-html.php first for best results.\n";
+    echo "WARNING: Using raw HTML (run strip-html.php first for a smaller file).\n";
 } else {
-    die("ERROR: Pasco-Municipal-Code.html not found at $htmlFile\n");
+    die("ERROR: No input file found. Expected Pasco-Municipal-Code-clean.html\n");
 }
 
-// ── Build the create-cache request ──────────────────────────────────────────
-// Use gemini-2.5-flash — confirmed available with createCachedContent support.
-// The caching API wants plain TEXT parts, NOT base64 inline_data, for text docs.
-$model = 'models/gemini-2.5-flash';
+echo "Reading file... ";
+$fileContent = file_get_contents($inputFile);
+$fileSize    = strlen($fileContent);
+echo number_format($fileSize) . " bytes loaded.\n\n";
 
-echo "API key loaded: " . substr($apiKey, 0, 8) . "...\n";
-echo "Model         : $model\n\n";
-echo "Reading Pasco Municipal Code... ";
-$textContent = file_get_contents($inputFile);
-$textSize    = strlen($textContent);
-echo number_format($textSize) . " bytes loaded.\n";
+// ── Upload to Gemini Files API ────────────────────────────────────────────────
+// Uses multipart/related upload — metadata first, then binary content.
+echo "Uploading to Gemini Files API...\n";
+echo "(This may take 15-60 seconds)\n\n";
 
-$payload = [
-    'model'       => $model,
-    'ttl'         => '3600s',
-    'displayName' => 'Pasco-Municipal-Code',
-    'systemInstruction' => [
-        'parts' => [[
-            'text' => 'You are an expert on the Pasco Municipal Code. The following document contains the full text of the Pasco, WA Municipal Code. Use it as your primary reference when answering engineering and civic questions.'
-        ]]
-    ],
-    // Pass the document as a plain text part — NOT base64 inline_data.
-    // The caching API tokenises text parts directly; inline_data is for images/audio.
-    'contents' => [
-        [
-            'role'  => 'user',
-            'parts' => [
-                ['text' => $textContent]
-            ]
-        ]
-    ]
-];
+$boundary = '----GeminiBoundary' . bin2hex(random_bytes(8));
+$url = "https://generativelanguage.googleapis.com/upload/v1beta/files?key=$apiKey";
 
-// ── POST to Gemini Caching API ───────────────────────────────────────────────
-$url = "https://generativelanguage.googleapis.com/v1beta/cachedContents?key=$apiKey";
+// Build multipart body
+$metadataJson = json_encode(['file' => ['display_name' => 'Pasco-Municipal-Code']]);
 
-echo "Uploading to Gemini Context Cache API...\n";
-echo "(This may take 30-90 seconds for a 9MB document)\n\n";
+$body  = "--$boundary\r\n";
+$body .= "Content-Type: application/json; charset=utf-8\r\n\r\n";
+$body .= $metadataJson . "\r\n";
+$body .= "--$boundary\r\n";
+$body .= "Content-Type: $mimeType\r\n\r\n";
+$body .= $fileContent . "\r\n";
+$body .= "--$boundary--\r\n";
 
 $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    "Content-Type: multipart/related; boundary=$boundary",
+    "X-Goog-Upload-Protocol: multipart",
+    "Content-Length: " . strlen($body),
+]);
 curl_setopt($ch, CURLOPT_TIMEOUT, 300);
 
 $response = curl_exec($ch);
@@ -116,36 +106,42 @@ $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 $curlErr  = curl_error($ch);
 curl_close($ch);
 
-if ($curlErr) {
-    die("CURL ERROR: $curlErr\n");
-}
+if ($curlErr) die("CURL ERROR: $curlErr\n");
 
 echo "HTTP $httpCode response received.\n\n";
 
 $result = json_decode($response, true);
 
-if ($httpCode !== 200 || !isset($result['name'])) {
-    echo "ERROR – API did not return a cache name.\n";
+if ($httpCode !== 200 || !isset($result['file']['uri'])) {
+    echo "ERROR – Upload failed.\n";
     echo "Full response:\n$response\n";
     exit(1);
 }
 
-// ── Save the cache name ──────────────────────────────────────────────────────
-$cacheName = $result['name'];  // e.g. "cachedContents/abc123xyz"
-file_put_contents($cacheNameFile, $cacheName);
+// ── Save the file URI ─────────────────────────────────────────────────────────
+$fileUri   = $result['file']['uri'];
+$fileState = $result['file']['state'] ?? 'UNKNOWN';
+$fileName  = $result['file']['name'] ?? '(unknown)';
+
+file_put_contents($cacheNameFile, $fileUri);
 
 echo "SUCCESS!\n";
-echo "Cache name : $cacheName\n";
+echo "File URI   : $fileUri\n";
+echo "File name  : $fileName\n";
+echo "State      : $fileState\n";
+echo "Expires    : " . ($result['file']['expirationTime'] ?? '48 hours from now') . "\n";
+echo "Size       : " . ($result['file']['sizeBytes'] ?? number_format($fileSize)) . " bytes\n";
 echo "Saved to   : $cacheNameFile\n\n";
 
-echo "Cache details:\n";
-echo "  Display name : " . ($result['displayName'] ?? '(none)') . "\n";
-echo "  Model        : " . ($result['model'] ?? '(none)') . "\n";
-echo "  Create time  : " . ($result['createTime'] ?? '(none)') . "\n";
-echo "  Expire time  : " . ($result['expireTime'] ?? '(none)') . "\n";
-echo "  Token count  : " . ($result['usageMetadata']['totalTokenCount'] ?? '(unknown)') . " tokens\n\n";
+if ($fileState !== 'ACTIVE') {
+    echo "NOTE: File state is '$fileState' (not yet ACTIVE).\n";
+    echo "      For large files this is normal — state becomes ACTIVE within seconds.\n";
+    echo "      api-proxy.php will use it once it's ACTIVE.\n\n";
+}
 
 echo "NEXT STEPS:\n";
-echo "  1. Set up the cron job to run cache-ping.php every 45 minutes.\n";
-echo "  2. The cache will now be used automatically by api-proxy.php.\n";
-echo "  3. Cached token reads are billed at a much lower rate than input tokens.\n";
+echo "  1. Cron job: set cache-ping.php to run daily at 3am.\n";
+echo "     Command: /usr/local/bin/php /home2/fikrttmy/public_html/gemini3/cache-ping.php >> /home2/fikrttmy/public_html/gemini3/cache-ping.log 2>&1\n";
+echo "     Schedule: Minute=0, Hour=3, Day=*, Month=*, Weekday=*\n";
+echo "  2. api-proxy.php already reads this URI automatically.\n";
+echo "  3. Test a student chat and check gemini_usage.log for FILE_URI flag.\n";

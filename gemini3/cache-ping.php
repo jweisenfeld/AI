@@ -2,20 +2,23 @@
 /**
  * cache-ping.php
  *
- * Called by the Bluehost cron job every 45 minutes to PATCH the cache TTL,
- * keeping the Gemini Context Cache alive indefinitely.
+ * Daily cron job that keeps the Pasco Municipal Code available in the
+ * Gemini Files API. Files expire after 48 hours; this runs at 3am daily
+ * to re-upload before expiry (24hr interval = comfortable safety margin).
  *
- * Gemini caches expire after their TTL (max 1 hour). This script resets the
- * TTL back to 3600s before it can expire.
+ * Strategy: always re-upload (simpler than checking expiry, and a 4.4MB
+ * text upload completes in seconds — not worth the complexity of polling).
  *
- * Cron schedule: every 45 minutes
- *   Minute: 0,45   Hour: *   Day: *   Month: *   Weekday: *
- *
- * Bluehost command:
- *   /usr/local/bin/php /home2/fikrttmy/public_html/gemini3/cache-ping.php >> /home2/fikrttmy/public_html/gemini3/cache-ping.log 2>&1
+ * Bluehost cron settings:
+ *   Minute:  0
+ *   Hour:    3
+ *   Day:     *
+ *   Month:   *
+ *   Weekday: *
+ *   Command: /usr/local/bin/php /home2/fikrttmy/public_html/gemini3/cache-ping.php >> /home2/fikrttmy/public_html/gemini3/cache-ping.log 2>&1
  */
 
-set_time_limit(60);
+set_time_limit(120);
 
 // ── Paths ────────────────────────────────────────────────────────────────────
 $accountRoot   = dirname($_SERVER['DOCUMENT_ROOT'] ?? '/home/fikrttmy/public_html');
@@ -29,20 +32,7 @@ function log_msg($msg) {
     global $logFile, $timestamp;
     $line = "[$timestamp] $msg\n";
     file_put_contents($logFile, $line, FILE_APPEND);
-    // Also echo for cron email / CLI output
     echo $line;
-}
-
-// ── Load cache name ──────────────────────────────────────────────────────────
-if (!file_exists($cacheNameFile)) {
-    log_msg("ERROR: Cache name file not found at $cacheNameFile");
-    log_msg("       Run cache-create.php first to create the cache.");
-    exit(1);
-}
-$cacheName = trim(file_get_contents($cacheNameFile));
-if (empty($cacheName)) {
-    log_msg("ERROR: Cache name file is empty. Re-run cache-create.php.");
-    exit(1);
 }
 
 // ── Load API key ─────────────────────────────────────────────────────────────
@@ -53,21 +43,51 @@ if (!file_exists($secretsFile)) {
 require_once($secretsFile);
 $apiKey = trim($GEMINI_API_KEY);
 
-// ── PATCH the cache to reset TTL ─────────────────────────────────────────────
-// The PATCH endpoint updates the expireTime by providing a new ttl.
-$url = "https://generativelanguage.googleapis.com/v1beta/{$cacheName}?key=$apiKey";
+// ── Choose input file ─────────────────────────────────────────────────────────
+$cleanFile = __DIR__ . '/Pasco-Municipal-Code-clean.html';
+$rawFile   = __DIR__ . '/Pasco-Municipal-Code.html';
 
-$payload = ['ttl' => '3600s'];
+if (file_exists($cleanFile)) {
+    $inputFile = $cleanFile;
+    $mimeType  = 'text/html';
+} elseif (file_exists($rawFile)) {
+    $inputFile = $rawFile;
+    $mimeType  = 'text/html';
+} else {
+    log_msg("ERROR: No municipal code file found. Expected Pasco-Municipal-Code-clean.html");
+    exit(1);
+}
+
+// ── Upload to Files API ───────────────────────────────────────────────────────
+log_msg("Starting daily re-upload of Pasco Municipal Code...");
+
+$fileContent = file_get_contents($inputFile);
+$fileSize    = strlen($fileContent);
+log_msg("File loaded: " . number_format($fileSize) . " bytes from " . basename($inputFile));
+
+$boundary = '----GeminiBoundary' . bin2hex(random_bytes(8));
+$url = "https://generativelanguage.googleapis.com/upload/v1beta/files?key=$apiKey";
+
+$metadataJson = json_encode(['file' => ['display_name' => 'Pasco-Municipal-Code']]);
+
+$body  = "--$boundary\r\n";
+$body .= "Content-Type: application/json; charset=utf-8\r\n\r\n";
+$body .= $metadataJson . "\r\n";
+$body .= "--$boundary\r\n";
+$body .= "Content-Type: $mimeType\r\n\r\n";
+$body .= $fileContent . "\r\n";
+$body .= "--$boundary--\r\n";
 
 $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PATCH');
-curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
 curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    'Content-Type: application/json',
-    'X-HTTP-Method-Override: PATCH'
+    "Content-Type: multipart/related; boundary=$boundary",
+    "X-Goog-Upload-Protocol: multipart",
+    "Content-Length: " . strlen($body),
 ]);
-curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+curl_setopt($ch, CURLOPT_TIMEOUT, 120);
 
 $response = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -81,18 +101,35 @@ if ($curlErr) {
 
 $result = json_decode($response, true);
 
-if ($httpCode === 200 && isset($result['name'])) {
-    $newExpiry = $result['expireTime'] ?? 'unknown';
-    log_msg("OK – Cache refreshed. New expiry: $newExpiry | Cache: $cacheName");
-} elseif ($httpCode === 404) {
-    // Cache was deleted or expired before we could ping it — need to recreate
-    log_msg("WARN – Cache not found (404). Cache may have expired.");
-    log_msg("       Attempting to clear saved cache name so next request triggers rebuild.");
-    // Clear the stale cache name so api-proxy falls back gracefully
-    file_put_contents($cacheNameFile, '');
-    log_msg("       Cleared $cacheNameFile — run cache-create.php to rebuild the cache.");
-    exit(2);
-} else {
-    log_msg("ERROR – HTTP $httpCode | Response: " . substr($response, 0, 500));
+if ($httpCode !== 200 || !isset($result['file']['uri'])) {
+    log_msg("ERROR – HTTP $httpCode | Response: " . substr($response, 0, 300));
     exit(1);
 }
+
+// ── Save new URI ──────────────────────────────────────────────────────────────
+$newUri   = $result['file']['uri'];
+$expiry   = $result['file']['expirationTime'] ?? '~48 hours';
+
+// Delete old file from Gemini to avoid accumulation (best-effort, ignore errors)
+$oldUri = trim(file_get_contents($cacheNameFile) ?: '');
+if (!empty($oldUri)) {
+    // Extract file name from URI for the DELETE call
+    // URI format: https://generativelanguage.googleapis.com/v1beta/files/FILE_ID
+    $oldName = preg_replace('#.*/v1beta/#', '', $oldUri); // → "files/FILE_ID"
+    if ($oldName && $oldName !== $oldUri) {
+        $deleteUrl = "https://generativelanguage.googleapis.com/v1beta/{$oldName}?key=$apiKey";
+        $dch = curl_init($deleteUrl);
+        curl_setopt($dch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($dch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+        curl_setopt($dch, CURLOPT_TIMEOUT, 15);
+        curl_exec($dch);
+        curl_close($dch);
+    }
+}
+
+file_put_contents($cacheNameFile, $newUri);
+
+log_msg("OK – File re-uploaded successfully.");
+log_msg("     New URI    : $newUri");
+log_msg("     Expires    : $expiry");
+log_msg("     Saved to   : $cacheNameFile");

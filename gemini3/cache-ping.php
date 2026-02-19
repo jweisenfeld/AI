@@ -21,7 +21,7 @@
 set_time_limit(120);
 
 // ── Paths ────────────────────────────────────────────────────────────────────
-$accountRoot   = dirname($_SERVER['DOCUMENT_ROOT'] ?? '/home/fikrttmy/public_html');
+$accountRoot   = dirname($_SERVER['DOCUMENT_ROOT'] ?? '') ?: '/home2/fikrttmy';
 $secretsFile   = $accountRoot . '/.secrets/amentum_geminikey.php';
 $cacheNameFile = $accountRoot . '/.secrets/gemini_cache_name.txt';
 $logFile       = __DIR__ . '/cache-ping.log';

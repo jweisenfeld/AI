@@ -211,10 +211,15 @@
                         let parsed;
                         try { parsed = JSON.parse(payload); } catch { continue; }
 
-                        if (parsed.error) throw new Error(parsed.error);
+                        if (parsed.error) throw new Error(JSON.stringify(parsed.error));
 
-                        if (parsed.text) {
-                            accumulated += parsed.text;
+                        // Handle both our simplified {"text":"..."} wrapper AND
+                        // Gemini's raw SSE format {"candidates":[{"content":{"parts":[{"text":"..."}]}}]}
+                        const delta = parsed.text
+                            ?? parsed.candidates?.[0]?.content?.parts?.[0]?.text
+                            ?? null;
+                        if (delta) {
+                            accumulated += delta;
                             bubbleEl.innerHTML = marked.parse(accumulated);
                             messagesDiv.scrollTop = messagesDiv.scrollHeight;
                         }

@@ -23,10 +23,20 @@
         .input-group { display: flex; gap: 10px; align-items: flex-start; }
         textarea { flex: 1; height: 60px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; resize: none; font-family: inherit; }
         .btn { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        .clip-btn { background: none; border: none; cursor: pointer; font-size: 1.4rem; padding: 5px; }
         #image-previews img { height: 50px; border-radius: 4px; border: 1px solid var(--border); margin-right: 5px; }
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
         .thinking-bubble { font-style: italic; color: #888; animation: blink 1.2s ease-in-out infinite; }
+        .ttfb-tag { font-size: 0.7em; color: #999; margin-top: 4px; align-self: flex-start; padding: 0 4px; }
+        .upload-btn { background: none; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; padding: 6px 8px; display: flex; align-items: center; justify-content: center; color: #5f6368; position: relative; }
+        .upload-btn:hover { background: #f1f3f4; border-color: #aaa; }
+        .upload-btn svg { width: 20px; height: 20px; }
+        .upload-btn::after { content: attr(data-tooltip); position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 0.75em; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.15s; }
+        .upload-btn:hover::after { opacity: 1; }
+        .copy-btn { background: none; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; padding: 6px 8px; display: flex; align-items: center; justify-content: center; color: #5f6368; font-size: 0.78em; gap: 4px; white-space: nowrap; position: relative; }
+        .copy-btn:hover { background: #f1f3f4; border-color: #aaa; }
+        .copy-btn svg { width: 16px; height: 16px; }
+        .copy-btn::after { content: attr(data-tooltip); position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 0.75em; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.15s; }
+        .copy-btn:hover::after { opacity: 1; }
     </style>
 </head>
 
@@ -67,9 +77,21 @@
             <div id="image-previews" style="padding: 0 20px; display: flex; gap: 8px;"></div>
             <div class="input-area">
                 <div class="input-group">
-                    <button class="clip-btn" onclick="document.getElementById('file-input').click()">📎</button>
-                    <input type="file" id="file-input" multiple style="display:none" onchange="handleFiles(this)">
+                    <button class="upload-btn" data-tooltip="Upload a picture" onclick="document.getElementById('file-input').click()" aria-label="Upload a picture">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                    </button>
+                    <input type="file" id="file-input" multiple style="display:none" onchange="handleFiles(this)" accept="image/*">
                     <textarea id="user-input" placeholder="Ask your Engineering Coach..."></textarea>
+                    <button class="copy-btn" data-tooltip="Copy last response" onclick="copyLastResponse()" aria-label="Copy last AI response">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                    </button>
                     <button class="btn" onclick="sendMessage()">Send</button>
                 </div>
             </div>
@@ -78,6 +100,7 @@
 
     <script>
         let STUDENT_ID = null; let STUDENT_NAME = null; let HISTORY = []; let PENDING_IMAGES = [];
+        let LAST_RESPONSE_TEXT = '';  // plain text of the most recent AI reply
 
         const MASTER_RUBRIC = `
         ### ROLE
@@ -171,6 +194,7 @@
             });
 
             try {
+                const fetchStart = performance.now();
                 const res = await fetch('api-proxy.php?stream=1', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -191,6 +215,7 @@
                 const decoder = new TextDecoder();
                 let accumulated = '';
                 let partialLine = '';
+                let ttfbMs = null;  // time-to-first-byte (first text delta)
 
                 while (true) {
                     const { value, done } = await reader.read();
@@ -229,6 +254,9 @@
                             }
                         }
                         if (delta) {
+                            if (ttfbMs === null) {
+                                ttfbMs = Math.round(performance.now() - fetchStart);
+                            }
                             accumulated += delta;
                             bubbleEl.innerHTML = marked.parse(accumulated);
                             messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -236,9 +264,18 @@
                     }
                 }
 
+                // Show TTFB tag beneath the bubble
+                if (ttfbMs !== null) {
+                    const ttfbTag = document.createElement('div');
+                    ttfbTag.className = 'ttfb-tag';
+                    ttfbTag.textContent = `⏱ First byte: ${ttfbMs < 1000 ? ttfbMs + 'ms' : (ttfbMs/1000).toFixed(1) + 's'}`;
+                    assistantDiv.appendChild(ttfbTag);
+                }
+
                 if (accumulated) {
+                    LAST_RESPONSE_TEXT = accumulated;
                     HISTORY.push({ role: 'model', parts: [{ text: accumulated }] });
-                    logToTeacher(text, accumulated);
+                    logToTeacher(text, accumulated, ttfbMs);
                 }
 
             } catch (err) {
@@ -255,9 +292,10 @@
                     const data = await res.json();
                     if (data.candidates) {
                         const reply = data.candidates[0].content.parts[0].text;
+                        LAST_RESPONSE_TEXT = reply;
                         appendBubble('assistant', reply);
                         HISTORY.push({ role: 'model', parts: [{ text: reply }] });
-                        logToTeacher(text, reply);
+                        logToTeacher(text, reply, null);
                     } else {
                         appendBubble('assistant', "⚠️ Error: " + (data.error?.message || "Connection failed."));
                     }
@@ -267,15 +305,37 @@
             }
         }
 
-        async function logToTeacher(userText, botReply) {
+        async function logToTeacher(userText, botReply, ttfbMs) {
+            const ttfbNote = ttfbMs !== null ? `TTFB: ${ttfbMs}ms\n` : '';
             fetch('api-proxy.php', {
                 method: 'POST',
                 body: JSON.stringify({
                     action: 'log_interaction',
                     student_id: STUDENT_ID,
-                    log: `USER: ${userText}\nBOT: ${botReply}\n---\n`
+                    ttfb_ms: ttfbMs,
+                    log: `USER: ${userText}\n${ttfbNote}BOT: ${botReply}\n---\n`
                 })
             });
+        }
+
+        async function copyLastResponse() {
+            if (!LAST_RESPONSE_TEXT) return;
+            try {
+                await navigator.clipboard.writeText(LAST_RESPONSE_TEXT);
+                const btn = document.querySelector('.copy-btn');
+                const orig = btn.getAttribute('data-tooltip');
+                btn.setAttribute('data-tooltip', 'Copied!');
+                setTimeout(() => btn.setAttribute('data-tooltip', orig), 1500);
+            } catch {
+                // Fallback for older browsers
+                const ta = document.createElement('textarea');
+                ta.value = LAST_RESPONSE_TEXT;
+                ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
         }
 
         function appendBubble(role, text) {

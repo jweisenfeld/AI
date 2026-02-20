@@ -129,8 +129,14 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
                 $usageMeta = $parsed['usageMetadata'];
             }
 
-            // Forward text delta to client
-            $textDelta = $parsed['candidates'][0]['content']['parts'][0]['text'] ?? null;
+            // Forward text delta to client — skip thinking-model parts (thoughtSignature)
+            $parts = $parsed['candidates'][0]['content']['parts'] ?? [];
+            $textDelta = null;
+            foreach ($parts as $part) {
+                if (isset($part['thoughtSignature'])) continue; // thinking artifact
+                $t = $part['text'] ?? null;
+                if ($t !== null && $t !== '') { $textDelta = $t; break; }
+            }
             if ($textDelta !== null) {
                 echo "data: " . json_encode(['text' => $textDelta]) . "\n\n";
                 flush();
@@ -201,6 +207,14 @@ if (isset($data['action']) && $data['action'] === 'log_interaction') {
     $formattedLog = "--- Entry: $timestamp ---\n" . $logContent . "\n";
 
     file_put_contents($logFilename, $formattedLog, FILE_APPEND);
+
+    // Append TTFB to usage log if provided (enables cache-hit analysis)
+    if (isset($data['ttfb_ms']) && is_numeric($data['ttfb_ms'])) {
+        $ttfbMs  = (int)$data['ttfb_ms'];
+        $ttfbLog = date('Y-m-d H:i:s') . " | $studentId | TTFB:{$ttfbMs}ms\n";
+        file_put_contents(__DIR__ . '/gemini_usage.log', $ttfbLog, FILE_APPEND);
+    }
+
     echo json_encode(['success' => true]);
     exit;
 }

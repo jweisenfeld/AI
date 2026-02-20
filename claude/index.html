@@ -357,6 +357,18 @@
         .message-content th, .message-content td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
         .message-content th { background: #f3f4f6; font-weight: 600; }
         .message-content tr:nth-child(even) td { background: #fafafa; }
+        .message-content blockquote { border-left: 4px solid var(--secondary); margin: 10px 0; padding: 8px 16px; background: var(--secondary-light); border-radius: 0 8px 8px 0; color: #0369a1; font-style: italic; }
+        .message-content hr { border: none; border-top: 2px solid var(--border); margin: 16px 0; }
+        .message-content del { color: var(--text-light); text-decoration: line-through; }
+        .message-content sup, .message-content sub { font-size: 0.75em; line-height: 0; position: relative; vertical-align: baseline; }
+        .message-content sup { top: -0.5em; }
+        .message-content sub { bottom: -0.25em; }
+        .message-content a { color: var(--secondary-dark); text-decoration: underline; }
+        .message-content a:hover { color: var(--secondary); }
+        .message-content ul.nested { margin: 4px 0 4px 20px; }
+        .message-content li.task-item { list-style: none; margin-left: -20px; }
+        .message-content li.task-item.checked { color: var(--text-light); }
+        .message-content ol { margin: 8px 0; padding-left: 24px; list-style: decimal; }
 
         /* Token display in message */
         .message-meta {
@@ -1343,124 +1355,167 @@
             return div;
         }
 
-        function renderMath(text) {
-            // Extract and render block math ($$...$$) and inline math ($...$)
-            // We replace them with placeholders so escapeHtml doesn't corrupt them,
-            // then swap the rendered HTML back in afterwards.
-            const placeholders = [];
-
-            // Block math: $$...$$
-            text = text.replace(/\$\$([\s\S]+?)\$\$/g, (match, latex) => {
-                try {
-                    const rendered = katex.renderToString(latex.trim(), { displayMode: true, throwOnError: false });
-                    const idx = placeholders.length;
-                    placeholders.push(rendered);
-                    return `\x00MATH${idx}\x00`;
-                } catch (e) {
-                    return match;
-                }
-            });
-
-            // Inline math: $...$  (but not $$)
-            text = text.replace(/\$([^\$\n]+?)\$/g, (match, latex) => {
-                try {
-                    const rendered = katex.renderToString(latex.trim(), { displayMode: false, throwOnError: false });
-                    const idx = placeholders.length;
-                    placeholders.push(rendered);
-                    return `\x00MATH${idx}\x00`;
-                } catch (e) {
-                    return match;
-                }
-            });
-
-            return { text, placeholders };
-        }
-
         function formatMessage(text) {
             if (!text) return '';
 
-            // Render math before escaping HTML (backslashes must be intact)
-            let placeholders = [];
-            if (window.katex) {
-                const result = renderMath(text);
-                text = result.text;
-                placeholders = result.placeholders;
+            // --- Step 1: Extract code blocks and math BEFORE any escaping ---
+            // These contain characters that must not be touched by later passes.
+            const rawPlaceholders = [];   // stores { html } for verbatim restoration
+            const mathPlaceholders = [];  // stores rendered KaTeX html
+
+            // Pull out fenced code blocks first (highest priority)
+            text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, lang, code) => {
+                const escaped = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                const html = `<pre><code class="language-${lang}">${escaped}</code></pre>`;
+                const idx = rawPlaceholders.length;
+                rawPlaceholders.push(html);
+                return `\x01RAW${idx}\x01`;
+            });
+
+            // Pull out block math $$...$$
+            text = text.replace(/\$\$([\s\S]+?)\$\$/g, (match, latex) => {
+                let html;
+                try {
+                    html = window.katex
+                        ? katex.renderToString(latex.trim(), { displayMode: true, throwOnError: false })
+                        : `<div class="math-block">$$${latex}$$</div>`;
+                } catch(e) { html = match; }
+                const idx = rawPlaceholders.length;
+                rawPlaceholders.push(html);
+                return `\x01RAW${idx}\x01`;
+            });
+
+            // Pull out inline math $...$
+            text = text.replace(/\$([^\$\n]+?)\$/g, (match, latex) => {
+                let html;
+                try {
+                    html = window.katex
+                        ? katex.renderToString(latex.trim(), { displayMode: false, throwOnError: false })
+                        : `<span class="math-inline">$${latex}$</span>`;
+                } catch(e) { html = match; }
+                const idx = rawPlaceholders.length;
+                rawPlaceholders.push(html);
+                return `\x01RAW${idx}\x01`;
+            });
+
+            // --- Step 2: HTML-escape the remaining text safely ---
+            let f = escapeHtml(text);
+
+            // --- Step 3: Inline formatting (order matters: code before bold/italic) ---
+            f = f.replace(/`([^`]+)`/g, '<code>$1</code>');
+            f = f.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+            f = f.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+            f = f.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+            // Superscript: ^text^ or ^{text}
+            f = f.replace(/\^\{([^}]+)\}/g, '<sup>$1</sup>');
+            f = f.replace(/\^(\S+)/g, '<sup>$1</sup>');
+            // Subscript: _{text} or _text (only inside word context to avoid italics clash)
+            f = f.replace(/\_\{([^}]+)\}/g, '<sub>$1</sub>');
+            // Links
+            f = f.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+            // --- Step 4: Block-level elements (line-by-line pass) ---
+            const lines = f.split('\n');
+            const out = [];
+            let i = 0;
+
+            while (i < lines.length) {
+                const line = lines[i];
+
+                // Headings
+                if (/^### /.test(line)) { out.push(`<h3>${line.slice(4)}</h3>`); i++; continue; }
+                if (/^## /.test(line))  { out.push(`<h2>${line.slice(3)}</h2>`); i++; continue; }
+                if (/^# /.test(line))   { out.push(`<h1>${line.slice(2)}</h1>`); i++; continue; }
+
+                // Horizontal rule
+                if (/^(\-{3,}|\*{3,}|_{3,})$/.test(line.trim())) { out.push('<hr>'); i++; continue; }
+
+                // Blockquote — collect consecutive > lines
+                if (/^&gt; /.test(line)) {
+                    const bqLines = [];
+                    while (i < lines.length && /^&gt; /.test(lines[i])) {
+                        bqLines.push(lines[i].slice(5));
+                        i++;
+                    }
+                    out.push(`<blockquote>${bqLines.join('<br>')}</blockquote>`);
+                    continue;
+                }
+
+                // Table — collect | lines with a separator as second line
+                if (/^\|/.test(line)) {
+                    const tableLines = [];
+                    while (i < lines.length && /^\|/.test(lines[i])) {
+                        tableLines.push(lines[i]);
+                        i++;
+                    }
+                    if (tableLines.length >= 3 && /^\|[\s\-:|]+\|$/.test(tableLines[1].trim())) {
+                        const parseRow = (l) => l.trim().replace(/^\||\|$/g,'').split('|').map(c=>c.trim());
+                        const headers = parseRow(tableLines[0]);
+                        const dataRows = tableLines.slice(2).map(parseRow);
+                        const thead = '<thead><tr>' + headers.map(h=>`<th>${h}</th>`).join('') + '</tr></thead>';
+                        const tbody = '<tbody>' + dataRows.map(r=>'<tr>'+r.map(c=>`<td>${c}</td>`).join('')+'</tr>').join('') + '</tbody>';
+                        out.push(`<table>${thead}${tbody}</table>`);
+                    } else {
+                        out.push(...tableLines);
+                    }
+                    continue;
+                }
+
+                // Ordered list — collect consecutive numbered lines
+                if (/^\d+\. /.test(line)) {
+                    const items = [];
+                    while (i < lines.length && /^\d+\. /.test(lines[i])) {
+                        items.push(`<li>${lines[i].replace(/^\d+\. /, '')}</li>`);
+                        i++;
+                    }
+                    out.push(`<ol>${items.join('')}</ol>`);
+                    continue;
+                }
+
+                // Unordered list — collect consecutive - lines, support one level of nesting
+                if (/^(\s{0,3})[*\-] /.test(line)) {
+                    const items = [];
+                    while (i < lines.length && /^(\s{0,3})[*\-] /.test(lines[i])) {
+                        const raw = lines[i].replace(/^(\s{0,3})[*\-] /, '');
+                        // Task list items
+                        if (/^\[ \] /.test(raw))      items.push(`<li class="task-item">&#9744; ${raw.slice(4)}</li>`);
+                        else if (/^\[x\] /i.test(raw)) items.push(`<li class="task-item checked">&#9745; ${raw.slice(4)}</li>`);
+                        else                            items.push(`<li>${raw}</li>`);
+                        i++;
+                        // Simple one-level nested list
+                        const nested = [];
+                        while (i < lines.length && /^(\s{2,})[*\-] /.test(lines[i])) {
+                            nested.push(`<li>${lines[i].replace(/^(\s+)[*\-] /, '')}</li>`);
+                            i++;
+                        }
+                        if (nested.length) items.push(`<ul class="nested">${nested.join('')}</ul>`);
+                    }
+                    out.push(`<ul>${items.join('')}</ul>`);
+                    continue;
+                }
+
+                out.push(line);
+                i++;
             }
 
-            let formatted = escapeHtml(text);
+            // --- Step 5: Join and wrap loose text in paragraphs ---
+            // Split on blank lines to find paragraph groups
+            const blocks = out.join('\n').split(/\n{2,}/);
+            const blockTags = /^<(h[1-6]|ul|ol|li|table|blockquote|pre|hr|div)/;
+            f = blocks.map(block => {
+                const trimmed = block.trim();
+                if (!trimmed) return '';
+                if (blockTags.test(trimmed)) return trimmed;
+                // Wrap plain text, converting single newlines to <br>
+                return `<p>${trimmed.replace(/\n/g, '<br>')}</p>`;
+            }).filter(Boolean).join('\n');
 
-            // Code blocks with language
-            formatted = formatted.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
-                return `<pre><code class="language-${lang}">${code}</code></pre>`;
+            // --- Step 6: Restore raw placeholders (code blocks + math) ---
+            rawPlaceholders.forEach((html, idx) => {
+                f = f.split(`\x01RAW${idx}\x01`).join(html);
             });
 
-            // Inline code
-            formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-            // Bold
-            formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-
-            // Italic
-            formatted = formatted.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-
-            // Headers
-            formatted = formatted.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-            formatted = formatted.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-            formatted = formatted.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-
-            // Tables: detect markdown table blocks (header | separator | rows)
-            formatted = formatted.replace(
-                /((?:^(?:\|[^\n]+\|)\n)+)/gm,
-                (block) => {
-                    const lines = block.trim().split('\n');
-                    // Need at least header + separator + one data row
-                    if (lines.length < 3) return block;
-                    // Second line must be a separator (---|--- pattern)
-                    if (!/^\|[\s\-:|]+\|$/.test(lines[1].trim())) return block;
-
-                    const parseRow = (line) =>
-                        line.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
-
-                    const headers = parseRow(lines[0]);
-                    const dataRows = lines.slice(2).map(parseRow);
-
-                    const thead = '<thead><tr>' +
-                        headers.map(h => `<th>${h}</th>`).join('') +
-                        '</tr></thead>';
-                    const tbody = '<tbody>' +
-                        dataRows.map(row =>
-                            '<tr>' + row.map(c => `<td>${c}</td>`).join('') + '</tr>'
-                        ).join('') +
-                        '</tbody>';
-
-                    return `<table>${thead}${tbody}</table>`;
-                }
-            );
-
-            // Lists
-            formatted = formatted.replace(/^\- (.+)$/gm, '<li>$1</li>');
-            formatted = formatted.replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
-
-            // Wrap consecutive li elements in ul
-            formatted = formatted.replace(/(<li>[\s\S]*?<\/li>)+/g, '<ul>$&</ul>');
-
-            // Paragraphs
-            formatted = formatted.split('\n\n').map(p => {
-                if (p.match(/^<(h[123]|ul|ol|pre|li|table)/)) return p;
-                return `<p>${p}</p>`;
-            }).join('');
-
-            // Clean up
-            formatted = formatted.replace(/<p><\/p>/g, '');
-            formatted = formatted.replace(/\n/g, '<br>');
-            formatted = formatted.replace(/<br><br>/g, '</p><p>');
-
-            // Restore rendered math placeholders
-            placeholders.forEach((html, idx) => {
-                formatted = formatted.replace(`\x00MATH${idx}\x00`, html);
-            });
-
-            return formatted;
+            return f;
         }
 
         // ============================================

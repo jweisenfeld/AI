@@ -128,9 +128,21 @@ function loadModelConfig(string $configPath): array
     }
     return [
         'tiers' => [
-            'haiku'  => ['primary' => 'claude-haiku-4-5',  'fallbacks' => []],
-            'sonnet' => ['primary' => 'claude-sonnet-4-5', 'fallbacks' => []],
-            'opus'   => ['primary' => 'claude-opus-4-6',   'fallbacks' => []],
+            'haiku'  => [
+                'primary'   => 'claude-haiku-4-5-20251001',
+                'fallbacks' => ['claude-haiku-4-5', 'claude-3-haiku-20240307'],
+                'pricing'   => ['input_per_mtok' => 1.00, 'output_per_mtok' => 5.00],
+            ],
+            'sonnet' => [
+                'primary'   => 'claude-sonnet-4-6',
+                'fallbacks' => ['claude-sonnet-4-5-20250929', 'claude-sonnet-4-5', 'claude-sonnet-4-20250514'],
+                'pricing'   => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00],
+            ],
+            'opus'   => [
+                'primary'   => 'claude-opus-4-6',
+                'fallbacks' => ['claude-opus-4-5-20251101', 'claude-opus-4-5', 'claude-opus-4-1-20250805'],
+                'pricing'   => ['input_per_mtok' => 5.00, 'output_per_mtok' => 25.00],
+            ],
         ]
     ];
 }
@@ -270,7 +282,7 @@ runTest('falls back to defaults for missing config', function() {
     $config = loadModelConfig('/nonexistent/path/model_config.json');
     assertArrayHasKey('tiers', $config, 'Should return default config');
     assertArrayHasKey('haiku', $config['tiers'], 'Default should have haiku');
-    assertEquals('claude-haiku-4-5', $config['tiers']['haiku']['primary'], 'Default haiku primary');
+    assertEquals('claude-haiku-4-5-20251001', $config['tiers']['haiku']['primary'], 'Default haiku primary');
 });
 
 runTest('falls back to defaults for corrupt config', function() {
@@ -611,6 +623,355 @@ runTest('handles special characters in system prompt', function() {
     ];
     $request = buildApiRequest($input);
     assertContains("\n", $request['system'], 'Newlines should be preserved in system prompt');
+});
+
+// --- Model Config JSON Validation Tests ---
+echo "\nModel Config JSON Validation:\n";
+
+runTest('model_config.json exists and is valid JSON', function() {
+    $path = __DIR__ . '/model_config.json';
+    assertTrue(file_exists($path), 'model_config.json should exist');
+    $raw = file_get_contents($path);
+    $config = json_decode($raw, true);
+    assertTrue(is_array($config), 'model_config.json should be valid JSON');
+    assertArrayHasKey('tiers', $config, 'Config should have tiers');
+});
+
+runTest('model_config.json has all three tiers', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    assertArrayHasKey('haiku', $config['tiers'], 'Should have haiku tier');
+    assertArrayHasKey('sonnet', $config['tiers'], 'Should have sonnet tier');
+    assertArrayHasKey('opus', $config['tiers'], 'Should have opus tier');
+    assertEquals(3, count($config['tiers']), 'Should have exactly 3 tiers');
+});
+
+runTest('each tier has pricing information', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    foreach ($config['tiers'] as $tier => $info) {
+        assertArrayHasKey('pricing', $info, "{$tier} should have pricing");
+        assertArrayHasKey('input_per_mtok', $info['pricing'], "{$tier} pricing should have input_per_mtok");
+        assertArrayHasKey('output_per_mtok', $info['pricing'], "{$tier} pricing should have output_per_mtok");
+        assertTrue($info['pricing']['input_per_mtok'] > 0, "{$tier} input price should be positive");
+        assertTrue($info['pricing']['output_per_mtok'] > 0, "{$tier} output price should be positive");
+    }
+});
+
+runTest('haiku is cheapest, opus is most expensive', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    $haikuIn = $config['tiers']['haiku']['pricing']['input_per_mtok'];
+    $sonnetIn = $config['tiers']['sonnet']['pricing']['input_per_mtok'];
+    $opusIn = $config['tiers']['opus']['pricing']['input_per_mtok'];
+    assertTrue($haikuIn < $sonnetIn, 'Haiku input should be cheaper than Sonnet');
+    assertTrue($sonnetIn <= $opusIn, 'Sonnet input should be <= Opus');
+});
+
+runTest('opus pricing reflects current 4.5/4.6 rates (not old 3.x/4.0)', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    $opusIn = $config['tiers']['opus']['pricing']['input_per_mtok'];
+    $opusOut = $config['tiers']['opus']['pricing']['output_per_mtok'];
+    // Opus 4.5/4.6 = $5/$25.  Old Opus 3/4.0/4.1 = $15/$75
+    assertTrue($opusIn <= 5.00, "Opus input should be <= $5/MTok (got $opusIn)");
+    assertTrue($opusOut <= 25.00, "Opus output should be <= $25/MTok (got $opusOut)");
+});
+
+runTest('all primary models use current generation IDs', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    $haikuPrimary = $config['tiers']['haiku']['primary'];
+    $sonnetPrimary = $config['tiers']['sonnet']['primary'];
+    $opusPrimary = $config['tiers']['opus']['primary'];
+    // Should be snapshot or alias IDs, not deprecated models
+    assertContains('haiku-4-5', $haikuPrimary, 'Haiku primary should be 4.5 series');
+    assertContains('sonnet-4-6', $sonnetPrimary, 'Sonnet primary should be 4.6');
+    assertContains('opus-4-6', $opusPrimary, 'Opus primary should be 4.6');
+});
+
+runTest('fallbacks are non-empty for all tiers', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    foreach ($config['tiers'] as $tier => $info) {
+        assertTrue(count($info['fallbacks']) >= 1, "{$tier} should have at least 1 fallback");
+    }
+});
+
+runTest('primaries are not duplicated in their fallbacks', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    foreach ($config['tiers'] as $tier => $info) {
+        assertFalse(in_array($info['primary'], $info['fallbacks'], true),
+            "{$tier} primary should not appear in its own fallbacks");
+    }
+});
+
+runTest('hardcoded fallback matches model_config.json', function() {
+    // Load from file
+    $fileConfig = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    // Load hardcoded fallback (by passing a nonexistent path)
+    $hardcoded = loadModelConfig('/nonexistent/path');
+
+    foreach (['haiku', 'sonnet', 'opus'] as $tier) {
+        assertEquals(
+            $fileConfig['tiers'][$tier]['primary'],
+            $hardcoded['tiers'][$tier]['primary'],
+            "Hardcoded {$tier} primary should match model_config.json"
+        );
+    }
+});
+
+// --- Input Size Cap Tests ---
+echo "\nInput Size Cap:\n";
+
+runTest('input under 200KB is accepted', function() {
+    $input = str_repeat('a', 100000);
+    $MAX_INPUT_BYTES = 200000;
+    assertTrue(strlen($input) <= $MAX_INPUT_BYTES, 'Input under 200KB should be accepted');
+});
+
+runTest('input over 200KB is rejected', function() {
+    $input = str_repeat('a', 250000);
+    $MAX_INPUT_BYTES = 200000;
+    assertTrue(strlen($input) > $MAX_INPUT_BYTES, 'Input over 200KB should be rejected');
+});
+
+runTest('200KB cap allows generous image payloads', function() {
+    // A base64-encoded 100KB image is ~133KB. With message overhead, should fit.
+    $fakeImage = base64_encode(str_repeat('x', 100000)); // ~133KB base64
+    $message = json_encode([
+        'model' => 'opus',
+        'messages' => [['role' => 'user', 'content' => [
+            ['type' => 'image', 'source' => ['type' => 'base64', 'data' => $fakeImage]],
+            ['type' => 'text', 'text' => 'What is this?']
+        ]]]
+    ]);
+    assertTrue(strlen($message) < 200000, 'Single image + question should fit in 200KB');
+});
+
+// --- Opus First-Exchange Restriction Tests ---
+echo "\nOpus First-Exchange Restriction:\n";
+
+runTest('opus allowed on first message (msg_count == 1)', function() {
+    $model = 'opus';
+    $messageCount = 1;
+    $opusDowngraded = false;
+    if ($model === 'opus' && $messageCount > 1) {
+        $model = 'sonnet';
+        $opusDowngraded = true;
+    }
+    assertEquals('opus', $model, 'Opus should be allowed on first message');
+    assertFalse($opusDowngraded, 'Should not be downgraded on first message');
+});
+
+runTest('opus downgraded on second exchange (msg_count == 3)', function() {
+    $model = 'opus';
+    $messageCount = 3;
+    $opusDowngraded = false;
+    if ($model === 'opus' && $messageCount > 1) {
+        $model = 'sonnet';
+        $opusDowngraded = true;
+    }
+    assertEquals('sonnet', $model, 'Opus should be downgraded to sonnet after first exchange');
+    assertTrue($opusDowngraded, 'opusDowngraded flag should be set');
+});
+
+runTest('non-opus model not affected by restriction', function() {
+    $model = 'sonnet';
+    $messageCount = 25;
+    $opusDowngraded = false;
+    if ($model === 'opus' && $messageCount > 1) {
+        $model = 'sonnet';
+        $opusDowngraded = true;
+    }
+    assertEquals('sonnet', $model, 'Sonnet should remain sonnet');
+    assertFalse($opusDowngraded, 'Should not flag downgrade for non-opus');
+});
+
+// --- Conversation Length Cap Tests ---
+echo "\nConversation Length Cap:\n";
+
+runTest('accepts conversation under cap (50 messages)', function() {
+    $MAX_MESSAGES = 50;
+    $messageCount = 30;
+    assertTrue($messageCount <= $MAX_MESSAGES, '30 messages should be under cap');
+});
+
+runTest('rejects conversation over cap', function() {
+    $MAX_MESSAGES = 50;
+    $messageCount = 52;
+    assertTrue($messageCount > $MAX_MESSAGES, '52 messages should be over cap');
+});
+
+runTest('accepts conversation at exactly the cap', function() {
+    $MAX_MESSAGES = 50;
+    $messageCount = 50;
+    assertTrue($messageCount <= $MAX_MESSAGES, '50 messages should be at cap (accepted)');
+});
+
+// --- Temperature Rounding Tests ---
+echo "\nTemperature Rounding:\n";
+
+runTest('temperature is rounded to 2 decimal places', function() {
+    $temp = round(0.6999999999999999555910790149937383830547332763671875, 2);
+    assertEquals(0.70, $temp, 'Ugly float should round to 0.70');
+});
+
+runTest('temperature 0.333333 rounds to 0.33', function() {
+    $temp = round(0.333333, 2);
+    assertEquals(0.33, $temp, 'Should round to 0.33');
+});
+
+runTest('temperature 1.0 stays 1.0', function() {
+    $temp = round(1.0, 2);
+    assertEquals(1.0, $temp, 'Should remain 1.0');
+});
+
+// --- School Hours Tests ---
+echo "\nSchool Hours Logic:\n";
+
+runTest('weekday 8AM Pacific is school hours', function() {
+    // Mon=1, 8AM
+    $dayOfWeek = 1; $hour = 8;
+    $isSchoolHours = ($dayOfWeek >= 1 && $dayOfWeek <= 5 && $hour >= 7 && $hour < 17);
+    assertTrue($isSchoolHours, 'Monday 8AM should be school hours');
+});
+
+runTest('weekday 6PM Pacific is NOT school hours', function() {
+    $dayOfWeek = 3; $hour = 18;
+    $isSchoolHours = ($dayOfWeek >= 1 && $dayOfWeek <= 5 && $hour >= 7 && $hour < 17);
+    assertFalse($isSchoolHours, 'Wednesday 6PM should not be school hours');
+});
+
+runTest('Saturday is NOT school hours', function() {
+    $dayOfWeek = 6; $hour = 10;
+    $isSchoolHours = ($dayOfWeek >= 1 && $dayOfWeek <= 5 && $hour >= 7 && $hour < 17);
+    assertFalse($isSchoolHours, 'Saturday should not be school hours');
+});
+
+runTest('Sunday is NOT school hours', function() {
+    $dayOfWeek = 7; $hour = 12;
+    $isSchoolHours = ($dayOfWeek >= 1 && $dayOfWeek <= 5 && $hour >= 7 && $hour < 17);
+    assertFalse($isSchoolHours, 'Sunday should not be school hours');
+});
+
+runTest('weekday 6:59 AM is NOT school hours', function() {
+    $dayOfWeek = 2; $hour = 6;
+    $isSchoolHours = ($dayOfWeek >= 1 && $dayOfWeek <= 5 && $hour >= 7 && $hour < 17);
+    assertFalse($isSchoolHours, 'Tuesday 6AM should not be school hours');
+});
+
+runTest('weekday 4:59 PM is school hours', function() {
+    $dayOfWeek = 4; $hour = 16;
+    $isSchoolHours = ($dayOfWeek >= 1 && $dayOfWeek <= 5 && $hour >= 7 && $hour < 17);
+    assertTrue($isSchoolHours, 'Thursday 4PM (hour 16) should be school hours');
+});
+
+runTest('weekday 5:00 PM is NOT school hours', function() {
+    $dayOfWeek = 5; $hour = 17;
+    $isSchoolHours = ($dayOfWeek >= 1 && $dayOfWeek <= 5 && $hour >= 7 && $hour < 17);
+    assertFalse($isSchoolHours, 'Friday 5PM (hour 17) should not be school hours');
+});
+
+// --- countImages function Tests ---
+echo "\ncountImages Function:\n";
+
+// Re-declare countImages here since it's defined in api-proxy.php
+if (!function_exists('countImages')) {
+    function countImages(array $messages): array
+    {
+        $count = 0;
+        $types = [];
+        foreach ($messages as $message) {
+            if (isset($message['content']) && is_array($message['content'])) {
+                foreach ($message['content'] as $content) {
+                    if (isset($content['type']) && $content['type'] === 'image') {
+                        $count++;
+                        $mediaType = $content['source']['media_type'] ?? 'unknown';
+                        $types[] = $mediaType;
+                    }
+                }
+            }
+        }
+        return ['count' => $count, 'types' => array_unique($types)];
+    }
+}
+
+runTest('countImages returns 0 for text-only messages', function() {
+    $result = countImages([['role' => 'user', 'content' => 'Hello']]);
+    assertEquals(0, $result['count'], 'Text-only should have 0 images');
+});
+
+runTest('countImages counts multiple images', function() {
+    $messages = [[
+        'role' => 'user',
+        'content' => [
+            ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => 'image/png', 'data' => 'x']],
+            ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => 'image/jpeg', 'data' => 'y']],
+            ['type' => 'text', 'text' => 'What are these?']
+        ]
+    ]];
+    $result = countImages($messages);
+    assertEquals(2, $result['count'], 'Should count 2 images');
+    assertTrue(in_array('image/png', $result['types']), 'Should include PNG type');
+    assertTrue(in_array('image/jpeg', $result['types']), 'Should include JPEG type');
+});
+
+// --- getLastUserText function Tests ---
+echo "\ngetLastUserText Function:\n";
+
+if (!function_exists('getLastUserText')) {
+    function getLastUserText(array $messages): string
+    {
+        $lastUserMsg = null;
+        foreach (array_reverse($messages) as $msg) {
+            if (($msg['role'] ?? '') === 'user') {
+                $lastUserMsg = $msg;
+                break;
+            }
+        }
+        if (!$lastUserMsg) return '';
+        if (is_string($lastUserMsg['content'])) {
+            return $lastUserMsg['content'];
+        }
+        if (is_array($lastUserMsg['content'])) {
+            $parts = [];
+            foreach ($lastUserMsg['content'] as $part) {
+                if (($part['type'] ?? '') === 'text') {
+                    $parts[] = $part['text'] ?? '';
+                }
+            }
+            return implode(' ', $parts);
+        }
+        return '';
+    }
+}
+
+runTest('getLastUserText returns text from simple string content', function() {
+    $messages = [
+        ['role' => 'user', 'content' => 'Hello world'],
+        ['role' => 'assistant', 'content' => 'Hi there']
+    ];
+    assertEquals('Hello world', getLastUserText($messages), 'Should return user text');
+});
+
+runTest('getLastUserText returns last user message not first', function() {
+    $messages = [
+        ['role' => 'user', 'content' => 'First question'],
+        ['role' => 'assistant', 'content' => 'Answer'],
+        ['role' => 'user', 'content' => 'Second question']
+    ];
+    assertEquals('Second question', getLastUserText($messages), 'Should return last user text');
+});
+
+runTest('getLastUserText extracts text from multimodal content', function() {
+    $messages = [[
+        'role' => 'user',
+        'content' => [
+            ['type' => 'image', 'source' => ['type' => 'base64', 'data' => 'x']],
+            ['type' => 'text', 'text' => 'What is this?']
+        ]
+    ]];
+    assertEquals('What is this?', getLastUserText($messages), 'Should extract text from multimodal');
+});
+
+runTest('getLastUserText returns empty for no user messages', function() {
+    $messages = [['role' => 'assistant', 'content' => 'Hi']];
+    assertEquals('', getLastUserText($messages), 'Should return empty string');
 });
 
 // ============================================

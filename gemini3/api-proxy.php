@@ -26,8 +26,12 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     header('Content-Type: text/event-stream; charset=utf-8');
     header('Cache-Control: no-cache');
     header('X-Accel-Buffering: no');      // Prevent nginx from buffering
-    header('Content-Encoding: identity'); // Prevent mod_deflate from buffering
+    header('Content-Encoding: identity'); // Ask mod_deflate not to compress
     header('Connection: keep-alive');
+    // Belt-and-suspenders: set the Apache env var that mod_deflate checks
+    if (function_exists('apache_setenv')) {
+        apache_setenv('no-gzip', '1');
+    }
 
     // Drain PHP output buffers so chunks flush immediately
     while (ob_get_level()) {

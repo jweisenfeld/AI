@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Claude API Feature Demo</title>
+    <!-- KaTeX for math rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+        onload="window.katexReady = true;"></script>
     <style>
         :root {
             --primary: #d97706;
@@ -1332,8 +1337,49 @@
             return div;
         }
 
+        function renderMath(text) {
+            // Extract and render block math ($$...$$) and inline math ($...$)
+            // We replace them with placeholders so escapeHtml doesn't corrupt them,
+            // then swap the rendered HTML back in afterwards.
+            const placeholders = [];
+
+            // Block math: $$...$$
+            text = text.replace(/\$\$([\s\S]+?)\$\$/g, (match, latex) => {
+                try {
+                    const rendered = katex.renderToString(latex.trim(), { displayMode: true, throwOnError: false });
+                    const idx = placeholders.length;
+                    placeholders.push(rendered);
+                    return `\x00MATH${idx}\x00`;
+                } catch (e) {
+                    return match;
+                }
+            });
+
+            // Inline math: $...$  (but not $$)
+            text = text.replace(/\$([^\$\n]+?)\$/g, (match, latex) => {
+                try {
+                    const rendered = katex.renderToString(latex.trim(), { displayMode: false, throwOnError: false });
+                    const idx = placeholders.length;
+                    placeholders.push(rendered);
+                    return `\x00MATH${idx}\x00`;
+                } catch (e) {
+                    return match;
+                }
+            });
+
+            return { text, placeholders };
+        }
+
         function formatMessage(text) {
             if (!text) return '';
+
+            // Render math before escaping HTML (backslashes must be intact)
+            let placeholders = [];
+            if (window.katex) {
+                const result = renderMath(text);
+                text = result.text;
+                placeholders = result.placeholders;
+            }
 
             let formatted = escapeHtml(text);
 
@@ -1373,6 +1419,11 @@
             formatted = formatted.replace(/<p><\/p>/g, '');
             formatted = formatted.replace(/\n/g, '<br>');
             formatted = formatted.replace(/<br><br>/g, '</p><p>');
+
+            // Restore rendered math placeholders
+            placeholders.forEach((html, idx) => {
+                formatted = formatted.replace(`\x00MATH${idx}\x00`, html);
+            });
 
             return formatted;
         }

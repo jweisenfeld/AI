@@ -215,10 +215,19 @@
                         if (parsed.error) throw new Error(JSON.stringify(parsed.error));
 
                         // Handle both our simplified {"text":"..."} wrapper AND
-                        // Gemini's raw SSE format {"candidates":[{"content":{"parts":[{"text":"..."}]}}]}
-                        const delta = parsed.text
-                            ?? parsed.candidates?.[0]?.content?.parts?.[0]?.text
-                            ?? null;
+                        // Gemini's raw SSE format. For thinking models (Gemini 3 Pro),
+                        // parts may include thoughtSignature blobs with empty text —
+                        // find the first part that has a non-empty text string.
+                        let delta = parsed.text ?? null;
+                        if (delta === null && Array.isArray(parsed.candidates?.[0]?.content?.parts)) {
+                            for (const part of parsed.candidates[0].content.parts) {
+                                if (typeof part.text === 'string' && part.text.length > 0
+                                        && !part.thoughtSignature) {
+                                    delta = part.text;
+                                    break;
+                                }
+                            }
+                        }
                         if (delta) {
                             accumulated += delta;
                             bubbleEl.innerHTML = marked.parse(accumulated);

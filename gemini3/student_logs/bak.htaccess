@@ -1,0 +1,6 @@
+Options +Indexes
+
+AuthType Basic
+AuthName "OHS Engineering Coach - Teacher Access"
+AuthUserFile /home2/fikrttmy/public_html/gemini3/student_logs/.htpasswd
+Require valid-user

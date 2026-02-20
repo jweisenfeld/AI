@@ -669,6 +669,52 @@
             position: relative;
         }
 
+        /* Word-style yellow usage tips */
+        .usage-tip {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 16px;
+            background: #fef9c3;
+            border: 1px solid #facc15;
+            border-left: 4px solid #eab308;
+            color: #713f12;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            animation: tipSlideIn 0.3s ease;
+        }
+
+        .usage-tip .tip-icon {
+            font-size: 1.1rem;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .usage-tip .tip-text {
+            flex: 1;
+        }
+
+        .usage-tip .tip-close {
+            background: none;
+            border: none;
+            color: #a16207;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0 4px;
+            flex-shrink: 0;
+            line-height: 1;
+            opacity: 0.6;
+        }
+
+        .usage-tip .tip-close:hover {
+            opacity: 1;
+        }
+
+        @keyframes tipSlideIn {
+            from { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; }
+            to   { opacity: 1; max-height: 80px; }
+        }
+
         /* Paste hint */
         .paste-hint {
             font-size: 0.75rem;
@@ -820,7 +866,7 @@
                         <span class="model-name">Sonnet</span>
                         <span class="model-desc">Balanced</span>
                     </button>
-                    <button class="model-btn" data-model="opus" onclick="selectModel(this)">
+                    <button class="model-btn" data-model="opus" onclick="selectModel(this)" title="Best for physics screenshots &amp; tough questions. Available for first message only.">
                         <span class="model-name">Opus</span>
                         <span class="model-desc">SOTA</span>
                     </button>
@@ -834,6 +880,9 @@
                     <button class="clear-btn" onclick="clearChat()">Clear Chat</button>
                 </div>
             </div>
+
+            <!-- Usage Tips (Word-style dismissible banners) -->
+            <div id="tips-container"></div>
 
             <!-- Messages -->
             <div class="chat-messages" id="chat-messages">
@@ -1012,6 +1061,7 @@
         // ============================================
 
         function selectModel(btn) {
+            if (btn.disabled) return;
             document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             currentModel = btn.dataset.model;
@@ -1137,8 +1187,13 @@
             document.getElementById('chat-messages').appendChild(loadingDiv);
             loadingDiv.scrollIntoView({ behavior: 'smooth' });
 
+            // Warn about large text input (potential copy-paste)
+            if (text.length > 5000) {
+                showTip('large-paste', 'Pasting large amounts of text increases usage costs. Consider summarizing or asking a shorter question instead.');
+            }
+
             try {
-                const temperature = parseFloat(document.getElementById('temperature').value) / 100;
+                const temperature = Math.round(parseFloat(document.getElementById('temperature').value)) / 100;
                 const systemPrompt = document.getElementById('system-prompt').value.trim();
 
                 const requestBody = {
@@ -1165,6 +1220,14 @@
                 loadingDiv.remove();
 
                 if (data.error) {
+                    // Show contextual tip for specific error types
+                    if (data.error.type === 'input_too_large') {
+                        showTip('input-large', 'Your message was too large. Pasting long text increases costs — try asking a shorter question or start a new conversation.');
+                    } else if (data.error.type === 'conversation_too_long') {
+                        showTip('conv-limit', 'You\'ve reached the conversation limit. Click <strong>Clear Chat</strong> to start fresh.');
+                    } else if (data.error.type === 'rate_limit_error') {
+                        showTip('rate-limit', 'You\'ve sent too many messages. Take a short break and try again soon.');
+                    }
                     throw new Error(data.error.message || JSON.stringify(data.error));
                 }
 
@@ -1195,9 +1258,18 @@
                     updateStatus('Ready');
                 }
 
+                // Gray out Opus after first exchange (server enforces too)
+                if (data._opus_limited || messages.length > 1) {
+                    disableOpusButton();
+                    showTip('opus-limited', 'Opus is available for your first message only. Click <strong>Clear Chat</strong> or refresh the page to start a new Opus session.');
+                }
+
                 // Warn if conversation is getting long (cap is 50 messages server-side)
                 if (messages.length >= 40) {
                     updateStatus(`Warning: ${messages.length}/50 messages used. Clear chat soon to avoid hitting the limit.`);
+                    showTip('conv-long', 'Your conversation is getting long — this increases usage costs. Please <strong>Clear Chat</strong> and start a new conversation soon.');
+                } else if (messages.length >= 20) {
+                    showTip('conv-growing', 'Tip: Starting a new conversation helps keep costs low. Click <strong>Clear Chat</strong> when you\'re ready for a new topic.');
                 }
 
             } catch (error) {
@@ -1354,6 +1426,34 @@
             `;
             sessionTokens = { total: 0, lastInput: 0, lastOutput: 0 };
             updateTokenDisplay();
+            enableOpusButton();
+            clearAllTips();
+            shownTips.clear();
+        }
+
+        function disableOpusButton() {
+            const opusBtn = document.querySelector('.model-btn[data-model="opus"]');
+            if (opusBtn) {
+                opusBtn.disabled = true;
+                opusBtn.style.opacity = '0.4';
+                opusBtn.style.cursor = 'not-allowed';
+                opusBtn.title = 'Opus is for your first message only. Click "Clear Chat" or refresh the page to start a new Opus session.';
+                // If Opus was active, switch to Haiku
+                if (currentModel === 'opus') {
+                    const haikuBtn = document.querySelector('.model-btn[data-model="haiku"]');
+                    if (haikuBtn) selectModel(haikuBtn);
+                }
+            }
+        }
+
+        function enableOpusButton() {
+            const opusBtn = document.querySelector('.model-btn[data-model="opus"]');
+            if (opusBtn) {
+                opusBtn.disabled = false;
+                opusBtn.style.opacity = '1';
+                opusBtn.style.cursor = 'pointer';
+                opusBtn.title = 'Best for physics screenshots & tough questions. Available for first message only.';
+            }
         }
 
         function handleKeyPress(event) {
@@ -1462,6 +1562,47 @@
                 setTimeout(() => updateStatus('Ready'), 1500);
             }
         });
+
+        // ============================================
+        // USAGE TIP BANNERS (Word-style, dismissible)
+        // ============================================
+
+        const shownTips = new Set();  // track which tips have been dismissed this session
+
+        function showTip(id, message) {
+            if (shownTips.has(id)) return;  // don't re-show dismissed tips
+            const container = document.getElementById('tips-container');
+            // Don't stack more than 2 tips
+            if (container.children.length >= 2) return;
+            // Don't show same tip if already visible
+            if (document.getElementById('tip-' + id)) return;
+
+            const tip = document.createElement('div');
+            tip.className = 'usage-tip';
+            tip.id = 'tip-' + id;
+            tip.innerHTML = `
+                <span class="tip-icon">💡</span>
+                <span class="tip-text">${message}</span>
+                <button class="tip-close" onclick="dismissTip('${id}')" title="Dismiss">&times;</button>
+            `;
+            container.appendChild(tip);
+        }
+
+        function dismissTip(id) {
+            shownTips.add(id);
+            const tip = document.getElementById('tip-' + id);
+            if (tip) {
+                tip.style.transition = 'opacity 0.2s, max-height 0.3s';
+                tip.style.opacity = '0';
+                tip.style.maxHeight = '0';
+                tip.style.overflow = 'hidden';
+                setTimeout(() => tip.remove(), 300);
+            }
+        }
+
+        function clearAllTips() {
+            document.getElementById('tips-container').innerHTML = '';
+        }
 
         // Initialize
         updateTempDisplay();

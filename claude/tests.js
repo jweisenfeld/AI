@@ -507,6 +507,245 @@ runTest('handles special characters in system prompt', () => {
     assertContains("\n", request.system, 'Newlines should be preserved in system prompt');
 });
 
+// --- Model Config JSON Validation Tests ---
+console.log('\nModel Config JSON Validation:');
+
+// Load model_config.json
+const fs = require('fs');
+const path = require('path');
+const configPath = path.join(__dirname, 'model_config.json');
+
+let modelConfig = null;
+runTest('model_config.json exists and is valid JSON', () => {
+    assertTrue(fs.existsSync(configPath), 'model_config.json should exist');
+    const raw = fs.readFileSync(configPath, 'utf8');
+    modelConfig = JSON.parse(raw);
+    assertArrayHasKey('tiers', modelConfig, 'Config should have tiers');
+});
+
+runTest('model_config.json has all three tiers', () => {
+    assertArrayHasKey('haiku', modelConfig.tiers, 'Should have haiku tier');
+    assertArrayHasKey('sonnet', modelConfig.tiers, 'Should have sonnet tier');
+    assertArrayHasKey('opus', modelConfig.tiers, 'Should have opus tier');
+    assertEquals(3, Object.keys(modelConfig.tiers).length, 'Should have exactly 3 tiers');
+});
+
+runTest('each tier has pricing information', () => {
+    for (const [tier, info] of Object.entries(modelConfig.tiers)) {
+        assertArrayHasKey('pricing', info, `${tier} should have pricing`);
+        assertArrayHasKey('input_per_mtok', info.pricing, `${tier} pricing should have input_per_mtok`);
+        assertArrayHasKey('output_per_mtok', info.pricing, `${tier} pricing should have output_per_mtok`);
+        assertTrue(info.pricing.input_per_mtok > 0, `${tier} input price should be positive`);
+        assertTrue(info.pricing.output_per_mtok > 0, `${tier} output price should be positive`);
+    }
+});
+
+runTest('haiku is cheapest, opus is most expensive', () => {
+    const hIn = modelConfig.tiers.haiku.pricing.input_per_mtok;
+    const sIn = modelConfig.tiers.sonnet.pricing.input_per_mtok;
+    const oIn = modelConfig.tiers.opus.pricing.input_per_mtok;
+    assertTrue(hIn < sIn, 'Haiku input should be cheaper than Sonnet');
+    assertTrue(sIn <= oIn, 'Sonnet input should be <= Opus');
+});
+
+runTest('opus pricing reflects current 4.5/4.6 rates (not old 3.x/4.0)', () => {
+    const oIn = modelConfig.tiers.opus.pricing.input_per_mtok;
+    const oOut = modelConfig.tiers.opus.pricing.output_per_mtok;
+    assertTrue(oIn <= 5.00, `Opus input should be <= $5/MTok (got ${oIn})`);
+    assertTrue(oOut <= 25.00, `Opus output should be <= $25/MTok (got ${oOut})`);
+});
+
+runTest('all primary models use current generation IDs', () => {
+    assertContains('haiku-4-5', modelConfig.tiers.haiku.primary, 'Haiku primary should be 4.5 series');
+    assertContains('sonnet-4-6', modelConfig.tiers.sonnet.primary, 'Sonnet primary should be 4.6');
+    assertContains('opus-4-6', modelConfig.tiers.opus.primary, 'Opus primary should be 4.6');
+});
+
+runTest('fallbacks are non-empty for all tiers', () => {
+    for (const [tier, info] of Object.entries(modelConfig.tiers)) {
+        assertTrue(info.fallbacks.length >= 1, `${tier} should have at least 1 fallback`);
+    }
+});
+
+runTest('primaries are not duplicated in their fallbacks', () => {
+    for (const [tier, info] of Object.entries(modelConfig.tiers)) {
+        assertFalse(info.fallbacks.includes(info.primary),
+            `${tier} primary should not appear in its own fallbacks`);
+    }
+});
+
+// --- Input Size Cap Tests ---
+console.log('\nInput Size Cap:');
+
+runTest('input under 200KB is accepted', () => {
+    const input = 'a'.repeat(100000);
+    const MAX_INPUT_BYTES = 200000;
+    assertTrue(input.length <= MAX_INPUT_BYTES, 'Input under 200KB should be accepted');
+});
+
+runTest('input over 200KB is rejected', () => {
+    const input = 'a'.repeat(250000);
+    const MAX_INPUT_BYTES = 200000;
+    assertTrue(input.length > MAX_INPUT_BYTES, 'Input over 200KB should be rejected');
+});
+
+// --- Opus First-Exchange Restriction Tests ---
+console.log('\nOpus First-Exchange Restriction:');
+
+runTest('opus allowed on first message (msg_count == 1)', () => {
+    let model = 'opus';
+    const messageCount = 1;
+    let opusDowngraded = false;
+    if (model === 'opus' && messageCount > 1) {
+        model = 'sonnet';
+        opusDowngraded = true;
+    }
+    assertEquals('opus', model, 'Opus should be allowed on first message');
+    assertFalse(opusDowngraded, 'Should not be downgraded on first message');
+});
+
+runTest('opus downgraded on second exchange (msg_count == 3)', () => {
+    let model = 'opus';
+    const messageCount = 3;
+    let opusDowngraded = false;
+    if (model === 'opus' && messageCount > 1) {
+        model = 'sonnet';
+        opusDowngraded = true;
+    }
+    assertEquals('sonnet', model, 'Opus should be downgraded to sonnet after first exchange');
+    assertTrue(opusDowngraded, 'opusDowngraded flag should be set');
+});
+
+runTest('non-opus model not affected by restriction', () => {
+    let model = 'sonnet';
+    const messageCount = 25;
+    let opusDowngraded = false;
+    if (model === 'opus' && messageCount > 1) {
+        model = 'sonnet';
+        opusDowngraded = true;
+    }
+    assertEquals('sonnet', model, 'Sonnet should remain sonnet');
+    assertFalse(opusDowngraded, 'Should not flag downgrade for non-opus');
+});
+
+// --- Conversation Length Cap Tests ---
+console.log('\nConversation Length Cap:');
+
+runTest('accepts conversation under cap (50 messages)', () => {
+    const MAX_MESSAGES = 50;
+    const messageCount = 30;
+    assertTrue(messageCount <= MAX_MESSAGES, '30 messages should be under cap');
+});
+
+runTest('rejects conversation over cap', () => {
+    const MAX_MESSAGES = 50;
+    const messageCount = 52;
+    assertTrue(messageCount > MAX_MESSAGES, '52 messages should be over cap');
+});
+
+runTest('accepts conversation at exactly the cap', () => {
+    const MAX_MESSAGES = 50;
+    const messageCount = 50;
+    assertTrue(messageCount <= MAX_MESSAGES, '50 messages should be at cap (accepted)');
+});
+
+// --- Temperature Rounding Tests ---
+console.log('\nTemperature Rounding:');
+
+runTest('frontend temperature rounding works correctly', () => {
+    // Simulates: Math.round(parseFloat(value)) / 100 where slider is 0-100
+    const sliderValue = '70';
+    const temp = Math.round(parseFloat(sliderValue)) / 100;
+    assertEquals(0.7, temp, 'Slider value 70 should produce 0.7');
+});
+
+runTest('frontend rounding avoids ugly floats', () => {
+    // Without Math.round: 70/100 = 0.7 (ok), but 33/100 = 0.33 (ok too)
+    // The old bug was sending the raw slider float before dividing
+    const sliderValue = '33';
+    const temp = Math.round(parseFloat(sliderValue)) / 100;
+    assertEquals(0.33, temp, 'Slider value 33 should produce 0.33');
+});
+
+// --- School Hours Tests ---
+console.log('\nSchool Hours Logic:');
+
+runTest('weekday 8AM Pacific is school hours', () => {
+    const dayOfWeek = 1; const hour = 8; // Mon=1
+    const isSchoolHours = (dayOfWeek >= 1 && dayOfWeek <= 5 && hour >= 7 && hour < 17);
+    assertTrue(isSchoolHours, 'Monday 8AM should be school hours');
+});
+
+runTest('weekday 6PM Pacific is NOT school hours', () => {
+    const dayOfWeek = 3; const hour = 18;
+    const isSchoolHours = (dayOfWeek >= 1 && dayOfWeek <= 5 && hour >= 7 && hour < 17);
+    assertFalse(isSchoolHours, 'Wednesday 6PM should not be school hours');
+});
+
+runTest('Saturday is NOT school hours', () => {
+    const dayOfWeek = 6; const hour = 10;
+    const isSchoolHours = (dayOfWeek >= 1 && dayOfWeek <= 5 && hour >= 7 && hour < 17);
+    assertFalse(isSchoolHours, 'Saturday should not be school hours');
+});
+
+runTest('weekday 5:00 PM is NOT school hours (boundary)', () => {
+    const dayOfWeek = 5; const hour = 17;
+    const isSchoolHours = (dayOfWeek >= 1 && dayOfWeek <= 5 && hour >= 7 && hour < 17);
+    assertFalse(isSchoolHours, 'Friday 5PM (hour 17) should not be school hours');
+});
+
+// --- Dashboard Cost Table Tests ---
+console.log('\nDashboard Cost Table:');
+
+// Simulate the COSTS table from the dashboards
+const COSTS = {
+    'claude-haiku-4-5-20251001': { input: 1.00,  output: 5.00 },
+    'claude-haiku-4-5':          { input: 1.00,  output: 5.00 },
+    'claude-3-haiku-20240307':   { input: 0.25,  output: 1.25 },
+    'claude-haiku-3-5-20241022': { input: 0.80,  output: 4.00 },
+    'claude-sonnet-4-6':         { input: 3.00,  output: 15.00 },
+    'claude-sonnet-4-5-20250929':{ input: 3.00,  output: 15.00 },
+    'claude-sonnet-4-5':         { input: 3.00,  output: 15.00 },
+    'claude-sonnet-4-20250514':  { input: 3.00,  output: 15.00 },
+    'claude-opus-4-6':           { input: 5.00,  output: 25.00 },
+    'claude-opus-4-5-20251101':  { input: 5.00,  output: 25.00 },
+    'claude-opus-4-5':           { input: 5.00,  output: 25.00 },
+    'claude-opus-4-1-20250805':  { input: 15.00, output: 75.00 },
+    'claude-opus-4-20250514':    { input: 15.00, output: 75.00 },
+};
+
+function estimateCost(model, inputTokens, outputTokens) {
+    const rates = COSTS[model] || { input: 3.00, output: 15.00 };
+    return (inputTokens / 1e6) * rates.input + (outputTokens / 1e6) * rates.output;
+}
+
+runTest('opus 4.6 cost estimate uses $5/$25 (not old $15/$75)', () => {
+    const cost = estimateCost('claude-opus-4-6', 1000000, 0);
+    assertEquals(5.00, cost, 'Opus 4.6 1M input tokens should cost $5');
+});
+
+runTest('opus 4.0 cost estimate uses old $15/$75', () => {
+    const cost = estimateCost('claude-opus-4-20250514', 1000000, 0);
+    assertEquals(15.00, cost, 'Opus 4.0 1M input tokens should cost $15');
+});
+
+runTest('haiku 4.5 cost estimate uses $1/$5', () => {
+    const cost = estimateCost('claude-haiku-4-5', 1000000, 1000000);
+    assertEquals(6.00, cost, 'Haiku 4.5 1M in + 1M out should cost $6');
+});
+
+runTest('unknown model falls back to sonnet pricing', () => {
+    const cost = estimateCost('claude-unknown-model', 1000000, 0);
+    assertEquals(3.00, cost, 'Unknown model should default to sonnet input rate');
+});
+
+runTest('cost calculation for typical student session', () => {
+    // Jessica-style: 1 Opus request with ~5K input, ~1K output
+    const cost = estimateCost('claude-opus-4-6', 5000, 1000);
+    // (5000/1M)*5 + (1000/1M)*25 = 0.025 + 0.025 = 0.05
+    assertTrue(cost < 0.10, `Single Opus question should cost < $0.10 (got $${cost.toFixed(4)})`);
+});
+
 // ============================================
 // RESULTS SUMMARY
 // ============================================

@@ -197,6 +197,37 @@ if ($messageCount > $MAX_MESSAGES) {
     exit;
 }
 
+// ============================================
+// INPUT SIZE CAP (prevents copy-paste exploit)
+// ============================================
+// Estimate input size from the raw JSON body. A single physics screenshot
+// with a question is typically under 10K tokens. 30K is very generous.
+$inputBytes = strlen($input);
+$MAX_INPUT_BYTES = 200000;  // ~30K tokens worth of JSON (generous for images)
+
+if ($inputBytes > $MAX_INPUT_BYTES) {
+    http_response_code(400);
+    echo json_encode([
+        'error' => [
+            'type' => 'input_too_large',
+            'message' => 'Request too large. Please clear your chat and start a shorter conversation.'
+        ]
+    ]);
+    exit;
+}
+
+// ============================================
+// OPUS: FIRST EXCHANGE ONLY
+// ============================================
+// Opus is allowed only on the first message (msg_count == 1) so students
+// can paste a screenshot and get one high-quality answer.  After that,
+// the server downgrades to Sonnet.  The frontend grays out the button.
+$opusDowngraded = false;
+if ($requestData['model'] === 'opus' && $messageCount > 1) {
+    $requestData['model'] = 'sonnet';
+    $opusDowngraded = true;
+}
+
 // Load model config from JSON file (with hardcoded fallback)
 $configPath = __DIR__ . '/model_config.json';
 $config = loadModelConfig($configPath);
@@ -258,6 +289,9 @@ $logEntry = [
 ];
 if (isset($modelDowngraded) && $modelDowngraded) {
     $logEntry['model_downgraded'] = true;
+}
+if ($opusDowngraded) {
+    $logEntry['opus_downgraded'] = true;
 }
 
 // --- Make API call with auto-healing fallback ---
@@ -327,6 +361,11 @@ if (isset($modelDowngraded) && $modelDowngraded && is_array($responseData)) {
     $responseData['_notice'] = 'Outside school hours: model downgraded to Haiku. Full model access Mon-Fri 7AM-5PM Pacific.';
     $response = json_encode($responseData);
 }
+if ($opusDowngraded && is_array($responseData)) {
+    $responseData['_opus_limited'] = true;
+    $responseData['_notice'] = 'Opus is available for your first message only. Switched to Sonnet for follow-ups. Clear chat to use Opus again.';
+    $response = json_encode($responseData);
+}
 
 http_response_code($httpCode);
 echo $response;
@@ -348,12 +387,26 @@ function loadModelConfig(string $configPath): array
             return $config;
         }
     }
-    // Hardcoded fallback if JSON is missing/corrupt
+    // Hardcoded fallback if JSON is missing/corrupt.
+    // Keep in sync with model_config.json and update_models.php
+    // Last verified: 2026-02-20 from https://platform.claude.com/docs/en/about-claude/models
     return [
         'tiers' => [
-            'haiku'  => ['primary' => 'claude-haiku-4-5',  'fallbacks' => []],
-            'sonnet' => ['primary' => 'claude-sonnet-4-5', 'fallbacks' => []],
-            'opus'   => ['primary' => 'claude-opus-4-6',   'fallbacks' => []],
+            'haiku'  => [
+                'primary'   => 'claude-haiku-4-5-20251001',
+                'fallbacks' => ['claude-haiku-4-5', 'claude-3-haiku-20240307'],
+                'pricing'   => ['input_per_mtok' => 1.00, 'output_per_mtok' => 5.00],
+            ],
+            'sonnet' => [
+                'primary'   => 'claude-sonnet-4-6',
+                'fallbacks' => ['claude-sonnet-4-5-20250929', 'claude-sonnet-4-5', 'claude-sonnet-4-20250514'],
+                'pricing'   => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00],
+            ],
+            'opus'   => [
+                'primary'   => 'claude-opus-4-6',
+                'fallbacks' => ['claude-opus-4-5-20251101', 'claude-opus-4-5', 'claude-opus-4-1-20250805'],
+                'pricing'   => ['input_per_mtok' => 5.00, 'output_per_mtok' => 25.00],
+            ],
         ]
     ];
 }

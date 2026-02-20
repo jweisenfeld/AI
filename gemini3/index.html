@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OHS Engineering Portal</title>
     <style>
-        /* CSS remains the same as your original file */
         :root { --primary: #1a73e8; --bg: #f8f9fa; --border: #dadce0; --text: #202124; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); height: 100vh; display: flex; flex-direction: column; margin: 0; color: var(--text); }
         .login-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); z-index: 999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
@@ -26,6 +25,8 @@
         .btn { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
         .clip-btn { background: none; border: none; cursor: pointer; font-size: 1.4rem; padding: 5px; }
         #image-previews img { height: 50px; border-radius: 4px; border: 1px solid var(--border); margin-right: 5px; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        .thinking-bubble { font-style: italic; color: #888; animation: blink 1.2s ease-in-out infinite; }
     </style>
 </head>
 
@@ -33,7 +34,7 @@
     <div id="login-modal" class="login-overlay">
         <div class="login-card">
             <h2 style="color:var(--primary); margin-top:0;">Engineering Portal</h2>
-            <input type="text" id="uid" class="login-input" placeholder="Student ID">
+            <input type="text" id="uid" class="login-input" placeholder="Student ID" autofocus>
             <input type="password" id="pwd" class="login-input" placeholder="Password">
             <button class="btn" style="width:100%" onclick="handleLogin()">Login to Project</button>
         </div>
@@ -77,10 +78,9 @@
     <script>
         let STUDENT_ID = null; let STUDENT_NAME = null; let HISTORY = []; let PENDING_IMAGES = [];
 
-        // System Prompt Injection (Fix #4)
         const MASTER_RUBRIC = `
         ### ROLE
-        You are the Senior Engineering Mentor for 9th-grade students at Orion High School in Pasco, WA. 
+        You are the Senior Engineering Mentor for 9th-grade students at Orion High School in Pasco, WA.
         Your goal is to coach students through the Civil Engineering Argument Project using the Engineering Design Process.
 
         ### PROJECT FRAMEWORK
@@ -105,6 +105,7 @@
         - MATH POLICY: Provide conceptual hints for math, but always state: "Verify these calculations with Mr. Weisenfeld"[cite: 191].
         - LOCAL CONTEXT: Reference Pasco, WA civic problems (e.g., crosswalk safety, road bottlenecks)[cite: 184, 194, 240].
         `;
+
         async function handleLogin() {
             const id = document.getElementById('uid').value;
             const pw = document.getElementById('pwd').value;
@@ -138,45 +139,119 @@
             if (!text && PENDING_IMAGES.length === 0) return;
 
             appendBubble('user', text || "(Image Uploaded)");
-            
-            // Build the content parts for the Gemini API
+
             const userContent = [];
             if (text) userContent.push({ text: text });
             PENDING_IMAGES.forEach(img => userContent.push(img));
-            
+
             HISTORY.push({ role: 'user', parts: userContent });
-            input.value = ''; document.getElementById('image-previews').innerHTML = '';
-            const currentImages = [...PENDING_IMAGES]; PENDING_IMAGES = [];
+            input.value = '';
+            document.getElementById('image-previews').innerHTML = '';
+            PENDING_IMAGES = [];
 
             const phaseIdx = document.getElementById('phase-select').value;
             const sys = `${MASTER_RUBRIC} The student is currently in Phase ${phaseIdx}.`;
 
-            const res = await fetch('api-proxy.php', {
-                method: 'POST',
-                body: JSON.stringify({
-                    action: 'chat', // Added for proxy routing
-                    student_id: STUDENT_ID,
-                    student_name: STUDENT_NAME,
-                    model: document.getElementById('model-select').value,
-                    system: sys,
-                    messages: HISTORY
-                })
+            // Show "Thinking…" bubble immediately, before fetch starts
+            const messagesDiv = document.getElementById('messages');
+            const thinkingDiv = document.createElement('div');
+            thinkingDiv.className = 'message assistant';
+            thinkingDiv.innerHTML = '<div class="bubble thinking-bubble">Thinking\u2026</div>';
+            messagesDiv.appendChild(thinkingDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            const requestBody = JSON.stringify({
+                action: 'chat',
+                student_id: STUDENT_ID,
+                student_name: STUDENT_NAME,
+                model: document.getElementById('model-select').value,
+                system: sys,
+                messages: HISTORY
             });
 
-            const data = await res.json();
-            if (data.candidates) {
-                const reply = data.candidates[0].content.parts[0].text;
-                appendBubble('assistant', reply);
-                HISTORY.push({ role: 'model', parts: [{ text: reply }] });
-                
-                // Fix #5: Auto-log interaction to server
-                logToTeacher(text, reply);
-            } else {
-                appendBubble('assistant', "⚠️ Error: " + (data.error?.message || "Connection failed."));
+            try {
+                const res = await fetch('api-proxy.php?stream=1', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: requestBody
+                });
+
+                if (!res.ok || !res.body) throw new Error('Stream unavailable');
+
+                // Replace thinking bubble with an empty assistant bubble to fill in
+                thinkingDiv.remove();
+                const assistantDiv = document.createElement('div');
+                assistantDiv.className = 'message assistant';
+                assistantDiv.innerHTML = '<div class="bubble"></div>';
+                messagesDiv.appendChild(assistantDiv);
+                const bubbleEl = assistantDiv.querySelector('.bubble');
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let accumulated = '';
+                let partialLine = '';
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    partialLine += decoder.decode(value, { stream: true });
+
+                    // Process all complete lines; keep any trailing incomplete line
+                    const lines = partialLine.split('\n');
+                    partialLine = lines.pop();
+
+                    for (const line of lines) {
+                        const trimmed = line.trimEnd();
+                        if (!trimmed.startsWith('data: ')) continue;
+
+                        const payload = trimmed.slice(6);
+                        if (payload === '[DONE]') break;
+
+                        let parsed;
+                        try { parsed = JSON.parse(payload); } catch { continue; }
+
+                        if (parsed.error) throw new Error(parsed.error);
+
+                        if (parsed.text) {
+                            accumulated += parsed.text;
+                            bubbleEl.innerHTML = marked.parse(accumulated);
+                            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                        }
+                    }
+                }
+
+                if (accumulated) {
+                    HISTORY.push({ role: 'model', parts: [{ text: accumulated }] });
+                    logToTeacher(text, accumulated);
+                }
+
+            } catch (err) {
+                // Streaming failed — fall back to non-streaming route
+                console.warn('SSE stream failed, falling back:', err);
+                thinkingDiv.remove();
+
+                try {
+                    const res = await fetch('api-proxy.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: requestBody
+                    });
+                    const data = await res.json();
+                    if (data.candidates) {
+                        const reply = data.candidates[0].content.parts[0].text;
+                        appendBubble('assistant', reply);
+                        HISTORY.push({ role: 'model', parts: [{ text: reply }] });
+                        logToTeacher(text, reply);
+                    } else {
+                        appendBubble('assistant', "⚠️ Error: " + (data.error?.message || "Connection failed."));
+                    }
+                } catch (fallbackErr) {
+                    appendBubble('assistant', "⚠️ Connection failed. Please try again.");
+                }
             }
         }
 
-        // Fix #5: Logging Function
         async function logToTeacher(userText, botReply) {
             fetch('api-proxy.php', {
                 method: 'POST',
@@ -196,6 +271,13 @@
             messagesDiv.appendChild(div);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
+
+        // Enter key support on login fields
+        ['uid', 'pwd'].forEach(id =>
+            document.getElementById(id).addEventListener('keydown', e => {
+                if (e.key === 'Enter') { e.preventDefault(); handleLogin(); }
+            })
+        );
     </script>
 </body>
 </html>

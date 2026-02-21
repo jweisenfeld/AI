@@ -1,7 +1,0 @@
-# Disable mod_deflate compression for SSE streaming responses.
-# Without this, Apache compresses the text/event-stream response even when
-# PHP sends "Content-Encoding: identity", breaking streaming in non-browser clients
-# and causing issues with some browser configurations.
-<IfModule mod_deflate.c>
-    SetEnvIfNoCase Request_URI "api-proxy\.php" no-gzip dont-vary
-</IfModule>

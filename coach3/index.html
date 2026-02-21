@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- KaTeX for LaTeX/math rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+        onload="window.katexReady = true;"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OHS Engineering Portal</title>
+    <style>
+        :root { --primary: #1a73e8; --bg: #f8f9fa; --border: #dadce0; --text: #202124; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); height: 100vh; display: flex; flex-direction: column; margin: 0; color: var(--text); }
+        .login-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); z-index: 999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .login-card { background: white; padding: 40px; border-radius: 12px; width: 320px; text-align: center; }
+        .login-input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
+        .header { background: white; padding: 10px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .main-container { flex: 1; display: flex; overflow: hidden; justify-content: center; }
+        .chat-area { width: 100%; max-width: 900px; background: white; display: flex; flex-direction: column; border-inline: 1px solid var(--border); }
+        .messages { flex: 1; overflow-y: auto; padding: 20px; }
+        .message { margin-bottom: 20px; display: flex; flex-direction: column; }
+        .bubble { padding: 12px 18px; border-radius: 18px; max-width: 85%; line-height: 1.5; font-size: 0.95rem; }
+        .user .bubble { background: var(--primary); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .assistant .bubble { background: #f1f3f4; align-self: flex-start; border-bottom-left-radius: 4px; }
+        .input-area { padding: 20px; border-top: 1px solid var(--border); }
+        .input-group { display: flex; gap: 10px; align-items: flex-start; }
+        textarea { flex: 1; height: 60px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; resize: none; font-family: inherit; }
+        .btn { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        #image-previews img { height: 50px; border-radius: 4px; border: 1px solid var(--border); margin-right: 5px; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        .thinking-bubble { font-style: italic; color: #888; animation: blink 1.2s ease-in-out infinite; }
+        .ttfb-tag { font-size: 0.7em; color: #999; margin-top: 4px; align-self: flex-start; padding: 0 4px; }
+        .upload-btn { background: none; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; padding: 6px 8px; display: flex; align-items: center; justify-content: center; color: #5f6368; position: relative; }
+        .upload-btn:hover { background: #f1f3f4; border-color: #aaa; }
+        .upload-btn svg { width: 20px; height: 20px; }
+        .upload-btn::after { content: attr(data-tooltip); position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 0.75em; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.15s; }
+        .upload-btn:hover::after { opacity: 1; }
+        .copy-btn { background: none; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; padding: 6px 8px; display: flex; align-items: center; justify-content: center; color: #5f6368; font-size: 0.78em; gap: 4px; white-space: nowrap; position: relative; }
+        .copy-btn:hover { background: #f1f3f4; border-color: #aaa; }
+        .copy-btn svg { width: 16px; height: 16px; }
+        .copy-btn::after { content: attr(data-tooltip); position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 0.75em; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.15s; }
+        .copy-btn:hover::after { opacity: 1; }
+
+        /* ── Rich content inside assistant bubbles ── */
+        .bubble h1, .bubble h2, .bubble h3 { margin: 14px 0 6px 0; }
+        .bubble h1 { font-size: 1.25rem; }
+        .bubble h2 { font-size: 1.1rem; }
+        .bubble h3 { font-size: 1.0rem; }
+        .bubble p { margin: 6px 0; }
+        .bubble ul, .bubble ol { margin: 6px 0; padding-left: 22px; }
+        .bubble li { margin: 3px 0; }
+        .bubble ul.nested { margin: 3px 0 3px 18px; }
+        .bubble li.task-item { list-style: none; margin-left: -18px; }
+        .bubble li.task-item.checked { color: #888; text-decoration: line-through; }
+        .bubble a { color: var(--primary); text-decoration: underline; }
+        .bubble a:hover { opacity: 0.8; }
+        .bubble del { color: #888; text-decoration: line-through; }
+        .bubble hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+        .bubble blockquote { border-left: 4px solid var(--primary); margin: 8px 0; padding: 6px 14px; background: #e8f0fe; border-radius: 0 8px 8px 0; color: #1a56b0; font-style: italic; }
+        .bubble table { border-collapse: collapse; margin: 10px 0; width: 100%; font-size: 0.9rem; }
+        .bubble th, .bubble td { border: 1px solid var(--border); padding: 7px 11px; text-align: left; }
+        .bubble th { background: #e8f0fe; font-weight: 600; color: #1a56b0; }
+        .bubble tr:nth-child(even) td { background: #f8f9fa; }
+        .bubble pre { background: #1e1e1e; color: #d4d4d4; padding: 12px 14px; border-radius: 8px; overflow-x: auto; margin: 10px 0; font-size: 0.85rem; font-family: 'Fira Code', 'Consolas', monospace; }
+        .bubble code { background: rgba(0,0,0,0.08); padding: 2px 5px; border-radius: 4px; font-size: 0.88em; font-family: 'Fira Code', 'Consolas', monospace; }
+        .bubble pre code { background: none; padding: 0; color: inherit; }
+        .bubble sup { font-size: 0.75em; vertical-align: super; }
+        .bubble sub { font-size: 0.75em; vertical-align: sub; }
+        .bubble .katex-display { margin: 10px 0; overflow-x: auto; }
+        /* User bubble overrides — readable on blue background */
+        .user .bubble a { color: #cfe2ff; }
+        .user .bubble code { background: rgba(255,255,255,0.2); }
+        .user .bubble blockquote { background: rgba(255,255,255,0.15); border-left-color: white; color: white; }
+        .user .bubble th { background: rgba(255,255,255,0.2); color: white; }
+        .user .bubble pre { background: rgba(0,0,0,0.3); }
+    </style>
+</head>
+
+<body>
+    <div id="login-modal" class="login-overlay">
+        <div class="login-card">
+            <h2 style="color:var(--primary); margin-top:0;">Engineering Portal</h2>
+            <input type="text" id="uid" class="login-input" placeholder="Student ID" autofocus>
+            <input type="password" id="pwd" class="login-input" placeholder="Password">
+            <button class="btn" style="width:100%" onclick="handleLogin()">Login to Project</button>
+            <p style="margin:18px 0 0; font-size:0.75em; color:#aaa;">gemini3 &nbsp;·&nbsp; v1.4 &nbsp;·&nbsp; BUILD_TIMESTAMP</p>
+        </div>
+    </div>
+
+    <header class="header">
+        <div style="font-weight:bold; color:var(--primary)">OHS Engineering Firm</div>
+        <div style="display:flex; gap:10px;">
+            <select id="model-select">
+                <option value="gemini-3-pro-preview">Gemini 3 Pro (Newest/Best)</option>
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Workhorse)</option>
+                <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (Fastest)</option>
+            </select>
+            <select id="phase-select">
+                <option value="1">Part 1: Proposal</option>
+                <option value="2">Part 2: Research & Argument</option>
+                <option value="3">Part 3: Journaling</option>
+                <option value="4">Part 4: Prototype</option>
+                <option value="5">Part 5: Testing</option>
+                <option value="6">Part 6: Presentation</option>
+            </select>
+            <div id="user-tag" style="font-size:0.8em; background:#e8f0fe; padding:4px 10px; border-radius:15px;">Logged Out</div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="chat-area">
+            <div class="messages" id="messages"></div>
+            <div id="image-previews" style="padding: 0 20px; display: flex; gap: 8px;"></div>
+            <div class="input-area">
+                <div class="input-group">
+                    <button class="upload-btn" data-tooltip="Upload a picture" onclick="document.getElementById('file-input').click()" aria-label="Upload a picture">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                    </button>
+                    <input type="file" id="file-input" multiple style="display:none" onchange="handleFiles(this)" accept="image/*">
+                    <textarea id="user-input" placeholder="Ask your Engineering Coach..."></textarea>
+                    <button class="copy-btn" data-tooltip="Copy last response" onclick="copyLastResponse()" aria-label="Copy last AI response">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                    </button>
+                    <button class="btn" onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let STUDENT_ID = null; let STUDENT_NAME = null; let HISTORY = []; let PENDING_IMAGES = [];
+        let LAST_RESPONSE_TEXT = '';  // plain text of the most recent AI reply
+
+        // ── Rich message formatter: math (KaTeX) + full markdown, no external lib ──
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatMessage(text) {
+            if (!text) return '';
+            const rawPlaceholders = [];
+
+            // 1. Fenced code blocks (highest priority — protect from everything else)
+            text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, lang, code) => {
+                const escaped = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                const html = `<pre><code class="language-${lang}">${escaped}</code></pre>`;
+                rawPlaceholders.push(html);
+                return `\x01RAW${rawPlaceholders.length - 1}\x01`;
+            });
+
+            // 2. Block math $$...$$
+            text = text.replace(/\$\$([\s\S]+?)\$\$/g, (match, latex) => {
+                let html;
+                try {
+                    html = window.katex
+                        ? katex.renderToString(latex.trim(), { displayMode: true, throwOnError: false })
+                        : `<div>$$${latex}$$</div>`;
+                } catch(e) { html = match; }
+                rawPlaceholders.push(html);
+                return `\x01RAW${rawPlaceholders.length - 1}\x01`;
+            });
+
+            // 3. Inline math $...$
+            text = text.replace(/\$([^\$\n]+?)\$/g, (match, latex) => {
+                let html;
+                try {
+                    html = window.katex
+                        ? katex.renderToString(latex.trim(), { displayMode: false, throwOnError: false })
+                        : `<span>$${latex}$</span>`;
+                } catch(e) { html = match; }
+                rawPlaceholders.push(html);
+                return `\x01RAW${rawPlaceholders.length - 1}\x01`;
+            });
+
+            // 4. HTML-escape the rest
+            let f = escapeHtml(text);
+
+            // 5. Inline formatting
+            f = f.replace(/`([^`]+)`/g, '<code>$1</code>');
+            f = f.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+            f = f.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+            f = f.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+            f = f.replace(/\^\{([^}]+)\}/g, '<sup>$1</sup>');
+            f = f.replace(/\^(\S+)/g, '<sup>$1</sup>');
+            f = f.replace(/\_\{([^}]+)\}/g, '<sub>$1</sub>');
+            f = f.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+            // 6. Block-level pass
+            const lines = f.split('\n');
+            const out = [];
+            let i = 0;
+            while (i < lines.length) {
+                const line = lines[i];
+                if (/^### /.test(line)) { out.push(`<h3>${line.slice(4)}</h3>`); i++; continue; }
+                if (/^## /.test(line))  { out.push(`<h2>${line.slice(3)}</h2>`); i++; continue; }
+                if (/^# /.test(line))   { out.push(`<h1>${line.slice(2)}</h1>`); i++; continue; }
+                if (/^(\-{3,}|\*{3,}|_{3,})$/.test(line.trim())) { out.push('<hr>'); i++; continue; }
+                if (/^&gt; /.test(line)) {
+                    const bqLines = [];
+                    while (i < lines.length && /^&gt; /.test(lines[i])) { bqLines.push(lines[i].slice(5)); i++; }
+                    out.push(`<blockquote>${bqLines.join('<br>')}</blockquote>`);
+                    continue;
+                }
+                if (/^\|/.test(line)) {
+                    const tbl = [];
+                    while (i < lines.length && /^\|/.test(lines[i])) { tbl.push(lines[i]); i++; }
+                    if (tbl.length >= 3 && /^\|[\s\-:|]+\|$/.test(tbl[1].trim())) {
+                        const pr = (l) => l.trim().replace(/^\||\|$/g,'').split('|').map(c => c.trim());
+                        const hdr = pr(tbl[0]); const rows = tbl.slice(2).map(pr);
+                        const thead = '<thead><tr>' + hdr.map(h => `<th>${h}</th>`).join('') + '</tr></thead>';
+                        const tbody = '<tbody>' + rows.map(r => '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('') + '</tbody>';
+                        out.push(`<table>${thead}${tbody}</table>`);
+                    } else { out.push(...tbl); }
+                    continue;
+                }
+                if (/^\d+\. /.test(line)) {
+                    const items = [];
+                    while (i < lines.length && /^\d+\. /.test(lines[i])) { items.push(`<li>${lines[i].replace(/^\d+\. /, '')}</li>`); i++; }
+                    out.push(`<ol>${items.join('')}</ol>`); continue;
+                }
+                if (/^(\s{0,3})[*\-] /.test(line)) {
+                    const items = [];
+                    while (i < lines.length && /^(\s{0,3})[*\-] /.test(lines[i])) {
+                        const raw = lines[i].replace(/^(\s{0,3})[*\-] /, '');
+                        if (/^\[ \] /.test(raw))       items.push(`<li class="task-item">&#9744; ${raw.slice(4)}</li>`);
+                        else if (/^\[x\] /i.test(raw)) items.push(`<li class="task-item checked">&#9745; ${raw.slice(4)}</li>`);
+                        else                            items.push(`<li>${raw}</li>`);
+                        i++;
+                        const nested = [];
+                        while (i < lines.length && /^(\s{2,})[*\-] /.test(lines[i])) { nested.push(`<li>${lines[i].replace(/^(\s+)[*\-] /, '')}</li>`); i++; }
+                        if (nested.length) items.push(`<ul class="nested">${nested.join('')}</ul>`);
+                    }
+                    out.push(`<ul>${items.join('')}</ul>`); continue;
+                }
+                out.push(line); i++;
+            }
+
+            // 7. Wrap loose text in <p>
+            const blockTags = /^<(h[1-6]|ul|ol|li|table|blockquote|pre|hr|div)/;
+            f = out.join('\n').split(/\n{2,}/).map(block => {
+                const trimmed = block.trim();
+                if (!trimmed) return '';
+                if (blockTags.test(trimmed)) return trimmed;
+                return `<p>${trimmed.replace(/\n/g, '<br>')}</p>`;
+            }).filter(Boolean).join('\n');
+
+            // 8. Restore placeholders
+            rawPlaceholders.forEach((html, idx) => { f = f.split(`\x01RAW${idx}\x01`).join(html); });
+            return f;
+        }
+
+        const MASTER_RUBRIC = `
+        ### ROLE
+        You are the Senior Engineering Mentor for 9th-grade students at Orion High School in Pasco, WA.
+        Your goal is to coach students through the Civil Engineering Argument Project using the Engineering Design Process.
+
+        ### PROJECT FRAMEWORK
+        Always guide students based on the 6 Parts of the Unit:
+        1. Select project & write proposal[cite: 260, 267].
+        2. Research solutions & argue for the best one[cite: 261, 270].
+        3. Maintain an Individual Engineering Journal[cite: 262, 255].
+        4. Produce a model or prototype[cite: 263, 256].
+        5. Complete labs to test the prototype[cite: 264].
+        6. Final Presentation (PowerPoint/Poster)[cite: 265, 275].
+
+        ### NGSS EVALUATION CRITERIA (MS-ETS1)
+        When providing feedback, reference these "Advanced (4)" standards:
+        - DEFINE: Analyze the problem deeply and identify all criteria/constraints[cite: 148, 150].
+        - CONCEPTS: Research scientific principles and justify solutions with physics[cite: 152, 158].
+        - PROTOTYPE: Persevere through iterations. Failure is data[cite: 161].
+        - EVALUATE: Analyze data from tests to identify flaws and suggest improvements[cite: 165, 166].
+
+        ### PURVIEW & CONSTRAINTS
+        - PHYSICS FOCUS: For Parts 4 & 5, ask: "What physics law (e.g., Newton's Laws) justifies this design choice?"[cite: 190].
+        - JOURNALING: Remind students to document at least TWO failed iterations to reach the "Advanced" score[cite: 162].
+        - MATH POLICY: Provide conceptual hints for math, but always state: "Verify these calculations with Mr. Weisenfeld"[cite: 191].
+        - LOCAL CONTEXT: Reference Pasco, WA civic problems (e.g., crosswalk safety, road bottlenecks)[cite: 184, 194, 240].
+        `;
+
+        async function handleLogin() {
+            const id = document.getElementById('uid').value;
+            const pw = document.getElementById('pwd').value;
+            const res = await fetch('api-proxy.php', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'verify_login', student_id: id, password: pw })
+            });
+            const data = await res.json();
+            if (data.success) {
+                STUDENT_ID = id; STUDENT_NAME = data.student_name;
+                document.getElementById('user-tag').textContent = "👤 " + STUDENT_NAME;
+                document.getElementById('login-modal').style.display = 'none';
+            } else { alert("Login Failed"); }
+        }
+
+        function handleFiles(input) {
+            for (let file of input.files) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    PENDING_IMAGES.push({ inline_data: { mime_type: file.type, data: e.target.result.split(',')[1] } });
+                    const img = document.createElement('img'); img.src = e.target.result;
+                    document.getElementById('image-previews').appendChild(img);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const text = input.value.trim();
+            if (!text && PENDING_IMAGES.length === 0) return;
+
+            appendBubble('user', text || "(Image Uploaded)");
+
+            const userContent = [];
+            if (text) userContent.push({ text: text });
+            PENDING_IMAGES.forEach(img => userContent.push(img));
+
+            HISTORY.push({ role: 'user', parts: userContent });
+            input.value = '';
+            document.getElementById('image-previews').innerHTML = '';
+            PENDING_IMAGES = [];
+
+            const phaseIdx = document.getElementById('phase-select').value;
+            const sys = `${MASTER_RUBRIC} The student is currently in Phase ${phaseIdx}.`;
+
+            // Show "Thinking…" bubble immediately, before fetch starts
+            const messagesDiv = document.getElementById('messages');
+            const thinkingDiv = document.createElement('div');
+            thinkingDiv.className = 'message assistant';
+            thinkingDiv.innerHTML = '<div class="bubble thinking-bubble">Thinking\u2026</div>';
+            messagesDiv.appendChild(thinkingDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            const requestBody = JSON.stringify({
+                action: 'chat',
+                student_id: STUDENT_ID,
+                student_name: STUDENT_NAME,
+                model: document.getElementById('model-select').value,
+                system: sys,
+                messages: HISTORY
+            });
+
+            try {
+                const fetchStart = performance.now();
+                const res = await fetch('api-proxy.php?stream=1', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: requestBody
+                });
+
+                if (!res.ok || !res.body) throw new Error('Stream unavailable');
+
+                // Replace thinking bubble with an empty assistant bubble to fill in
+                thinkingDiv.remove();
+                const assistantDiv = document.createElement('div');
+                assistantDiv.className = 'message assistant';
+                assistantDiv.innerHTML = '<div class="bubble"></div>';
+                messagesDiv.appendChild(assistantDiv);
+                const bubbleEl = assistantDiv.querySelector('.bubble');
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let accumulated = '';
+                let partialLine = '';
+                let ttfbMs = null;  // time-to-first-byte (first text delta)
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    partialLine += decoder.decode(value, { stream: true });
+
+                    // Process all complete lines; keep any trailing incomplete line
+                    const lines = partialLine.split('\n');
+                    partialLine = lines.pop();
+
+                    for (const line of lines) {
+                        const trimmed = line.trimEnd();
+                        if (!trimmed.startsWith('data: ')) continue;
+
+                        const payload = trimmed.slice(6);
+                        if (payload === '[DONE]') break;
+
+                        let parsed;
+                        try { parsed = JSON.parse(payload); } catch { continue; }
+
+                        if (parsed.error) throw new Error(JSON.stringify(parsed.error));
+
+                        // Handle both our simplified {"text":"..."} wrapper AND
+                        // Gemini's raw SSE format. For thinking models (Gemini 3 Pro),
+                        // parts may include thoughtSignature blobs with empty text —
+                        // find the first part that has a non-empty text string.
+                        let delta = parsed.text ?? null;
+                        if (delta === null && Array.isArray(parsed.candidates?.[0]?.content?.parts)) {
+                            for (const part of parsed.candidates[0].content.parts) {
+                                if (typeof part.text === 'string' && part.text.length > 0
+                                        && !part.thoughtSignature) {
+                                    delta = part.text;
+                                    break;
+                                }
+                            }
+                        }
+                        if (delta) {
+                            if (ttfbMs === null) {
+                                ttfbMs = Math.round(performance.now() - fetchStart);
+                            }
+                            accumulated += delta;
+                            bubbleEl.innerHTML = formatMessage(accumulated);
+                            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                        }
+                    }
+                }
+
+                // Show TTFB tag beneath the bubble
+                if (ttfbMs !== null) {
+                    const ttfbTag = document.createElement('div');
+                    ttfbTag.className = 'ttfb-tag';
+                    ttfbTag.textContent = `⏱ First byte: ${ttfbMs < 1000 ? ttfbMs + 'ms' : (ttfbMs/1000).toFixed(1) + 's'}`;
+                    assistantDiv.appendChild(ttfbTag);
+                }
+
+                if (accumulated) {
+                    LAST_RESPONSE_TEXT = accumulated;
+                    HISTORY.push({ role: 'model', parts: [{ text: accumulated }] });
+                    logToTeacher(text, accumulated, ttfbMs);
+                }
+
+            } catch (err) {
+                // Streaming failed — fall back to non-streaming route
+                console.warn('SSE stream failed, falling back:', err);
+                thinkingDiv.remove();
+
+                try {
+                    const res = await fetch('api-proxy.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: requestBody
+                    });
+                    const data = await res.json();
+                    if (data.candidates) {
+                        const reply = data.candidates[0].content.parts[0].text;
+                        LAST_RESPONSE_TEXT = reply;
+                        appendBubble('assistant', reply);
+                        HISTORY.push({ role: 'model', parts: [{ text: reply }] });
+                        logToTeacher(text, reply, null);
+                    } else {
+                        appendBubble('assistant', "⚠️ Error: " + (data.error?.message || "Connection failed."));
+                    }
+                } catch (fallbackErr) {
+                    appendBubble('assistant', "⚠️ Connection failed. Please try again.");
+                }
+            }
+        }
+
+        async function logToTeacher(userText, botReply, ttfbMs) {
+            const ttfbNote = ttfbMs !== null ? `TTFB: ${ttfbMs}ms\n` : '';
+            fetch('api-proxy.php', {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'log_interaction',
+                    student_id: STUDENT_ID,
+                    ttfb_ms: ttfbMs,
+                    log: `USER: ${userText}\n${ttfbNote}BOT: ${botReply}\n---\n`
+                })
+            });
+        }
+
+        async function copyLastResponse() {
+            if (!LAST_RESPONSE_TEXT) return;
+            try {
+                await navigator.clipboard.writeText(LAST_RESPONSE_TEXT);
+                const btn = document.querySelector('.copy-btn');
+                const orig = btn.getAttribute('data-tooltip');
+                btn.setAttribute('data-tooltip', 'Copied!');
+                setTimeout(() => btn.setAttribute('data-tooltip', orig), 1500);
+            } catch {
+                // Fallback for older browsers
+                const ta = document.createElement('textarea');
+                ta.value = LAST_RESPONSE_TEXT;
+                ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+        }
+
+        function appendBubble(role, text) {
+            const messagesDiv = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = `message ${role === 'model' ? 'assistant' : 'user'}`;
+            div.innerHTML = `<div class="bubble">${formatMessage(text)}</div>`;
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // Enter key support on login fields
+        ['uid', 'pwd'].forEach(id =>
+            document.getElementById(id).addEventListener('keydown', e => {
+                if (e.key === 'Enter') { e.preventDefault(); handleLogin(); }
+            })
+        );
+    </script>
+</body>
+</html>

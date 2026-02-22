@@ -139,8 +139,10 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     $buffer      = '';   // Accumulates partial lines across curl chunks
     $usageMeta   = null; // Populated when the final chunk with usageMetadata arrives
     $metaSent    = false; // Guard: emit meta event only once
+    $rawLog      = '';   // DEBUG: captures full raw response for inspection
 
-    $writeCallback = function($ch, $chunk) use (&$buffer, &$usageMeta, &$metaSent) {
+    $writeCallback = function($ch, $chunk) use (&$buffer, &$usageMeta, &$metaSent, &$rawLog) {
+        $rawLog .= $chunk; // DEBUG
         $buffer .= $chunk;
 
         // Process all complete lines in the buffer
@@ -201,6 +203,16 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, false); // Must be false with WRITEFUNCTION
     curl_exec($ch);
     curl_close($ch);
+
+    // DEBUG: log the tail of the raw Gemini SSE response so we can see
+    // whether usageMetadata is present and what format it uses.
+    // Remove this block once the token-counting issue is diagnosed.
+    $debugTail = substr($rawLog, -2000);
+    file_put_contents(__DIR__ . '/gemini_debug.log',
+        date('Y-m-d H:i:s') . " usageMeta=" . json_encode($usageMeta) . "\n" .
+        "RAW_TAIL:\n" . $debugTail . "\n" .
+        str_repeat('-', 60) . "\n",
+        FILE_APPEND);
 
     // ── Fallback: emit meta event if cachedContentTokenCount never arrived
     // (e.g. cache miss — usageMetadata present but field absent)

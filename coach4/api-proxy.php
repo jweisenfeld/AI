@@ -135,104 +135,74 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
         "systemInstruction" => ["parts" => [["text" => $data['system'] ?? "You are a civil engineer."]]]
     ];
 
-    // ── State captured by the CURLOPT_WRITEFUNCTION closure ──────────────────
-    $buffer      = '';   // Accumulates partial lines across curl chunks
-    $usageMeta   = null; // Populated when the final chunk with usageMetadata arrives
-    $metaSent    = false; // Guard: emit meta event only once
-    $rawLog      = '';   // DEBUG: captures full raw response for inspection
-
-    $writeCallback = function($ch, $chunk) use (&$buffer, &$usageMeta, &$metaSent, &$rawLog) {
-        $rawLog .= $chunk; // DEBUG
-        $buffer .= $chunk;
-
-        // Process all complete lines in the buffer
-        while (($pos = strpos($buffer, "\n")) !== false) {
-            $line   = substr($buffer, 0, $pos);
-            $buffer = substr($buffer, $pos + 1);
-            $line   = rtrim($line, "\r"); // handle CRLF
-
-            if (strncmp($line, 'data: ', 6) !== 0) continue;
-
-            $jsonStr = substr($line, 6);
-            $parsed  = json_decode($jsonStr, true);
-            if ($parsed === null) continue;
-
-            // Capture usage — prefer chunks that include cachedContentTokenCount
-            // (intermediate chunks often have usageMetadata but without cached field)
-            if (isset($parsed['usageMetadata'])) {
-                $incoming = $parsed['usageMetadata'];
-                // Always keep the most complete version: prefer one with cachedContentTokenCount
-                if ($usageMeta === null || isset($incoming['cachedContentTokenCount'])) {
-                    $usageMeta = $incoming;
-                }
-                // Emit meta event as soon as we have cachedContentTokenCount
-                // (it arrives in the final usageMetadata chunk from Gemini)
-                if (!$metaSent && isset($incoming['cachedContentTokenCount'])) {
-                    $metaSent = true;
-                    echo "data: " . json_encode(['meta' => [
-                        'cachedTokens' => (int)($incoming['cachedContentTokenCount'] ?? 0),
-                        'inTokens'     => (int)($incoming['promptTokenCount']        ?? 0),
-                        'outTokens'    => (int)($incoming['candidatesTokenCount']    ?? 0),
-                    ]]) . "\n\n";
-                    flush();
-                }
-            }
-
-            // Forward text delta to client — skip thinking-model parts (thoughtSignature)
-            $parts = $parsed['candidates'][0]['content']['parts'] ?? [];
-            $textDelta = null;
-            foreach ($parts as $part) {
-                if (isset($part['thoughtSignature'])) continue; // thinking artifact
-                $t = $part['text'] ?? null;
-                if ($t !== null && $t !== '') { $textDelta = $t; break; }
-            }
-            if ($textDelta !== null) {
-                echo "data: " . json_encode(['text' => $textDelta]) . "\n\n";
-                flush();
-            }
-        }
-
-        return strlen($chunk); // MUST return byte count or curl aborts
-    };
-
+    // ── Fetch the full SSE response with RETURNTRANSFER ──────────────────────
+    // CURLOPT_WRITEFUNCTION closures are silently ignored on some shared hosts
+    // (Bluehost / cPanel PHP) regardless of RETURNTRANSFER=false.  The safe
+    // alternative is to collect the full body with RETURNTRANSFER=true, parse
+    // the SSE lines ourselves, then stream them to the browser in one pass.
+    // True per-chunk streaming is lost, but the browser still receives the
+    // full text and metadata in one SSE burst which is indistinguishable to
+    // the ReadableStream parser in index.html.
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_POST,           true);
     curl_setopt($ch, CURLOPT_POSTFIELDS,     json_encode($payload));
     curl_setopt($ch, CURLOPT_HTTPHEADER,     ['Content-Type: application/json']);
-    curl_setopt($ch, CURLOPT_WRITEFUNCTION,  $writeCallback);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, false); // Must be false with WRITEFUNCTION
-    $curlResult = curl_exec($ch);
-    $curlErrno  = curl_errno($ch);
-    $curlError  = curl_error($ch);
-    $curlInfo   = curl_getinfo($ch);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT,        120);
+    $rawBody   = curl_exec($ch);
+    $curlErrno = curl_errno($ch);
+    $curlError = curl_error($ch);
+    $curlInfo  = curl_getinfo($ch);
     curl_close($ch);
 
-    // DEBUG: log curl diagnostics + raw tail to pinpoint why usageMeta is null
-    file_put_contents(__DIR__ . '/gemini_debug.log',
-        date('Y-m-d H:i:s') . "\n" .
-        "  curl_exec result : " . var_export($curlResult, true) . "\n" .
-        "  curl_errno       : $curlErrno\n" .
-        "  curl_error       : $curlError\n" .
-        "  http_code        : " . ($curlInfo['http_code'] ?? 'n/a') . "\n" .
-        "  total_time       : " . ($curlInfo['total_time'] ?? 'n/a') . "s\n" .
-        "  size_download    : " . ($curlInfo['size_download'] ?? 'n/a') . " bytes\n" .
-        "  url              : " . ($curlInfo['url'] ?? 'n/a') . "\n" .
-        "  rawLog bytes     : " . strlen($rawLog) . "\n" .
-        "  usageMeta        : " . json_encode($usageMeta) . "\n" .
-        "  RAW_TAIL         :\n" . substr($rawLog, -1000) . "\n" .
-        str_repeat('-', 60) . "\n",
-        FILE_APPEND);
-
-    // ── Fallback: emit meta event if cachedContentTokenCount never arrived
-    // (e.g. cache miss — usageMetadata present but field absent)
-    if (!$metaSent) {
-        echo "data: " . json_encode(['meta' => [
-            'cachedTokens' => 0,
-            'inTokens'     => (int)($usageMeta['promptTokenCount']     ?? 0),
-            'outTokens'    => (int)($usageMeta['candidatesTokenCount'] ?? 0),
-        ]]) . "\n\n";
+    if ($curlErrno || $curlInfo['http_code'] !== 200) {
+        $errMsg = $curlErrno ? "curl error $curlErrno: $curlError"
+                             : "Gemini returned HTTP " . $curlInfo['http_code'];
+        echo "data: " . json_encode(['error' => $errMsg]) . "\n\n";
+        echo "data: [DONE]\n\n";
         flush();
+        return;
     }
+
+    // ── Parse SSE lines, re-emit text deltas, collect usageMetadata ──────────
+    $usageMeta = null;
+    $lines     = preg_split('/\r?\n/', $rawBody);
+
+    foreach ($lines as $line) {
+        if (strncmp($line, 'data: ', 6) !== 0) continue;
+        $jsonStr = substr($line, 6);
+        $parsed  = json_decode($jsonStr, true);
+        if ($parsed === null) continue;
+
+        // Capture usage — prefer the chunk that has cachedContentTokenCount
+        if (isset($parsed['usageMetadata'])) {
+            $incoming = $parsed['usageMetadata'];
+            if ($usageMeta === null || isset($incoming['cachedContentTokenCount'])) {
+                $usageMeta = $incoming;
+            }
+        }
+
+        // Forward text delta — skip thinking-model parts (thoughtSignature)
+        $parts     = $parsed['candidates'][0]['content']['parts'] ?? [];
+        $textDelta = null;
+        foreach ($parts as $part) {
+            if (isset($part['thoughtSignature'])) continue;
+            $t = $part['text'] ?? null;
+            if ($t !== null && $t !== '') { $textDelta = $t; break; }
+        }
+        if ($textDelta !== null) {
+            echo "data: " . json_encode(['text' => $textDelta]) . "\n\n";
+        }
+    }
+
+    // ── Emit meta event (cache hit info for the badge in index.html) ─────────
+    $cachedTok = (int)($usageMeta['cachedContentTokenCount'] ?? 0);
+    echo "data: " . json_encode(['meta' => [
+        'cachedTokens' => $cachedTok,
+        'inTokens'     => (int)($usageMeta['promptTokenCount']     ?? 0),
+        'outTokens'    => (int)($usageMeta['candidatesTokenCount'] ?? 0),
+    ]]) . "\n\n";
 
     // Send done sentinel
     echo "data: [DONE]\n\n";

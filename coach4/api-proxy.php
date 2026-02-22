@@ -201,16 +201,25 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     curl_setopt($ch, CURLOPT_HTTPHEADER,     ['Content-Type: application/json']);
     curl_setopt($ch, CURLOPT_WRITEFUNCTION,  $writeCallback);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, false); // Must be false with WRITEFUNCTION
-    curl_exec($ch);
+    $curlResult = curl_exec($ch);
+    $curlErrno  = curl_errno($ch);
+    $curlError  = curl_error($ch);
+    $curlInfo   = curl_getinfo($ch);
     curl_close($ch);
 
-    // DEBUG: log the tail of the raw Gemini SSE response so we can see
-    // whether usageMetadata is present and what format it uses.
-    // Remove this block once the token-counting issue is diagnosed.
-    $debugTail = substr($rawLog, -2000);
+    // DEBUG: log curl diagnostics + raw tail to pinpoint why usageMeta is null
     file_put_contents(__DIR__ . '/gemini_debug.log',
-        date('Y-m-d H:i:s') . " usageMeta=" . json_encode($usageMeta) . "\n" .
-        "RAW_TAIL:\n" . $debugTail . "\n" .
+        date('Y-m-d H:i:s') . "\n" .
+        "  curl_exec result : " . var_export($curlResult, true) . "\n" .
+        "  curl_errno       : $curlErrno\n" .
+        "  curl_error       : $curlError\n" .
+        "  http_code        : " . ($curlInfo['http_code'] ?? 'n/a') . "\n" .
+        "  total_time       : " . ($curlInfo['total_time'] ?? 'n/a') . "s\n" .
+        "  size_download    : " . ($curlInfo['size_download'] ?? 'n/a') . " bytes\n" .
+        "  url              : " . ($curlInfo['url'] ?? 'n/a') . "\n" .
+        "  rawLog bytes     : " . strlen($rawLog) . "\n" .
+        "  usageMeta        : " . json_encode($usageMeta) . "\n" .
+        "  RAW_TAIL         :\n" . substr($rawLog, -1000) . "\n" .
         str_repeat('-', 60) . "\n",
         FILE_APPEND);
 

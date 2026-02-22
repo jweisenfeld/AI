@@ -501,8 +501,8 @@
                     }
                 }
 
-                // Show TTFB + cache badge beneath the bubble
-                if (ttfbMs !== null || cachedTokens !== null) {
+                // Show TTFB + cache badge beneath the bubble — only if we got a response
+                if (accumulated && (ttfbMs !== null || cachedTokens !== null)) {
                     const metaRow = document.createElement('div');
                     metaRow.className = 'meta-tags';
 
@@ -541,7 +541,10 @@
             } catch (err) {
                 // Streaming failed — fall back to non-streaming route
                 console.warn('SSE stream failed, falling back:', err);
+                // Remove both the thinking indicator and any partially-rendered
+                // assistant bubble (which would otherwise leave an orphaned badge)
                 thinkingDiv.remove();
+                assistantDiv?.remove();
 
                 try {
                     const res = await fetch('api-proxy.php', {

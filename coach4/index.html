@@ -447,7 +447,8 @@
                 let ttfbMs = null;       // time-to-first-byte (first text delta)
                 let cachedTokens = null; // populated from trailing meta event
 
-                while (true) {
+                let streamDone = false;
+                while (!streamDone) {
                     const { value, done } = await reader.read();
                     if (done) break;
 
@@ -462,7 +463,7 @@
                         if (!trimmed.startsWith('data: ')) continue;
 
                         const payload = trimmed.slice(6);
-                        if (payload === '[DONE]') break;
+                        if (payload === '[DONE]') { streamDone = true; break; }
 
                         let parsed;
                         try { parsed = JSON.parse(payload); } catch { continue; }

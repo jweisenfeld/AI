@@ -19,6 +19,26 @@ function send_error($msg, $details = null) {
     exit;
 }
 
+// ══════════════════════════════════════════════════════════════
+// TUNABLE COST CONTROLS  — adjust here, mirrored in index.html
+// ══════════════════════════════════════════════════════════════
+//
+// MAX_HISTORY_CHARS: hard ceiling on the serialised messages array
+// (JSON bytes).  Rejects oversized payloads before any API call.
+//
+// Rule of thumb:  ~4 chars per Gemini token for English text.
+// Images in HISTORY are base64 — 1 MB image ≈ 1.33 MB of chars,
+// so a single uploaded photo can easily be 500k–1.3M chars alone.
+// Images are NOT stored in HISTORY (they're sent once then dropped),
+// so this limit applies only to text conversation history.
+//
+//  40,000 chars ≈  10,000 tokens  — default, short sessions
+//  80,000 chars ≈  20,000 tokens  — allows ~3-4 pages of journal paste
+// 160,000 chars ≈  40,000 tokens  — large journal dumps, higher cost
+//
+// Keep in sync with MAX_HISTORY_CHARS in index.html.
+define('MAX_HISTORY_CHARS', 40_000);
+
 // --- STREAMING HANDLER ---
 function handle_stream($data, $secretsFile, $cacheNameFile) {
 
@@ -92,6 +112,16 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
         }
     }
 
+    // ── Server-side payload size guard ───────────────────────────────────────
+    // Belt-and-suspenders check — client enforces MAX_HISTORY_CHARS too, but a
+    // crafty student could POST directly. Abort with an SSE error event.
+    if (strlen(json_encode($contents)) > MAX_HISTORY_CHARS) {
+        echo "data: " . json_encode(['error' => 'History too large. Please refresh and start a new session.']) . "\n\n";
+        echo "data: [DONE]\n\n";
+        flush();
+        return;
+    }
+
     // ── Prepend file URI as first user turn ───────────────────────────────────
     if ($fileUri !== null) {
         array_unshift($contents, [
@@ -154,6 +184,17 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, false); // Must be false with WRITEFUNCTION
     curl_exec($ch);
     curl_close($ch);
+
+    // ── Emit usage metadata event so the browser can show cache-hit badge ───────
+    $cachedTokensEarly = $usageMeta['cachedContentTokenCount'] ?? 0;
+    $inTokensEarly     = $usageMeta['promptTokenCount']        ?? 0;
+    $outTokensEarly    = $usageMeta['candidatesTokenCount']    ?? 0;
+    echo "data: " . json_encode(['meta' => [
+        'cachedTokens' => $cachedTokensEarly,
+        'inTokens'     => $inTokensEarly,
+        'outTokens'    => $outTokensEarly,
+    ]]) . "\n\n";
+    flush();
 
     // Send done sentinel
     echo "data: [DONE]\n\n";
@@ -277,6 +318,11 @@ if (isset($data['messages'])) {
             $contents[] = ["role" => $role, "parts" => $parts];
         }
     }
+}
+
+// ── Server-side payload size guard (non-streaming route) ─────────────────────
+if (strlen(json_encode($contents)) > MAX_HISTORY_CHARS) {
+    send_error('History too large. Please refresh and start a new session.');
 }
 
 // ── Prepend the municipal code file as the first user turn ───────────────────

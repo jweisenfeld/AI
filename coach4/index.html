@@ -31,6 +31,15 @@
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
         .thinking-bubble { font-style: italic; color: #888; animation: blink 1.2s ease-in-out infinite; }
         .ttfb-tag { font-size: 0.7em; color: #999; margin-top: 4px; align-self: flex-start; padding: 0 4px; }
+        .meta-tags { display: flex; gap: 6px; margin-top: 4px; align-self: flex-start; flex-wrap: wrap; }
+        .cache-tag { font-size: 0.7em; padding: 1px 6px; border-radius: 10px; font-weight: 600; }
+        .cache-tag.hit  { background: #e6f4ea; color: #1e8e3e; border: 1px solid #a8d5b5; }
+        .cache-tag.miss { background: #f1f3f4; color: #80868b; border: 1px solid #dadce0; }
+        .convo-banner { display: none; margin: 0 20px 10px; padding: 9px 14px; border-radius: 8px; font-size: 0.85em; line-height: 1.4; }
+        .convo-banner.warn { background: #fef9e7; color: #7d5a00; border: 1px solid #f5c518; }
+        .convo-banner.stop { background: #fce8e6; color: #c0392b; border: 1px solid #f28b82; }
+        .convo-banner button.dismiss { float: right; background: none; border: none; cursor: pointer; font-size: 1em; line-height: 1; color: inherit; opacity: 0.6; margin-left: 8px; }
+        .convo-banner button.dismiss:hover { opacity: 1; }
         .upload-btn { background: none; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; padding: 6px 8px; display: flex; align-items: center; justify-content: center; color: #5f6368; position: relative; }
         .upload-btn:hover { background: #f1f3f4; border-color: #aaa; }
         .upload-btn svg { width: 20px; height: 20px; }
@@ -84,7 +93,7 @@
             <input type="text" id="uid" class="login-input" placeholder="Student ID" autofocus>
             <input type="password" id="pwd" class="login-input" placeholder="Password">
             <button class="btn" style="width:100%" onclick="handleLogin()">Login to Project</button>
-            <p style="margin:18px 0 0; font-size:0.75em; color:#aaa;">coach4 &nbsp;·&nbsp; v20260222 &nbsp;·&nbsp; BUILD_TIMESTAMP</p>
+            <p style="margin:18px 0 0; font-size:0.75em; color:#aaa;">coach4 &nbsp;·&nbsp; vBUILD_DATE &nbsp;·&nbsp; BUILD_TIMESTAMP</p>
         </div>
     </div>
 
@@ -110,6 +119,7 @@
     <div class="main-container">
         <div class="chat-area">
             <div class="messages" id="messages"></div>
+            <div id="convo-banner" class="convo-banner"></div>
             <div id="image-previews" style="padding: 0 20px; display: flex; gap: 8px;"></div>
             <div class="input-area">
                 <div class="input-group">
@@ -137,6 +147,47 @@
     <script>
         let STUDENT_ID = null; let STUDENT_NAME = null; let HISTORY = []; let PENDING_IMAGES = [];
         let LAST_RESPONSE_TEXT = '';  // plain text of the most recent AI reply
+
+        // ── Conversation length guard ─────────────────────────────────────────────
+        // HISTORY stores alternating user/model turns; divide by 2 for exchange count.
+        const WARN_TURNS = 10;   // yellow banner appears, dismissible
+        const STOP_TURNS = 15;   // red banner, input locked (turn-based)
+
+        // ── TUNABLE COST CONTROL — keep in sync with api-proxy.php ──────────────
+        // MAX_HISTORY_CHARS: hard ceiling on JSON.stringify(messagesWithPhase).
+        // Rule of thumb: ~4 chars per token for English text.
+        // Images are NOT stored in HISTORY (sent once, then dropped), so this
+        // only limits text conversation history. Raise it if students need to
+        // paste multi-day engineering journal entries for feedback.
+        //
+        //   40_000 chars ≈  10,000 tokens — default, short sessions
+        //   80_000 chars ≈  20,000 tokens — allows ~3-4 pages of journal paste
+        //  160_000 chars ≈  40,000 tokens — large journal dumps, higher cost
+        const MAX_HISTORY_CHARS = 40_000;
+
+        function checkConversationLength() {
+            const turns = Math.floor(HISTORY.length / 2);
+            const banner = document.getElementById('convo-banner');
+            const sendBtn = document.querySelector('.btn[onclick="sendMessage()"]');
+            const textarea = document.getElementById('user-input');
+
+            if (turns >= STOP_TURNS) {
+                banner.className = 'convo-banner stop';
+                banner.style.display = 'block';
+                banner.innerHTML = '🛑 <strong>Conversation limit reached.</strong> This chat has grown very long and would cost a lot to continue. Please refresh the page to start a new session — your engineering coach will be ready instantly!';
+                sendBtn.disabled = true;
+                sendBtn.title = 'Refresh the page to start a new conversation';
+                textarea.disabled = true;
+                textarea.placeholder = 'Please refresh the page to start a new conversation.';
+            } else if (turns >= WARN_TURNS) {
+                // Only show warn banner if stop banner isn't already visible
+                if (!banner.classList.contains('stop')) {
+                    banner.className = 'convo-banner warn';
+                    banner.style.display = 'block';
+                    banner.innerHTML = '⚠️ <strong>Long conversation.</strong> This chat is getting lengthy. Consider refreshing the page for a fresh start — you won\'t lose your project work, just this chat history. <button class="dismiss" onclick="this.parentElement.style.display=\'none\'" title="Dismiss">✕</button>';
+                }
+            }
+        }
 
         // ── Rich message formatter: math (KaTeX) + full markdown, no external lib ──
         function escapeHtml(text) {
@@ -335,6 +386,25 @@
             const phasePrefix = { role: 'user', parts: [{ text: `[Context: The student is currently in Phase ${phaseIdx} of the project.]` }] };
             const messagesWithPhase = [phasePrefix, ...HISTORY];
 
+            // ── Hard payload size guard (catches paste-back exploits) ─────────────
+            // Check before sending so we can pop the user message back out of HISTORY.
+            const historyChars = JSON.stringify(messagesWithPhase).length;
+            if (historyChars > MAX_HISTORY_CHARS) {
+                // Roll back the push we just did — don't leave a dangling user turn
+                HISTORY.pop();
+                const approxTokens = Math.round(historyChars / 4).toLocaleString();
+                const banner = document.getElementById('convo-banner');
+                banner.className = 'convo-banner stop';
+                banner.style.display = 'block';
+                banner.innerHTML = `🛑 <strong>Context limit reached (~${approxTokens} tokens).</strong> Your conversation history is too large to send, even after a refresh. Please start a new session and avoid pasting large blocks of prior conversation.`;
+                const sendBtn = document.querySelector('.btn[onclick="sendMessage()"]');
+                const textarea = document.getElementById('user-input');
+                sendBtn.disabled = true;
+                textarea.disabled = true;
+                textarea.placeholder = 'Please refresh the page to start a new conversation.';
+                return;
+            }
+
             // Show "Thinking…" bubble immediately, before fetch starts
             const messagesDiv = document.getElementById('messages');
             const thinkingDiv = document.createElement('div');
@@ -374,7 +444,8 @@
                 const decoder = new TextDecoder();
                 let accumulated = '';
                 let partialLine = '';
-                let ttfbMs = null;  // time-to-first-byte (first text delta)
+                let ttfbMs = null;       // time-to-first-byte (first text delta)
+                let cachedTokens = null; // populated from trailing meta event
 
                 while (true) {
                     const { value, done } = await reader.read();
@@ -397,6 +468,12 @@
                         try { parsed = JSON.parse(payload); } catch { continue; }
 
                         if (parsed.error) throw new Error(JSON.stringify(parsed.error));
+
+                        // Capture trailing metadata event (cache hit info)
+                        if (parsed.meta) {
+                            cachedTokens = parsed.meta.cachedTokens ?? 0;
+                            continue;
+                        }
 
                         // Handle both our simplified {"text":"..."} wrapper AND
                         // Gemini's raw SSE format. For thinking models (Gemini 3 Pro),
@@ -423,18 +500,41 @@
                     }
                 }
 
-                // Show TTFB tag beneath the bubble
-                if (ttfbMs !== null) {
-                    const ttfbTag = document.createElement('div');
-                    ttfbTag.className = 'ttfb-tag';
-                    ttfbTag.textContent = `⏱ First byte: ${ttfbMs < 1000 ? ttfbMs + 'ms' : (ttfbMs/1000).toFixed(1) + 's'}`;
-                    assistantDiv.appendChild(ttfbTag);
+                // Show TTFB + cache badge beneath the bubble
+                if (ttfbMs !== null || cachedTokens !== null) {
+                    const metaRow = document.createElement('div');
+                    metaRow.className = 'meta-tags';
+
+                    if (ttfbMs !== null) {
+                        const ttfbTag = document.createElement('span');
+                        ttfbTag.className = 'ttfb-tag';
+                        ttfbTag.textContent = `⏱ ${ttfbMs < 1000 ? ttfbMs + 'ms' : (ttfbMs/1000).toFixed(1) + 's'}`;
+                        metaRow.appendChild(ttfbTag);
+                    }
+
+                    if (cachedTokens !== null) {
+                        const cacheTag = document.createElement('span');
+                        if (cachedTokens > 0) {
+                            const pct = Math.round(cachedTokens / 1000);
+                            cacheTag.className = 'cache-tag hit';
+                            cacheTag.title = `${cachedTokens.toLocaleString()} tokens served from cache`;
+                            cacheTag.textContent = `⚡ cached ${pct}k tok`;
+                        } else {
+                            cacheTag.className = 'cache-tag miss';
+                            cacheTag.title = 'No cached tokens — first request warms the cache';
+                            cacheTag.textContent = '○ no cache';
+                        }
+                        metaRow.appendChild(cacheTag);
+                    }
+
+                    assistantDiv.appendChild(metaRow);
                 }
 
                 if (accumulated) {
                     LAST_RESPONSE_TEXT = accumulated;
                     HISTORY.push({ role: 'model', parts: [{ text: accumulated }] });
                     logToTeacher(text, accumulated, ttfbMs);
+                    checkConversationLength();
                 }
 
             } catch (err) {
@@ -455,6 +555,7 @@
                         appendBubble('assistant', reply);
                         HISTORY.push({ role: 'model', parts: [{ text: reply }] });
                         logToTeacher(text, reply, null);
+                        checkConversationLength();
                     } else {
                         appendBubble('assistant', "⚠️ Error: " + (data.error?.message || "Connection failed."));
                     }

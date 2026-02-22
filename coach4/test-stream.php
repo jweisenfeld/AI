@@ -7,7 +7,7 @@
  *
  * Usage:
  *   CLI:  php test-stream.php
- *   Web:  https://psd1.net/gemini3/test-stream.php?secret=amentum2025
+ *   Web:  https://psd1.net/coach4/test-stream.php?secret=amentum2025
  */
 
 if (php_sapi_name() !== 'cli' && ($_GET['secret'] ?? '') !== 'amentum2025') {
@@ -68,7 +68,7 @@ $TEST_PAYLOAD = json_encode([
     ],
 ]);
 
-$BASE_URL = 'https://psd1.net/gemini3/api-proxy.php';
+$BASE_URL = 'https://psd1.net/coach4/api-proxy.php';
 
 // ============================================================
 // Helper: extract a text delta from a single SSE line.
@@ -403,6 +403,111 @@ if (!file_exists($cacheNameFile) || !file_exists($secretsFile)) {
             out("  Cache efficiency: $pct% of prompt tokens were cached");
         }
     }
+}
+
+// ============================================================
+// TEST 4 - Payload size guard (MAX_HISTORY_CHARS enforcement)
+//
+// Sends an intentionally oversized messages payload (>40k chars)
+// to both the streaming and non-streaming routes and verifies
+// that api-proxy.php rejects it before touching the Gemini API.
+//
+// This confirms the server-side paste-back guard is working,
+// independent of the client-side check in index.html.
+// ============================================================
+
+section('TEST 4: Payload size guard (oversized history rejected by server)');
+
+// Build a message array whose JSON serialisation exceeds 40k chars.
+// Each message is ~200 chars; 210 messages ≈ 42k chars.
+$bigMessages = [];
+for ($i = 0; $i < 210; $i++) {
+    $role = ($i % 2 === 0) ? 'user' : 'model';
+    $bigMessages[] = [
+        'role'  => $role,
+        'parts' => [['text' => "This is synthetic filler message number $i to simulate a student pasting back a very long conversation history into the chat window after a page refresh. It contains enough text to push past the 40k character limit when combined with many other messages like it."]],
+    ];
+}
+
+$oversizedPayload = json_encode([
+    'model'        => 'gemini-2.5-flash-lite',
+    'student_id'   => 'test_script',
+    'student_name' => 'Test Script',
+    'system'       => 'You are a helpful assistant.',
+    'messages'     => $bigMessages,
+]);
+
+out('  Oversized payload size: ' . number_format(strlen($oversizedPayload)) . ' chars (limit: 40,000)');
+out('');
+
+// ── Sub-test 4a: streaming route ──────────────────────────────────────────────
+out('  Sub-test 4a: streaming route (?stream=1)');
+
+$t4StreamBody = '';
+$t4StreamCode = 0;
+$t4StreamTyp  = '';
+
+$t4HeaderCb = function($ch, $hdr) use (&$t4StreamCode, &$t4StreamTyp): int {
+    if (preg_match('/^HTTP\/[\d.]+ (\d+)/', $hdr, $m)) $t4StreamCode = (int)$m[1];
+    if (stripos($hdr, 'Content-Type:') === 0) $t4StreamTyp = trim(substr($hdr, 13));
+    return strlen($hdr);
+};
+
+$ch = curl_init($BASE_URL . '?stream=1');
+curl_setopt($ch, CURLOPT_POST,           true);
+curl_setopt($ch, CURLOPT_POSTFIELDS,     $oversizedPayload);
+curl_setopt($ch, CURLOPT_HTTPHEADER,     ['Content-Type: application/json']);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_TIMEOUT,        30);
+curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+curl_setopt($ch, CURLOPT_HEADERFUNCTION, $t4HeaderCb);
+$t4StreamBody = curl_exec($ch);
+curl_close($ch);
+
+// Expect an SSE error event (no text delta, contains 'error' key)
+$t4StreamLines = preg_split('/\r?\n/', $t4StreamBody);
+$t4ErrorFound  = false;
+$t4TextFound   = false;
+foreach ($t4StreamLines as $ln) {
+    if (strncmp($ln, 'data: ', 6) !== 0) continue;
+    $j = json_decode(substr($ln, 6), true);
+    if (isset($j['error']))  $t4ErrorFound = true;
+    if (isset($j['text']))   $t4TextFound  = true;
+}
+
+if ($t4ErrorFound && !$t4TextFound) {
+    result_pass('Streaming route returned SSE error event (no text delta sent)');
+} else {
+    result_fail(
+        'Streaming route returned SSE error event',
+        'error_found=' . ($t4ErrorFound?'yes':'no') . ' text_found=' . ($t4TextFound?'yes':'no')
+    );
+}
+
+// ── Sub-test 4b: non-streaming fallback route ─────────────────────────────────
+out('');
+out('  Sub-test 4b: non-streaming fallback route');
+
+$ch = curl_init($BASE_URL);
+curl_setopt($ch, CURLOPT_POST,           true);
+curl_setopt($ch, CURLOPT_POSTFIELDS,     $oversizedPayload);
+curl_setopt($ch, CURLOPT_HTTPHEADER,     ['Content-Type: application/json']);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_TIMEOUT,        30);
+curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+$t4FallbackBody   = curl_exec($ch);
+curl_close($ch);
+
+$t4FallbackParsed = json_decode($t4FallbackBody, true);
+$t4FallbackError  = $t4FallbackParsed['error'] ?? null;
+
+if ($t4FallbackError !== null && stripos($t4FallbackError, 'too large') !== false) {
+    result_pass("Non-streaming route returned error JSON: \"$t4FallbackError\"");
+} else {
+    result_fail(
+        'Non-streaming route returned error JSON with "too large" message',
+        'got: ' . substr($t4FallbackBody, 0, 120)
+    );
 }
 
 // ============================================================

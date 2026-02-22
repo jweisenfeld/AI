@@ -14,11 +14,16 @@ jobs:
       - name: 🚚 Get latest code
         uses: actions/checkout@v4
 
-      - name: 🕐 Update version file
+      - name: 🕐 Stamp version into coach4/index.html (deploy copy only)
         run: |
-          echo $(date -u +"%Y%m%d%H%M%S") > public/version.txt
-          cat public/version.txt
-      
+          BUILD_TS=$(date -u +"%Y-%m-%d %H:%M UTC")
+          BUILD_VER=$(date -u +"%Y%m%d")
+          # Substitute both tokens in the runner's working copy.
+          # The committed file keeps the literal placeholders — git stays clean.
+          sed -i "s/BUILD_TIMESTAMP/${BUILD_TS}/g" coach4/index.html
+          sed -i "s/BUILD_DATE/${BUILD_VER}/g"     coach4/index.html
+          echo "Stamped: v${BUILD_VER} / ${BUILD_TS}"
+
       - name: 📂 Sync repo root into public_html
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:

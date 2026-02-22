@@ -137,9 +137,10 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
 
     // ── State captured by the CURLOPT_WRITEFUNCTION closure ──────────────────
     $buffer      = '';   // Accumulates partial lines across curl chunks
-    $usageMeta   = null; // Populated when the last chunk with usageMetadata arrives
+    $usageMeta   = null; // Populated when the final chunk with usageMetadata arrives
+    $metaSent    = false; // Guard: emit meta event only once
 
-    $writeCallback = function($ch, $chunk) use (&$buffer, &$usageMeta) {
+    $writeCallback = function($ch, $chunk) use (&$buffer, &$usageMeta, &$metaSent) {
         $buffer .= $chunk;
 
         // Process all complete lines in the buffer
@@ -154,9 +155,25 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
             $parsed  = json_decode($jsonStr, true);
             if ($parsed === null) continue;
 
-            // Capture usage from last chunk
+            // Capture usage — prefer chunks that include cachedContentTokenCount
+            // (intermediate chunks often have usageMetadata but without cached field)
             if (isset($parsed['usageMetadata'])) {
-                $usageMeta = $parsed['usageMetadata'];
+                $incoming = $parsed['usageMetadata'];
+                // Always keep the most complete version: prefer one with cachedContentTokenCount
+                if ($usageMeta === null || isset($incoming['cachedContentTokenCount'])) {
+                    $usageMeta = $incoming;
+                }
+                // Emit meta event as soon as we have cachedContentTokenCount
+                // (it arrives in the final usageMetadata chunk from Gemini)
+                if (!$metaSent && isset($incoming['cachedContentTokenCount'])) {
+                    $metaSent = true;
+                    echo "data: " . json_encode(['meta' => [
+                        'cachedTokens' => (int)($incoming['cachedContentTokenCount'] ?? 0),
+                        'inTokens'     => (int)($incoming['promptTokenCount']        ?? 0),
+                        'outTokens'    => (int)($incoming['candidatesTokenCount']    ?? 0),
+                    ]]) . "\n\n";
+                    flush();
+                }
             }
 
             // Forward text delta to client — skip thinking-model parts (thoughtSignature)
@@ -185,16 +202,16 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     curl_exec($ch);
     curl_close($ch);
 
-    // ── Emit usage metadata event so the browser can show cache-hit badge ───────
-    $cachedTokensEarly = $usageMeta['cachedContentTokenCount'] ?? 0;
-    $inTokensEarly     = $usageMeta['promptTokenCount']        ?? 0;
-    $outTokensEarly    = $usageMeta['candidatesTokenCount']    ?? 0;
-    echo "data: " . json_encode(['meta' => [
-        'cachedTokens' => $cachedTokensEarly,
-        'inTokens'     => $inTokensEarly,
-        'outTokens'    => $outTokensEarly,
-    ]]) . "\n\n";
-    flush();
+    // ── Fallback: emit meta event if cachedContentTokenCount never arrived
+    // (e.g. cache miss — usageMetadata present but field absent)
+    if (!$metaSent) {
+        echo "data: " . json_encode(['meta' => [
+            'cachedTokens' => 0,
+            'inTokens'     => (int)($usageMeta['promptTokenCount']     ?? 0),
+            'outTokens'    => (int)($usageMeta['candidatesTokenCount'] ?? 0),
+        ]]) . "\n\n";
+        flush();
+    }
 
     // Send done sentinel
     echo "data: [DONE]\n\n";

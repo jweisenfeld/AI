@@ -330,7 +330,10 @@
             PENDING_IMAGES = [];
 
             const phaseIdx = document.getElementById('phase-select').value;
-            const sys = `${MASTER_RUBRIC} The student is currently in Phase ${phaseIdx}.`;
+            // Keep system prompt constant so Gemini's implicit prefix cache stays stable.
+            // Phase context is injected as the first user turn instead.
+            const phasePrefix = { role: 'user', parts: [{ text: `[Context: The student is currently in Phase ${phaseIdx} of the project.]` }] };
+            const messagesWithPhase = [phasePrefix, ...HISTORY];
 
             // Show "Thinking…" bubble immediately, before fetch starts
             const messagesDiv = document.getElementById('messages');
@@ -345,8 +348,8 @@
                 student_id: STUDENT_ID,
                 student_name: STUDENT_NAME,
                 model: document.getElementById('model-select').value,
-                system: sys,
-                messages: HISTORY
+                system: MASTER_RUBRIC,
+                messages: messagesWithPhase
             });
 
             try {

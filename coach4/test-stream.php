@@ -310,6 +310,102 @@ if ($fallbackText !== null && strlen($fallbackText) > 0) {
 }
 
 // ============================================================
+// TEST 3 - Implicit caching verification
+//
+// Sends two identical requests (same system + file_data prefix).
+// The second response should report cachedContentTokenCount > 0,
+// confirming Google's implicit prefix cache kicked in.
+//
+// NOTE: The file URI must be active (run cache-create.php first).
+//       If no file URI is stored, this test is skipped.
+// ============================================================
+
+section('TEST 3: Implicit caching (cachedContentTokenCount on 2nd request)');
+
+$accountRoot   = dirname($_SERVER['DOCUMENT_ROOT'] ?? '/home/fikrttmy/public_html');
+$cacheNameFile = $accountRoot . '/.secrets/gemini_cache_name.txt';
+$secretsFile   = $accountRoot . '/.secrets/amentum_geminikey.php';
+
+if (!file_exists($cacheNameFile) || !file_exists($secretsFile)) {
+    out('  SKIP: cache file URI or API key not found — run cache-create.php first.');
+} else {
+    $fileUri = trim(file_get_contents($cacheNameFile));
+    if (empty($fileUri) || strpos($fileUri, 'generativelanguage.googleapis.com') === false) {
+        out('  SKIP: gemini_cache_name.txt does not contain a valid Files API URI.');
+    } else {
+        require_once $secretsFile; // defines $GEMINI_API_KEY
+        $apiKey = trim($GEMINI_API_KEY);
+
+        // Use non-streaming route so we get a clean JSON response with usageMetadata
+        $cacheTestUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . $apiKey;
+
+        // Stable system prompt (same on both calls — must never vary for caching)
+        $stableSystem = 'You are a civil engineering mentor for 9th-grade students in Pasco, WA.';
+
+        // Payload factory: file_data as first user turn, then a fixed question
+        $makePayload = function() use ($fileUri, $stableSystem): string {
+            return json_encode([
+                'contents' => [
+                    [
+                        'role'  => 'user',
+                        'parts' => [['file_data' => ['mime_type' => 'text/plain', 'file_uri' => $fileUri]]],
+                    ],
+                    [
+                        'role'  => 'user',
+                        'parts' => [['text' => 'In one sentence, what is the Pasco Municipal Code?']],
+                    ],
+                ],
+                'systemInstruction' => ['parts' => [['text' => $stableSystem]]],
+            ]);
+        };
+
+        // Helper: POST payload, return decoded JSON
+        $doRequest = function(string $payload) use ($cacheTestUrl): ?array {
+            $ch = curl_init($cacheTestUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST,           true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS,     $payload);
+            curl_setopt($ch, CURLOPT_HTTPHEADER,     ['Content-Type: application/json']);
+            curl_setopt($ch, CURLOPT_TIMEOUT,        120);
+            $body = curl_exec($ch);
+            curl_close($ch);
+            return json_decode($body, true);
+        };
+
+        out('  Request 1 (warm-up — populates the cache)…');
+        $r1 = $doRequest($makePayload());
+        $cached1 = $r1['usageMetadata']['cachedContentTokenCount'] ?? 0;
+        $prompt1 = $r1['usageMetadata']['promptTokenCount']        ?? 0;
+        out("    promptTokenCount       : $prompt1");
+        out("    cachedContentTokenCount: $cached1");
+
+        out('');
+        out('  Request 2 (should hit the implicit cache)…');
+        $r2 = $doRequest($makePayload());
+        $cached2 = $r2['usageMetadata']['cachedContentTokenCount'] ?? 0;
+        $prompt2 = $r2['usageMetadata']['promptTokenCount']        ?? 0;
+        out("    promptTokenCount       : $prompt2");
+        out("    cachedContentTokenCount: $cached2");
+        out('');
+
+        if ($cached2 > 0) {
+            result_pass("Cache HIT on request 2 — $cached2 tokens served from cache");
+        } else {
+            result_fail(
+                'Cache HIT on request 2',
+                'cachedContentTokenCount=0. Cache may need more warm-up or file URI may be stale.'
+            );
+        }
+
+        // Sanity: cached tokens should be a large share of prompt tokens
+        if ($cached2 > 0 && $prompt2 > 0) {
+            $pct = round(100 * $cached2 / $prompt2);
+            out("  Cache efficiency: $pct% of prompt tokens were cached");
+        }
+    }
+}
+
+// ============================================================
 // Done
 // ============================================================
 

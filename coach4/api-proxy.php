@@ -160,12 +160,14 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     flush();
 
     // ── Usage logging (same format as non-streaming route) ───────────────────
-    $studentName = $data['student_name'] ?? 'Unknown';
-    $studentID   = $data['student_id']   ?? 'unknown';
-    $fileFlag    = $fileUri ? "FILE_URI" : "NO_FILE";
-    $inTokens    = $usageMeta['promptTokenCount']     ?? 0;
-    $outTokens   = $usageMeta['candidatesTokenCount'] ?? 0;
-    $logLine     = date('Y-m-d H:i:s') . " | $studentName | $actualModel | In:$inTokens | Out:$outTokens | $fileFlag | ID:$studentID\n";
+    $studentName   = $data['student_name'] ?? 'Unknown';
+    $studentID     = $data['student_id']   ?? 'unknown';
+    $fileFlag      = $fileUri ? "FILE_URI" : "NO_FILE";
+    $inTokens      = $usageMeta['promptTokenCount']        ?? 0;
+    $outTokens     = $usageMeta['candidatesTokenCount']    ?? 0;
+    $cachedTokens  = $usageMeta['cachedContentTokenCount'] ?? 0;
+    $cacheFlag     = $cachedTokens > 0 ? "CACHE_HIT:{$cachedTokens}" : "CACHE_MISS";
+    $logLine       = date('Y-m-d H:i:s') . " | $studentName | $actualModel | In:$inTokens | Out:$outTokens | Cached:$cachedTokens | $fileFlag | $cacheFlag | ID:$studentID\n";
     file_put_contents(__DIR__ . '/gemini_usage.log', $logLine, FILE_APPEND);
 }
 
@@ -306,12 +308,15 @@ curl_close($ch);
 
 // --- 4. USAGE LOGGING (Teacher Dashboard Data) ---
 $responseData = json_decode($response, true);
-$usage = $responseData['usageMetadata'] ?? ['promptTokenCount' => 0, 'candidatesTokenCount' => 0];
-$studentName = $data['student_name'] ?? 'Unknown';
-
-$studentID = $data['student_id'] ?? 'unknown';
-$fileFlag  = $fileUri ? "FILE_URI" : "NO_FILE";
-$logLine   = date('Y-m-d H:i:s') . " | $studentName | $actualModel | In:{$usage['promptTokenCount']} | Out:{$usage['candidatesTokenCount']} | $fileFlag | ID:$studentID\n";
+$usage = $responseData['usageMetadata'] ?? [];
+$studentName  = $data['student_name'] ?? 'Unknown';
+$studentID    = $data['student_id']   ?? 'unknown';
+$fileFlag     = $fileUri ? "FILE_URI" : "NO_FILE";
+$inTokens     = $usage['promptTokenCount']        ?? 0;
+$outTokens    = $usage['candidatesTokenCount']    ?? 0;
+$cachedTokens = $usage['cachedContentTokenCount'] ?? 0;
+$cacheFlag    = $cachedTokens > 0 ? "CACHE_HIT:{$cachedTokens}" : "CACHE_MISS";
+$logLine      = date('Y-m-d H:i:s') . " | $studentName | $actualModel | In:$inTokens | Out:$outTokens | Cached:$cachedTokens | $fileFlag | $cacheFlag | ID:$studentID\n";
 file_put_contents('gemini_usage.log', $logLine, FILE_APPEND);
 
 http_response_code($httpCode);

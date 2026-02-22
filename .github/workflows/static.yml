@@ -47,4 +47,8 @@ jobs:
             **/*.ps1
             **/*.py
             **/__pycache__/**
+            # Protect runtime-generated log files from being wiped on deploy
+            **/student_logs/**
+            **/gemini_usage.log
+            **/claude_usage.log
 

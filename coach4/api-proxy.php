@@ -235,6 +235,40 @@ if (isset($_GET['stream']) && $_GET['stream'] === '1') {
 // ── Non-streaming routes ──────────────────────────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
 
+// --- DEBUG ROUTE (remove after diagnosis) ---
+// Usage: POST {"action":"debug_chat","secret":"amentum2025","model":"gemini-2.5-flash","message":"Hello"}
+if (isset($data['action']) && $data['action'] === 'debug_chat') {
+    if (($data['secret'] ?? '') !== 'amentum2025') { send_error('Forbidden'); }
+    if (!file_exists($secretsFile)) send_error("API Key file missing.");
+    require_once($secretsFile);
+    $model = $data['model'] ?? 'gemini-2.5-flash';
+    $msg   = $data['message'] ?? 'Say hello';
+    $url   = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:streamGenerateContent?alt=sse&key=" . trim($GEMINI_API_KEY);
+    $payload = [
+        "contents" => [["role" => "user", "parts" => [["text" => $msg]]]],
+        "systemInstruction" => ["parts" => [["text" => "You are a helpful assistant."]]]
+    ];
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_POST,           true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS,     json_encode($payload));
+    curl_setopt($ch, CURLOPT_HTTPHEADER,     ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT,        30);
+    $rawBody   = curl_exec($ch);
+    $curlErrno = curl_errno($ch);
+    $curlError = curl_error($ch);
+    $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    echo json_encode([
+        'http_code'  => $httpCode,
+        'curl_errno' => $curlErrno,
+        'curl_error' => $curlError,
+        'url_used'   => $url,
+        'raw_body'   => $rawBody,   // first 4000 chars
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
+
 // --- 0. GET MODELS ROUTE ---
 // Serves the cached model list saved by list-models.php?save=1
 if (isset($data['action']) && $data['action'] === 'get_models') {

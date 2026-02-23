@@ -133,7 +133,11 @@ if (!empty($oldUri)) {
 
 file_put_contents($cacheNameFile, $newUri);
 
+// Write expiry timestamp so api-proxy.php can skip stale URIs without a 400 error
+$expireTimestamp = ($expiry !== '~48 hours') ? strtotime($expiry) : (time() + 47 * 3600);
+file_put_contents($cacheNameFile . '.expires', (string)$expireTimestamp);
+
 log_msg("OK – File re-uploaded successfully.");
 log_msg("     New URI    : $newUri");
-log_msg("     Expires    : $expiry");
+log_msg("     Expires    : $expiry (unix: $expireTimestamp)");
 log_msg("     Saved to   : $cacheNameFile");

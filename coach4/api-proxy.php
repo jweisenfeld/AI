@@ -92,7 +92,17 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     if (file_exists($cacheNameFile)) {
         $saved = trim(file_get_contents($cacheNameFile));
         if (!empty($saved) && strpos($saved, 'generativelanguage.googleapis.com') !== false) {
-            $fileUri = $saved;
+            // Check expiry: Files API URIs last 48 hours; skip if stale
+            $expiryFile = $cacheNameFile . '.expires';
+            $expired = true;
+            if (file_exists($expiryFile)) {
+                $expireTime = (int)trim(file_get_contents($expiryFile));
+                $expired = (time() > $expireTime);
+            }
+            if (!$expired) {
+                $fileUri = $saved;
+            }
+            // If no expiry file exists, assume stale — don't risk a 400 error
         }
     }
 
@@ -235,6 +245,44 @@ if (isset($_GET['stream']) && $_GET['stream'] === '1') {
 // ── Non-streaming routes ──────────────────────────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
 
+// --- CRON STATUS ROUTE ---
+// Usage: POST {"action":"cron_status","secret":"amentum2025"}
+if (isset($data['action']) && $data['action'] === 'cron_status') {
+    if (($data['secret'] ?? '') !== 'amentum2025') { send_error('Forbidden'); }
+
+    $expiryFile  = $cacheNameFile . '.expires';
+    $pingLog     = __DIR__ . '/cache-ping.log';
+
+    // File URI status
+    $uriStatus = ['uri' => null, 'expired' => true, 'expires_at' => null, 'expires_human' => 'No expiry file'];
+    if (file_exists($cacheNameFile)) {
+        $uriStatus['uri'] = trim(file_get_contents($cacheNameFile));
+    }
+    if (file_exists($expiryFile)) {
+        $expireTime = (int)trim(file_get_contents($expiryFile));
+        $uriStatus['expires_at']    = $expireTime;
+        $uriStatus['expires_human'] = date('Y-m-d H:i:s T', $expireTime);
+        $uriStatus['expired']       = (time() > $expireTime);
+        $uriStatus['hours_left']    = round(($expireTime - time()) / 3600, 1);
+    }
+
+    // Last N lines of cache-ping.log
+    $logLines = [];
+    if (file_exists($pingLog)) {
+        $lines = file($pingLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        $logLines = array_slice($lines, -30); // last 30 lines
+    }
+
+    echo json_encode([
+        'now'         => date('Y-m-d H:i:s T'),
+        'file_cache'  => $uriStatus,
+        'ping_log'    => $logLines,
+        'log_exists'  => file_exists($pingLog),
+        'log_size'    => file_exists($pingLog) ? filesize($pingLog) : 0,
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
+
 // --- DEBUG ROUTE (remove after diagnosis) ---
 // Usage: POST {"action":"debug_chat","secret":"amentum2025","model":"gemini-2.5-flash","message":"Hello"}
 if (isset($data['action']) && $data['action'] === 'debug_chat') {
@@ -350,7 +398,17 @@ if (file_exists($mimeHintFile)) {
 if (file_exists($cacheNameFile)) {
     $saved = trim(file_get_contents($cacheNameFile));
     if (!empty($saved) && strpos($saved, 'generativelanguage.googleapis.com') !== false) {
-        $fileUri = $saved;
+        // Check expiry: Files API URIs last 48 hours; skip if stale
+        $expiryFile = $cacheNameFile . '.expires';
+        $expired = true;
+        if (file_exists($expiryFile)) {
+            $expireTime = (int)trim(file_get_contents($expiryFile));
+            $expired = (time() > $expireTime);
+        }
+        if (!$expired) {
+            $fileUri = $saved;
+        }
+        // If no expiry file exists, assume stale — don't risk a 400 error
     }
 }
 

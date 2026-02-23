@@ -134,11 +134,16 @@ $fileName  = $result['file']['name'] ?? '(unknown)';
 
 file_put_contents($cacheNameFile, $fileUri);
 
+// Write expiry timestamp so api-proxy.php can skip stale URIs without a 400 error
+$expirationIso = $result['file']['expirationTime'] ?? null;
+$expireTimestamp = $expirationIso ? strtotime($expirationIso) : (time() + 47 * 3600); // default: 47h
+file_put_contents($cacheNameFile . '.expires', (string)$expireTimestamp);
+
 echo "SUCCESS!\n";
 echo "File URI   : $fileUri\n";
 echo "File name  : $fileName\n";
 echo "State      : $fileState\n";
-echo "Expires    : " . ($result['file']['expirationTime'] ?? '48 hours from now') . "\n";
+echo "Expires    : " . ($expirationIso ?? '48 hours from now') . " (unix: $expireTimestamp)\n";
 echo "Size       : " . ($result['file']['sizeBytes'] ?? number_format($fileSize)) . " bytes\n";
 echo "Saved to   : $cacheNameFile\n\n";
 

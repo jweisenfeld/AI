@@ -66,9 +66,13 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     require_once($secretsFile); // defines $GEMINI_API_KEY
 
     $modelMap = [
-        "gemini-3-pro-preview"  => "gemini-3-pro-preview",
         "gemini-2.5-flash"      => "gemini-2.5-flash",
-        "gemini-2.5-flash-lite" => "gemini-2.5-flash-lite"
+        "gemini-2.5-flash-lite" => "gemini-2.5-flash-lite",
+        "gemini-2.5-pro"        => "gemini-2.5-pro",
+        "gemini-3-flash-preview"=> "gemini-3-flash-preview",
+        "gemini-3-pro-preview"  => "gemini-3-pro-preview",
+        "gemini-2.0-flash"      => "gemini-2.0-flash",
+        "gemini-2.0-flash-lite" => "gemini-2.0-flash-lite",
     ];
     $requested   = $data['model'] ?? 'gemini-2.5-flash';
     $actualModel = $modelMap[$requested] ?? "gemini-2.5-flash";
@@ -231,6 +235,21 @@ if (isset($_GET['stream']) && $_GET['stream'] === '1') {
 // ── Non-streaming routes ──────────────────────────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
 
+// --- 0. GET MODELS ROUTE ---
+// Serves the cached model list saved by list-models.php?save=1
+if (isset($data['action']) && $data['action'] === 'get_models') {
+    $cacheFile = __DIR__ . '/models_cache.json';
+    if (!file_exists($cacheFile)) {
+        send_error("Model cache not found. Visit list-models.php?secret=amentum2025&save=1 to generate it.");
+    }
+    $models = json_decode(file_get_contents($cacheFile), true);
+    if (!$models) {
+        send_error("Model cache is invalid or empty.");
+    }
+    echo json_encode(['success' => true, 'models' => $models, 'cached_at' => filemtime($cacheFile)]);
+    exit;
+}
+
 // --- 1. LOGIN ROUTE ---
 if (isset($data['action']) && $data['action'] === 'verify_login') {
     if (!file_exists($studentFile)) send_error("Roster file missing.");
@@ -275,9 +294,13 @@ if (!file_exists($secretsFile)) send_error("API Key file missing.");
 require_once($secretsFile);
 
 $modelMap = [
-    "gemini-3-pro-preview"  => "gemini-3-pro-preview",
     "gemini-2.5-flash"      => "gemini-2.5-flash",
-    "gemini-2.5-flash-lite" => "gemini-2.5-flash-lite"
+    "gemini-2.5-flash-lite" => "gemini-2.5-flash-lite",
+    "gemini-2.5-pro"        => "gemini-2.5-pro",
+    "gemini-3-flash-preview"=> "gemini-3-flash-preview",
+    "gemini-3-pro-preview"  => "gemini-3-pro-preview",
+    "gemini-2.0-flash"      => "gemini-2.0-flash",
+    "gemini-2.0-flash-lite" => "gemini-2.0-flash-lite",
 ];
 
 $requested   = $data['model'] ?? 'gemini-2.5-flash';

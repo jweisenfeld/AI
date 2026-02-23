@@ -81,3 +81,28 @@ foreach ($allModels as $m) {
 }
 
 echo "\nTotal models found: " . count($allModels) . "\n";
+
+// ── Optional: save a clean JSON cache for api-proxy.php get_models route ──
+if (($_GET['save'] ?? '') === '1') {
+    // Build a minimal array: only models that support generateContent
+    $saveable = [];
+    foreach ($allModels as $m) {
+        $methods = $m['supportedGenerationMethods'] ?? [];
+        if (!in_array('generateContent', $methods)) continue;
+        $saveable[] = [
+            'id'              => str_replace('models/', '', $m['name']),  // strip "models/" prefix
+            'name'            => $m['name'],
+            'displayName'     => $m['displayName']     ?? $m['name'],
+            'inputTokenLimit' => $m['inputTokenLimit']  ?? null,
+            'methods'         => $methods,
+            'cacheable'       => in_array('createCachedContent', $methods),
+        ];
+    }
+    $cacheFile = __DIR__ . '/models_cache.json';
+    $written   = file_put_contents($cacheFile, json_encode($saveable, JSON_PRETTY_PRINT));
+    if ($written !== false) {
+        echo "\n✅ Saved " . count($saveable) . " models to models_cache.json (" . $written . " bytes)\n";
+    } else {
+        echo "\n❌ Failed to write models_cache.json — check directory permissions\n";
+    }
+}

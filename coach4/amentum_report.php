@@ -15,12 +15,17 @@ if (file_exists($logFile)) {
     $lines = file($logFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
 }
 
-// Compute stats from log data
-$stats = ['total_in' => 0, 'total_out' => 0, 'students' => []];
+// Log format (9 pipe-separated fields):
+// timestamp | studentName | model | In:XXXX | Out:XXXX | Cached:XXXX | FILE_FLAG | CACHE_FLAG | ID:studentID
+//    [0]          [1]        [2]      [3]        [4]         [5]           [6]          [7]           [8]
+
+// Compute stats from log data (skip TTFB lines which have < 5 parts)
+$stats = ['total_in' => 0, 'total_out' => 0, 'students' => [], 'chat_lines' => 0];
 foreach ($lines as $line) {
     $parts = explode('|', $line);
     if (count($parts) < 5) continue;
 
+    $stats['chat_lines']++;
     $studentName = trim($parts[1]);
     $stats['students'][$studentName] = true;
 
@@ -30,36 +35,43 @@ foreach ($lines as $line) {
     $stats['total_out'] += intval($outMatch[1] ?? 0);
 }
 
-// 1. UPDATED DATA PROCESSING
+// Build per-student summary
+$studentSummary = [];
+foreach ($lines as $line) {
+    $parts = explode('|', $line);
+    if (count($parts) < 9) continue;
+
+    $studentName = trim($parts[1]);
+    $studentID   = trim(substr(trim($parts[8]), 3)); // strip "ID:" prefix
+
+    if (!isset($studentSummary[$studentName])) {
+        $studentSummary[$studentName] = ['id' => $studentID, 'count' => 0, 'last' => ''];
+    }
+    $studentSummary[$studentName]['count']++;
+    $studentSummary[$studentName]['last'] = trim($parts[0]);
+}
+uasort($studentSummary, fn($a, $b) => $b['count'] <=> $a['count']);
+
+// Build recent activity list
 $recentActivity = [];
 foreach ($lines as $line) {
     $parts = explode('|', $line);
-    // Ensure we have all necessary parts including Student ID if added to proxy
-    if (count($parts) < 5) continue;
+    if (count($parts) < 9) continue;
 
-    $timestamp = trim($parts[0]);
-    $studentName = trim($parts[1]);
-    $modelUsed = trim($parts[2]);
-    $tokens = trim($parts[3]) . " / " . trim($parts[4]);
-    $intent = isset($parts[5]) ? htmlspecialchars(substr($parts[5], 8)) : '-';
-
-    // Extract student ID from log (format: "ID:12345")
-    $studentID = 'unknown';
-    if (isset($parts[5]) && strpos(trim($parts[5]), 'ID:') === 0) {
-        $studentID = substr(trim($parts[5]), 3);
-    } elseif (isset($parts[6]) && strpos(trim($parts[6]), 'ID:') === 0) {
-        $studentID = substr(trim($parts[6]), 3);
-    }
+    // ID is at position 8: "ID:studentID"
+    $studentID = trim(substr(trim($parts[8]), 3));
 
     $recentActivity[] = [
-        'time' => $timestamp,
-        'name' => $studentName,
-        'id'   => $studentID, 
-        'model'=> $modelUsed,
-        'tokens'=> $tokens,
-        'intent'=> $intent
+        'time'   => trim($parts[0]),
+        'name'   => trim($parts[1]),
+        'id'     => $studentID,
+        'model'  => trim($parts[2]),
+        'tokens' => trim($parts[3]) . " / " . trim($parts[4]),
+        'cache'  => trim($parts[7]),
     ];
 }
+// Show most recent 50 (reverse so newest is first)
+$recentActivity = array_reverse($recentActivity);
 
 // 2. Financials (Gemini 2.5/3 Estimated Pricing)
 $estCost = ($stats['total_in'] / 1000000 * 0.15) + ($stats['total_out'] / 1000000 * 0.60);
@@ -102,7 +114,7 @@ $remaining = $grantAmount - $estCost;
         </div>
         <div class="card">
             <div class="label">Total Interactions</div>
-            <div class="big-num"><?php echo count($lines); ?></div>
+            <div class="big-num"><?php echo $stats['chat_lines']; ?></div>
         </div>
         <div class="card">
             <div class="label">Active Students</div>
@@ -118,26 +130,52 @@ $remaining = $grantAmount - $estCost;
                     <th>Timestamp</th>
                     <th>Student</th>
                     <th>Model</th>
-                    <th>Tokens</th>
-                    <th>Last Intent</th>
+                    <th>Tokens (In / Out)</th>
+                    <th>Cache</th>
                 </tr>
             </thead>
             <tbody>
-                <?php 
-                // Display all interactions to correctly show different students
-                foreach (array_slice($recentActivity, 0, 50) as $entry): 
-                ?>
+                <?php foreach (array_slice($recentActivity, 0, 50) as $entry): ?>
                 <tr>
-                    <td><?php echo $entry['time']; ?></td>
+                    <td><?php echo htmlspecialchars($entry['time']); ?></td>
                     <td>
-                        <a href="student_logs/<?php echo urlencode($entry['id']); ?>.txt" 
+                        <a href="student_logs/<?php echo urlencode($entry['id']); ?>.txt"
                         class="student-link" target="_blank">
                             <?php echo htmlspecialchars($entry['name']); ?>
                         </a>
                     </td>
                     <td><small><?php echo htmlspecialchars($entry['model']); ?></small></td>
                     <td><?php echo htmlspecialchars($entry['tokens']); ?></td>
-                    <td class="prompt-text"><?php echo $entry['intent']; ?></td>
+                    <td class="prompt-text"><?php echo htmlspecialchars($entry['cache']); ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card" style="margin-top:30px">
+        <h2>All Students (<?php echo count($studentSummary); ?> unique)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Student</th>
+                    <th>Student ID</th>
+                    <th>Interactions</th>
+                    <th>Last Active</th>
+                    <th>Log</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($studentSummary as $name => $info): ?>
+                <tr>
+                    <td><?php echo htmlspecialchars($name); ?></td>
+                    <td><?php echo htmlspecialchars($info['id']); ?></td>
+                    <td><?php echo $info['count']; ?></td>
+                    <td><?php echo htmlspecialchars($info['last']); ?></td>
+                    <td>
+                        <a href="student_logs/<?php echo urlencode($info['id']); ?>.txt"
+                        class="student-link" target="_blank">view</a>
+                    </td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>

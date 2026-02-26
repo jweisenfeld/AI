@@ -1,68 +1,556 @@
-<html>
-    <hr>
-    <a href="https://console.cloud.google.com/billing/013DA4-5AB42A-D2E137/reports?project=gen-lang-client-0528955695&organizationId=0">$. Billing</a>
-    <hr>
-    <a href="https://psd1.net/coach4/gemini_usage.log">0. Cache Usage</a>
-    <hr>
-    <a href="https://psd1.net/coach4/cache-ping.log">1. Cache Ping Log</a>
-    <hr>
-    <a href="https://psd1.net/coach4/cache-ping.php?secret=amentum2025">2. Cache Ping</a>        
-    <hr>
-    <hr>
-    <a href="https://psd1.net/coach4/download_logs.php">*. Download Logs</a>
-    <hr>
-    <hr>
-    <a href="https://psd1.net/coach4/amentum_report.php">*. Amentum Report</a>
-    <hr>
-    <hr>
-    <a href="https://psd1.net/coach4/list-models.php?secret=amentum2025">*. List Models</a>
-    <hr>
-    <hr>
-    <a href="https://psd1.net/coach4/test-stream.php?secret=amentum2025">*. Test Stream</a>
-    <hr>
-    <hr>
-    <a href="https://psd1.net/coach4/Pasco-Municipal-Code.html">*. Pasco Municipal Code</a>
-    <hr>
-    <hr>
-    <a href="https://psd1.net/coach4/Pasco-Municipal-Code-clean.html">*. Pasco Municipal Code (clean)</a>
-    <hr>
-    <hr>
-    In the same folder...when do I need to use cache-create.php.
-    I'm curious what it does differently from cache-ping.php?
-    <hr>
-    <hr>
-    Examined cache management scripts for Gemini Files API integration
-    Examined cache management scripts for Gemini Files API integration
-    
-    They both do the same core job — upload the Pasco Municipal Code to the Gemini Files API and save the resulting URI —
-    but they serve completely different roles:
-    <hr>
-    <hr>    
-    cache-create.php — One-time manual setup tool
-    Run it once, by hand, in a browser: cache-create.php?secret=amentum2025
-    Verbose human-readable output (progress messages, "SUCCESS!", next steps)
-    Supports ?key=2 to switch to an alternate API key if needed
-    300-second timeout for slow connections
-    When to use it:
-    The very first time you set up the tool
-    If the cron job has been broken for >48 hours and the URI has expired
-    If you need to switch API keys
-    After running strip-html.php to update the cleaned document
-    <hr>
-    <hr>
-    cache-ping.php — Automated daily cron job
-    Designed to be called by cron at 3am every day (not by a human in a browser)
-    Logs quietly to cache-ping.log instead of printing to screen
-    One extra thing cache-create.php doesn't do: it deletes the old file from Gemini before saving the new URI, to avoid
-    accumulating stale files against your quota
-    120-second timeout (cron environment)
-    Why this exists at all
-    The Gemini Files API stores uploaded files for only 48 hours. Since the Pasco Municipal Code is ~4.4MB (~875k tokens),
-    you don't want every student to re-send it with each request — instead, api-proxy.php just passes the stored URI to
-    Gemini, and Gemini reads it server-side. The cron keeps that URI fresh on a 24-hour cycle (well within the 48-hour
-    window).
-    <hr>
-    <hr>
-    Bottom line: You should only ever need to run cache-create.php manually when first deploying or recovering from an
-    outage. After that, cache-ping.php handles everything automatically and you never have to touch either one.
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coach4 Admin</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --card-border: #334155;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #f59e0b;
+      --blue: #3b82f6;
+      --green: #10b981;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --purple: #8b5cf6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 32px 24px;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 4px; }
+    .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 32px; }
+
+    /* Section headers */
+    h2 {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--muted);
+      margin: 32px 0 10px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 4px;
+    }
+
+    /* ── Cache Health Panel ───────────────────────── */
+    .health-panel {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 8px;
+    }
+    .health-panel .panel-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+    .health-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .health-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-top: 5px;
+      flex-shrink: 0;
+    }
+    .status-dot.green  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .status-dot.yellow { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+    .status-dot.red    { background: var(--red); box-shadow: 0 0 6px var(--red); }
+    .status-dot.grey   { background: #475569; }
+    .health-label  { font-size: 0.88rem; font-weight: 600; flex: 0 0 180px; }
+    .health-value  { font-size: 0.88rem; color: var(--muted); flex: 1; }
+    .health-value strong { color: var(--text); }
+    .health-value .good    { color: var(--green); font-weight: 600; }
+    .health-value .warn    { color: var(--yellow); font-weight: 600; }
+    .health-value .bad     { color: var(--red); font-weight: 600; }
+
+    /* Recommendation box */
+    .recommendation {
+      margin-top: 16px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      border-left: 4px solid;
+    }
+    .recommendation.green  { background: rgba(16,185,129,0.08); border-color: var(--green); }
+    .recommendation.yellow { background: rgba(245,158,11,0.08); border-color: var(--yellow); }
+    .recommendation.red    { background: rgba(239,68,68,0.08);  border-color: var(--red); }
+    .recommendation .rec-title { font-weight: 700; margin-bottom: 4px; }
+    .recommendation.green  .rec-title { color: var(--green); }
+    .recommendation.yellow .rec-title { color: var(--yellow); }
+    .recommendation.red    .rec-title { color: var(--red); }
+    #loading-msg { color: var(--muted); font-size: 0.85rem; font-style: italic; }
+
+    /* ── File links ──────────────────────────────── */
+    ul { list-style: none; padding: 0; margin: 0; }
+    li { margin: 5px 0; }
+    a {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      color: var(--blue);
+      font-size: 0.92rem;
+    }
+    a:hover { text-decoration: underline; }
+    .tag {
+      font-size: 0.68rem;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      flex-shrink: 0;
+    }
+    .tag-php  { background: #1e3a5f; color: #60a5fa; }
+    .tag-html { background: #1a3a2a; color: #34d399; }
+    .tag-log  { background: #2d1f4e; color: #a78bfa; }
+    .tag-ext  { background: #3b1f1f; color: #f87171; }
+    .tag-js   { background: #3b2e00; color: #fbbf24; }
+
+    .file-note {
+      margin: 4px 0 10px 28px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.03);
+      border-left: 3px solid var(--card-border);
+      border-radius: 0 4px 4px 0;
+      font-size: 0.81rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .file-note code {
+      background: rgba(255,255,255,0.07);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 0.9em;
+      color: var(--text);
+    }
+    .file-note .cost-warn {
+      color: var(--yellow);
+      font-weight: 600;
+    }
+
+    /* ── Action buttons ──────────────────────────── */
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 4px 0 12px 28px;
+    }
+    .action-btn {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .action-btn.blue   { background: rgba(59,130,246,0.15); color: var(--blue); border: 1px solid rgba(59,130,246,0.3); }
+    .action-btn.yellow { background: rgba(245,158,11,0.15); color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); }
+    .action-btn.red    { background: rgba(239,68,68,0.1);   color: var(--red);    border: 1px solid rgba(239,68,68,0.3); }
+    .action-btn.green  { background: rgba(16,185,129,0.1);  color: var(--green);  border: 1px solid rgba(16,185,129,0.3); }
+    .action-btn:hover  { filter: brightness(1.2); text-decoration: none; }
+
+    @media (max-width: 600px) {
+      body { padding: 16px 12px; }
+      .health-label { flex: 0 0 130px; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Coach4 Admin</h1>
+  <p class="subtitle">Gemini / Pasco Municipal Code chatbot — cache health, billing, and script reference.</p>
+
+  <!-- ── CACHE HEALTH PANEL ─────────────────────────────── -->
+  <h2>Cache Health Status</h2>
+  <div class="health-panel">
+    <div class="panel-title">Live check — reading gemini_usage.log &amp; cache-ping.log</div>
+    <span id="loading-msg">Loading...</span>
+    <div id="health-rows" style="display:none">
+      <div class="health-row">
+        <div class="status-dot grey" id="dot-ping"></div>
+        <div class="health-label">Last cache-ping</div>
+        <div class="health-value" id="val-ping">—</div>
+      </div>
+      <div class="health-row">
+        <div class="status-dot grey" id="dot-file"></div>
+        <div class="health-label">FILE_URI in recent logs</div>
+        <div class="health-value" id="val-file">—</div>
+      </div>
+      <div class="health-row">
+        <div class="status-dot grey" id="dot-cache"></div>
+        <div class="health-label">Context cache hits</div>
+        <div class="health-value" id="val-cache">—</div>
+      </div>
+      <div id="recommendation" class="recommendation green" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- ── BILLING ─────────────────────────────────────────── -->
+  <h2>Billing</h2>
+  <ul>
+    <li>
+      <a href="https://console.cloud.google.com/billing/013DA4-5AB42A-D2E137/reports?project=gen-lang-client-0528955695&organizationId=0" target="_blank">
+        <span class="tag tag-ext">↗</span>
+        Google Cloud Billing — Gemini API costs &amp; grant spending
+      </a>
+    </li>
+  </ul>
+
+  <!-- ── DASHBOARDS ──────────────────────────────────────── -->
+  <h2>Dashboards &amp; Reports</h2>
+  <ul>
+    <li>
+      <a href="amentum_report.php">
+        <span class="tag tag-php">PHP</span>
+        amentum_report.php — <strong>Live grant dashboard</strong> (usage, costs, student activity)
+      </a>
+    </li>
+  </ul>
+
+  <!-- ── CACHE MANAGEMENT ───────────────────────────────── -->
+  <h2>Cache Management</h2>
+  <ul>
+
+    <li>
+      <a href="cache-ping.log" target="_blank">
+        <span class="tag tag-log">LOG</span>
+        cache-ping.log — CRON run history (read this first when troubleshooting)
+      </a>
+    </li>
+    <li>
+      <a href="gemini_usage.log" target="_blank">
+        <span class="tag tag-log">LOG</span>
+        gemini_usage.log — Per-request log (check FILE_URI vs NO_FILE column)
+      </a>
+    </li>
+
+    <li style="margin-top:12px">
+      <a href="cache-ping.php?secret=amentum2025" target="_blank">
+        <span class="tag tag-php">PHP</span>
+        cache-ping.php — Manual trigger of the daily cron job
+      </a>
+      <p class="file-note">
+        The cron runs this at <strong>3am daily</strong> to keep the Pasco Municipal Code alive in the Gemini
+        Files API (files expire after 48 hours). Run it manually only if the health panel above shows the
+        ping is overdue or students are getting <code>NO_FILE</code> errors.
+        <span class="cost-warn">Costs a small amount</span> — it re-uploads the full ~3.5MB document.
+        Prints a live log to the browser so you can confirm success.
+      </p>
+      <div class="action-row">
+        <a class="action-btn yellow" href="cache-ping.php?secret=amentum2025" target="_blank">Run cache-ping now</a>
+      </div>
+    </li>
+
+    <li>
+      <a href="cache-create.php?secret=amentum2025" target="_blank">
+        <span class="tag tag-php">PHP</span>
+        cache-create.php — Full rebuild (manual setup / disaster recovery)
+      </a>
+      <p class="file-note">
+        Use this only when:
+        <br>• Setting up the tool for the first time
+        <br>• The cron has been broken for <strong>more than 48 hours</strong> and the URI has expired
+        <br>• You need to switch to an alternate API key (<code>?key=2</code>)
+        <br>• You just ran <code>strip-html.php</code> to update the cleaned document
+        <br><br>
+        <span class="cost-warn">Same cost as cache-ping.</span>
+        Unlike cache-ping, it also deletes the old file from Gemini before saving the new URI,
+        avoiding stale-file quota accumulation. Verbose output — you'll see "SUCCESS!" when done.
+      </p>
+      <div class="action-row">
+        <a class="action-btn red" href="cache-create.php?secret=amentum2025" target="_blank">Run cache-create (recovery)</a>
+        <a class="action-btn blue" href="cache-create.php?secret=amentum2025&key=2" target="_blank">Run with alternate key</a>
+      </div>
+    </li>
+
+  </ul>
+
+  <!-- ── DIAGNOSTICS ─────────────────────────────────────── -->
+  <h2>Diagnostics</h2>
+  <ul>
+
+    <li>
+      <a href="list-models.php?secret=amentum2025" target="_blank">
+        <span class="tag tag-php">PHP</span>
+        list-models.php — List available Gemini models on this API key
+      </a>
+      <p class="file-note">
+        Queries the Gemini API and prints all available models, highlighting which ones support
+        <code>createCachedContent</code>. Use this if you're unsure which model IDs to put in the
+        proxy, or to verify a new key has the expected model access.
+        Append <code>&amp;save=1</code> to also write a <code>models_cache.json</code> to disk.
+      </p>
+    </li>
+
+    <li>
+      <a href="test-stream.php?secret=amentum2025" target="_blank">
+        <span class="tag tag-php">PHP</span>
+        test-stream.php — End-to-end streaming test
+      </a>
+      <p class="file-note">
+        Sends a short test prompt through the full proxy stack with SSE streaming enabled and prints
+        the response. Use this to confirm the API key is valid, the model responds, and streaming is
+        working before students start a session.
+      </p>
+    </li>
+
+    <li>
+      <a href="download_logs.php">
+        <span class="tag tag-php">PHP</span>
+        download_logs.php — Download all student logs as a ZIP
+      </a>
+      <p class="file-note">
+        Bundles all <code>student_logs/*.txt</code> files into a timestamped ZIP and sends it as a
+        download. Useful for grant reporting, backing up conversations, or offline analysis.
+      </p>
+    </li>
+
+  </ul>
+
+  <!-- ── SUPPORTING FILES ───────────────────────────────── -->
+  <h2>Supporting Files</h2>
+  <ul>
+
+    <li>
+      <a href="api-proxy.php">
+        <span class="tag tag-php">PHP</span>
+        api-proxy.php — Gemini API proxy (called automatically by the chatbot; never open directly)
+      </a>
+    </li>
+
+    <li style="margin-top:8px">
+      <a href="strip-html.php?secret=amentum2025" target="_blank">
+        <span class="tag tag-php">PHP</span>
+        strip-html.php — Converts raw municipal code HTML to token-efficient plain text
+      </a>
+      <p class="file-note">
+        The raw <code>Pasco-Municipal-Code.html</code> is ~9MB / ~3.3M tokens — too large for Gemini's 1M
+        context window. This script strips all HTML tags and outputs a lean
+        <code>Pasco-Municipal-Code-clean.html</code> (~3.5MB / ~875k tokens) that fits.
+        Run it only if you update the source HTML file. After running it, also run
+        <code>cache-create.php</code> to upload the new version to the Files API.
+      </p>
+      <div class="action-row">
+        <a class="action-btn blue" href="strip-html.php?secret=amentum2025" target="_blank">Run strip-html.php</a>
+      </div>
+    </li>
+
+    <li>
+      <a href="Pasco-Municipal-Code.html" target="_blank">
+        <span class="tag tag-html">HTML</span>
+        Pasco-Municipal-Code.html — Full source (9MB, raw)
+      </a>
+    </li>
+    <li>
+      <a href="Pasco-Municipal-Code-clean.html" target="_blank">
+        <span class="tag tag-html">HTML</span>
+        Pasco-Municipal-Code-clean.html — Stripped version uploaded to Gemini Files API
+      </a>
+    </li>
+
+    <li style="margin-top:8px">
+      <a href="test-stream.mjs">
+        <span class="tag tag-js">MJS</span>
+        test-stream.mjs — Node.js streaming test (CLI use only)
+      </a>
+    </li>
+
+  </ul>
+
+  <!-- ── STUDENT INTERFACE ──────────────────────────────── -->
+  <h2>Student Interface</h2>
+  <ul>
+    <li>
+      <a href="index.html">
+        <span class="tag tag-html">HTML</span>
+        index.html — Student-facing chatbot UI
+      </a>
+    </li>
+  </ul>
+
+  <!-- ── LIVE HEALTH CHECK SCRIPT ─────────────────────────── -->
+  <script>
+    const LOOK_BACK_LINES = 30; // examine last N usage log entries
+
+    async function fetchTail(url, maxBytes = 32768) {
+      try {
+        // Fetch with a range header to avoid loading huge log files
+        const r = await fetch(url, { headers: { Range: `bytes=-${maxBytes}` }, cache: 'no-store' });
+        if (!r.ok && r.status !== 206) return null;
+        return await r.text();
+      } catch { return null; }
+    }
+
+    function setDot(id, color) {
+      const el = document.getElementById(id);
+      el.className = 'status-dot ' + color;
+    }
+
+    function setVal(id, html) {
+      document.getElementById(id).innerHTML = html;
+    }
+
+    function showRec(level, title, body) {
+      const el = document.getElementById('recommendation');
+      el.className = 'recommendation ' + level;
+      el.innerHTML = `<div class="rec-title">${title}</div>${body}`;
+      el.style.display = 'block';
+    }
+
+    async function runHealthCheck() {
+      // ── 1. Parse cache-ping.log ──────────────────────────
+      const pingText = await fetchTail('cache-ping.log');
+      let pingHoursAgo = null;
+      let pingStatus = 'grey';
+      let pingDisplay = '<span style="color:#475569">Could not read log</span>';
+
+      if (pingText) {
+        // Find last line containing "OK –"
+        const pingLines = pingText.split('\n').filter(l => l.includes('OK'));
+        if (pingLines.length > 0) {
+          const lastOk = pingLines[pingLines.length - 1];
+          // Timestamp is at start: [YYYY-MM-DD HH:MM:SS]
+          const m = lastOk.match(/\[?(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]?/);
+          if (m) {
+            const then = new Date(m[1].replace(' ', 'T') + 'Z'); // treat as UTC
+            // Server logs in server local time — compute diff without assuming TZ
+            const diffMs = Date.now() - then.getTime();
+            pingHoursAgo = diffMs / 3600000;
+            const h = pingHoursAgo.toFixed(1);
+            if (pingHoursAgo < 30) {
+              pingStatus = 'green';
+              pingDisplay = `<strong class="good">${h} hours ago</strong> — well within 48h window`;
+            } else if (pingHoursAgo < 44) {
+              pingStatus = 'yellow';
+              pingDisplay = `<strong class="warn">${h} hours ago</strong> — getting close to 48h expiry`;
+            } else {
+              pingStatus = 'red';
+              pingDisplay = `<strong class="bad">${h} hours ago</strong> — likely expired, action needed`;
+            }
+          }
+        } else {
+          pingDisplay = '<span style="color:#ef4444">No successful ping found in log</span>';
+          pingStatus = 'red';
+        }
+      }
+
+      setDot('dot-ping', pingStatus);
+      setVal('val-ping', pingDisplay);
+
+      // ── 2. Parse gemini_usage.log ────────────────────────
+      const usageText = await fetchTail('gemini_usage.log', 65536);
+      let fileHits = 0, fileMisses = 0, cacheHits = 0, cacheMisses = 0;
+      let fileStatus = 'grey', cacheStatus = 'grey';
+      let fileDisplay = '<span style="color:#475569">Could not read log</span>';
+      let cacheDisplay = '<span style="color:#475569">Could not read log</span>';
+
+      if (usageText) {
+        const usageLines = usageText.split('\n')
+          .filter(l => l.includes('|') && l.split('|').length >= 8)
+          .slice(-LOOK_BACK_LINES);
+
+        for (const line of usageLines) {
+          const parts = line.split('|').map(p => p.trim());
+          const fileFlag  = parts[6] || '';
+          const cacheFlag = parts[7] || '';
+          if (fileFlag === 'FILE_URI') fileHits++;
+          else if (fileFlag === 'NO_FILE') fileMisses++;
+          if (cacheFlag.startsWith('CACHE_HIT')) cacheHits++;
+          else if (cacheFlag === 'CACHE_MISS') cacheMisses++;
+        }
+
+        const total = fileHits + fileMisses;
+        if (total > 0) {
+          const pct = Math.round(fileHits / total * 100);
+          if (pct === 100) {
+            fileStatus = 'green';
+            fileDisplay = `<strong class="good">100% FILE_URI</strong> in last ${total} requests — municipal code is being delivered`;
+          } else if (pct >= 70) {
+            fileStatus = 'yellow';
+            fileDisplay = `<strong class="warn">${pct}% FILE_URI</strong> (${fileHits}/${total}) — some requests missed the file`;
+          } else {
+            fileStatus = 'red';
+            fileDisplay = `<strong class="bad">${pct}% FILE_URI</strong> (${fileHits}/${total}) — most requests are missing the municipal code`;
+          }
+        } else if (usageText.length > 100) {
+          fileDisplay = '<span style="color:#94a3b8">No recent chat requests in log</span>';
+          fileStatus = 'grey';
+        }
+
+        // Context cache hits — expected to be MISS (Files API doesn't use context caching)
+        const cacheTotal = cacheHits + cacheMisses;
+        if (cacheTotal > 0) {
+          if (cacheHits > 0) {
+            cacheStatus = 'green';
+            cacheDisplay = `<strong class="good">${cacheHits} hits</strong> out of ${cacheTotal} requests — context caching is active`;
+          } else {
+            cacheStatus = 'yellow';
+            cacheDisplay = `<strong style="color:var(--muted)">0 hits</strong> out of ${cacheTotal} — <em>expected if using Files API only</em>`;
+          }
+        }
+      }
+
+      setDot('dot-file', fileStatus);
+      setVal('val-file', fileDisplay);
+      setDot('dot-cache', cacheStatus);
+      setVal('val-cache', cacheDisplay);
+
+      // ── 3. Recommendation ────────────────────────────────
+      const worst = [pingStatus, fileStatus].includes('red') ? 'red'
+                  : [pingStatus, fileStatus].includes('yellow') ? 'yellow'
+                  : 'green';
+
+      if (worst === 'green') {
+        showRec('green', 'All good',
+          'Cache is healthy. The daily cron is running on schedule and students are receiving the Pasco Municipal Code. No action needed.');
+      } else if (worst === 'yellow') {
+        showRec('yellow', 'Watch closely',
+          `The cache ping is ${pingHoursAgo ? pingHoursAgo.toFixed(0) + ' hours old' : 'overdue'} — still within the 48-hour window but cutting it close.
+          If the cron doesn't run in the next few hours, consider triggering <strong>cache-ping.php</strong> manually (see below).`);
+      } else {
+        const overDue = pingHoursAgo !== null && pingHoursAgo > 48;
+        if (overDue || fileMisses > fileHits) {
+          showRec('red', 'Action needed — cache likely expired',
+            `The last successful ping was ${pingHoursAgo ? pingHoursAgo.toFixed(0) + ' hours ago' : 'not found'}, which exceeds the 48-hour expiry window.
+            Students may be getting responses without the municipal code.<br><br>
+            <strong>Run <code>cache-create.php</code></strong> (not just cache-ping) to do a full rebuild — it handles the expired URI and cleans up the old file.`);
+        } else {
+          showRec('red', 'Action needed — cron may be failing',
+            `The cache ping is overdue. Run <strong>cache-ping.php</strong> manually now to refresh the file URI.
+            If that fails, run <strong>cache-create.php</strong> for a full rebuild.`);
+        }
+      }
+
+      document.getElementById('loading-msg').style.display = 'none';
+      document.getElementById('health-rows').style.display = 'block';
+    }
+
+    runHealthCheck();
+  </script>
+</body>
 </html>

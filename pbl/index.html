@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PBL Design Elements — Depth & Complexity Choice Board</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+–navy:   #2E4057;
+–teal:   #1A7A6E;
+–gold:   #C9860A;
+–purple: #5C3D8F;
+–coral:  #C0392B;
+–gray:   #F7F8FA;
+–border: #DDE1E7;
+}
+
+body {
+font-family: ‘Inter’, system-ui, sans-serif;
+background: #EAECF0;
+min-height: 100vh;
+padding: 28px 20px;
+}
+
+/* ── HEADER ── */
+.header {
+max-width: 1280px;
+margin: 0 auto 24px;
+display: flex;
+align-items: flex-end;
+justify-content: space-between;
+gap: 20px;
+}
+.header-left h1 {
+font-size: 13px;
+font-weight: 700;
+letter-spacing: .12em;
+text-transform: uppercase;
+color: var(–purple);
+margin-bottom: 4px;
+}
+.header-left h2 {
+font-size: 30px;
+font-weight: 900;
+color: var(–navy);
+line-height: 1.1;
+}
+.header-left h2 span { color: var(–purple); }
+.header-right {
+background: var(–navy);
+color: white;
+border-radius: 10px;
+padding: 12px 20px;
+font-size: 13px;
+line-height: 1.6;
+max-width: 340px;
+text-align: right;
+}
+.header-right strong { color: #A5C8FF; }
+
+/* ── INSTRUCTION BAR ── */
+.instruction-bar {
+max-width: 1280px;
+margin: 0 auto 20px;
+background: white;
+border: 2px solid var(–purple);
+border-radius: 10px;
+padding: 12px 20px;
+display: flex;
+align-items: center;
+gap: 14px;
+font-size: 14px;
+color: #333;
+}
+.instruction-bar .badge {
+background: var(–purple);
+color: white;
+border-radius: 6px;
+padding: 4px 10px;
+font-size: 12px;
+font-weight: 700;
+white-space: nowrap;
+letter-spacing: .05em;
+}
+
+/* ── GRID ── */
+.grid {
+max-width: 1280px;
+margin: 0 auto;
+display: grid;
+grid-template-columns: repeat(3, 1fr);
+gap: 16px;
+}
+
+/* ── CARD ── */
+.card {
+background: white;
+border-radius: 14px;
+border: 2px solid var(–border);
+padding: 0;
+display: flex;
+flex-direction: column;
+box-shadow: 0 2px 8px rgba(0,0,0,.06);
+transition: transform .15s, box-shadow .15s;
+cursor: pointer;
+position: relative;
+overflow: hidden;
+}
+.card:hover {
+transform: translateY(-3px);
+box-shadow: 0 8px 24px rgba(0,0,0,.12);
+}
+.card.selected {
+border-color: var(–navy);
+box-shadow: 0 0 0 3px rgba(46,64,87,.25), 0 8px 24px rgba(0,0,0,.12);
+}
+.card.selected::after {
+content: “✓ SELECTED”;
+position: absolute;
+top: 10px;
+right: 10px;
+background: var(–navy);
+color: white;
+font-size: 10px;
+font-weight: 700;
+letter-spacing: .08em;
+padding: 3px 8px;
+border-radius: 20px;
+}
+
+.card-accent {
+height: 5px;
+border-radius: 14px 14px 0 0;
+}
+
+.card-body {
+padding: 18px 18px 14px;
+display: flex;
+flex-direction: column;
+flex: 1;
+}
+
+.card-icon {
+font-size: 28px;
+margin-bottom: 8px;
+display: block;
+}
+
+.card-label {
+font-size: 10px;
+font-weight: 700;
+letter-spacing: .1em;
+text-transform: uppercase;
+margin-bottom: 4px;
+}
+
+.card-title {
+font-size: 17px;
+font-weight: 800;
+color: var(–navy);
+margin-bottom: 10px;
+line-height: 1.2;
+}
+
+.card-text {
+font-size: 13.5px;
+color: #444;
+line-height: 1.6;
+flex: 1;
+}
+
+.card-pbl-tag {
+margin-top: 12px;
+display: flex;
+flex-wrap: wrap;
+gap: 6px;
+}
+.tag {
+font-size: 11px;
+font-weight: 600;
+padding: 2px 8px;
+border-radius: 20px;
+background: #EEF0F5;
+color: #555;
+}
+
+/* ── CARD COLOR THEMES ── */
+.theme-purple { –accent: #5C3D8F; –light: #F3EEF9; –label-color: #5C3D8F; }
+.theme-teal   { –accent: #1A7A6E; –light: #EAF6F4; –label-color: #1A7A6E; }
+.theme-gold   { –accent: #C9860A; –light: #FEF5E7; –label-color: #C9860A; }
+.theme-coral  { –accent: #C0392B; –light: #FDEEEC; –label-color: #C0392B; }
+.theme-navy   { –accent: #2E4057; –light: #EAF0F7; –label-color: #2E4057; }
+.theme-green  { –accent: #2E7D32; –light: #EBF5EB; –label-color: #2E7D32; }
+
+.card .card-accent { background: var(–accent); }
+.card .card-label  { color: var(–label-color); }
+.card.selected { border-color: var(–accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(–accent) 25%, transparent), 0 8px 24px rgba(0,0,0,.12); }
+
+/* ── EQUITY CALLOUT ── */
+.equity-bar {
+max-width: 1280px;
+margin: 20px auto 0;
+background: #FFF7ED;
+border: 2px solid #C9860A;
+border-radius: 10px;
+padding: 14px 20px;
+display: flex;
+align-items: flex-start;
+gap: 14px;
+font-size: 13.5px;
+color: #333;
+line-height: 1.6;
+}
+.equity-bar .label {
+background: var(–gold);
+color: white;
+border-radius: 6px;
+padding: 4px 10px;
+font-size: 12px;
+font-weight: 700;
+white-space: nowrap;
+margin-top: 2px;
+}
+
+/* ── COUNTER ── */
+.counter-bar {
+max-width: 1280px;
+margin: 16px auto 0;
+display: flex;
+align-items: center;
+justify-content: space-between;
+background: white;
+border-radius: 10px;
+border: 2px solid var(–border);
+padding: 10px 20px;
+}
+.counter-text { font-size: 14px; color: #555; }
+.counter-text strong { color: var(–purple); font-size: 20px; }
+.reset-btn {
+background: #F0EEF5;
+color: var(–purple);
+border: none;
+border-radius: 8px;
+padding: 8px 16px;
+font-size: 13px;
+font-weight: 600;
+cursor: pointer;
+font-family: inherit;
+transition: background .15s;
+}
+.reset-btn:hover { background: #DDD8F0; }
+
+/* ── FOOTER ── */
+.footer {
+max-width: 1280px;
+margin: 20px auto 0;
+text-align: center;
+font-size: 12px;
+color: #888;
+}
+</style>
+
+</head>
+<body>
+
+<!-- HEADER -->
+
+<div class="header">
+  <div class="header-left">
+    <h1>Orion High School PBL Collective · Session 4 · Feb 25, 2026</h1>
+    <h2>PBL Design Elements<br><span>Depth &amp; Complexity</span> Choice Board</h2>
+  </div>
+  <div class="header-right">
+    <strong>How to use this board:</strong><br>
+    Work independently for 12–15 minutes.<br>
+    Choose any <strong>3 cells</strong> that call to you.<br>
+    Debrief: share the one sentence from your work that surprised you most.
+  </div>
+</div>
+
+<!-- INSTRUCTION BAR -->
+
+<div class="instruction-bar">
+  <span class="badge">KAPLAN'S DEPTH &amp; COMPLEXITY</span>
+  Each cell applies a different intellectual lens to the 7 PBL Design Elements. No two colleagues will choose the same three — that's the point. Click a card to mark it selected.
+</div>
+
+<!-- COUNTER BAR -->
+
+<div class="counter-bar">
+  <span class="counter-text">You've selected <strong id="count">0</strong> of 3 tasks</span>
+  <button class="reset-btn" onclick="resetAll()">↺ Reset selections</button>
+</div>
+
+<!-- GRID -->
+
+<div class="grid">
+
+  <!-- 1. Language of the Discipline -->
+
+  <div class="card theme-purple" onclick="toggleCard(this)">
+    <div class="card-accent"></div>
+    <div class="card-body">
+      <span class="card-icon">🗣️</span>
+      <div class="card-label">Language of the Discipline</div>
+      <div class="card-title">Speak Like a PBL Designer</div>
+      <div class="card-text">
+        PBL has its own precise vocabulary. Choose 5 terms from the 7 Design Elements framework. Define each with the precision a PBLWorks trainer would use. Then test yourself: where does your current practice match the definition — and where does it quietly diverge?
+      </div>
+      <div class="card-pbl-tag">
+        <span class="tag">All 7 Elements</span>
+        <span class="tag">Vocabulary</span>
+        <span class="tag">Self-assessment</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Details -->
+
+  <div class="card theme-teal" onclick="toggleCard(this)">
+    <div class="card-accent"></div>
+    <div class="card-body">
+      <span class="card-icon">🔬</span>
+      <div class="card-label">Details</div>
+      <div class="card-title">Zoom In on the Evidence</div>
+      <div class="card-text">
+        Choose one Design Element from today's exemplar analysis. Identify every specific, concrete detail that provides evidence for it — tasks, timing, structures, protocols, products. What details are present? What specific details would need to be added to reach Gold Standard?
+      </div>
+      <div class="card-pbl-tag">
+        <span class="tag">Any Design Element</span>
+        <span class="tag">Evidence</span>
+        <span class="tag">Gold Standard</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Patterns -->
+
+  <div class="card theme-gold" onclick="toggleCard(this)">
+    <div class="card-accent"></div>
+    <div class="card-body">
+      <span class="card-icon">🔁</span>
+      <div class="card-label">Patterns</div>
+      <div class="card-title">What Keeps Showing Up?</div>
+      <div class="card-text">
+        Across the three exemplars analyzed today, what patterns emerge in how Design Elements appear — or go missing? Do certain elements cluster together, both strong or both weak? What does the pattern suggest about systemic assumptions in how PBL projects tend to get designed?
+      </div>
+      <div class="card-pbl-tag">
+        <span class="tag">Cross-exemplar</span>
+        <span class="tag">Analysis</span>
+        <span class="tag">System thinking</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Trends Over Time -->
+
+  <div class="card theme-green" onclick="toggleCard(this)">
+    <div class="card-accent"></div>
+    <div class="card-body">
+      <span class="card-icon">📈</span>
+      <div class="card-label">Trends Over Time</div>
+      <div class="card-title">What's Changing — and What Should?</div>
+      <div class="card-text">
+        The PBLWorks framework was updated in 2019. Which Design Elements feel most urgent in 2026 that may have felt secondary five years ago? How might AI tools change what "Sustained Inquiry" or "Student Voice &amp; Choice" means in five more years? What should the next update add?
+      </div>
+      <div class="card-pbl-tag">
+        <span class="tag">Sustained Inquiry</span>
+        <span class="tag">Voice &amp; Choice</span>
+        <span class="tag">AI in PBL</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Unanswered Questions — CENTER (emphasized) -->
+
+  <div class="card theme-navy" style="border-width: 3px;" onclick="toggleCard(this)">
+    <div class="card-accent" style="height:7px;"></div>
+    <div class="card-body">
+      <span class="card-icon">❓</span>
+      <div class="card-label" style="color: #2E4057;">Unanswered Questions</div>
+      <div class="card-title" style="font-size:19px;">What the Rubric Doesn't Settle</div>
+      <div class="card-text">
+        Generate 5 genuine questions you still have about implementing the 7 Design Elements at Orion — questions the rubric alone can't answer. Prioritize them: which is most urgent for your teaching right now? Share with your team. Which questions are held in common?
+      </div>
+      <div class="card-pbl-tag">
+        <span class="tag">All 7 Elements</span>
+        <span class="tag">Team reflection</span>
+        <span class="tag">Orion-specific</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. Rules -->
+
+  <div class="card theme-coral" onclick="toggleCard(this)">
+    <div class="card-accent"></div>
+    <div class="card-body">
+      <span class="card-icon">📏</span>
+      <div class="card-label">Rules</div>
+      <div class="card-title">What Governs Gold Standard?</div>
+      <div class="card-text">
+        What are the underlying rules that define what counts as Gold Standard PBL? Articulate them as principles — e.g., <em>"An element must be designed, not assumed."</em> Generate at least 5 rules. Which are hardest to follow consistently at Orion — and why?
+      </div>
+      <div class="card-pbl-tag">
+        <span class="tag">Gold Standard</span>
+        <span class="tag">Design principles</span>
+        <span class="tag">Implementation</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. Ethics -->
+
+  <div class="card theme-gold" onclick="toggleCard(this)">
+    <div class="card-accent"></div>
+    <div class="card-body">
+      <span class="card-icon">⚖️</span>
+      <div class="card-label">Ethics</div>
+      <div class="card-title">Who Benefits — and Who Bears the Risk?</div>
+      <div class="card-text">
+        Who benefits when PBL is implemented well — and who is most harmed when it's done poorly? Analyze the ethical dimensions of each Design Element for Orion's multilingual students. Which elements carry the greatest equity risk? What is your ethical obligation as a project designer?
+      </div>
+      <div class="card-pbl-tag">
+        <span class="tag">Equity</span>
+        <span class="tag">Multilingual Learners</span>
+        <span class="tag">All 7 Elements</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. Big Ideas -->
+
+  <div class="card theme-teal" onclick="toggleCard(this)">
+    <div class="card-accent"></div>
+    <div class="card-body">
+      <span class="card-icon">💡</span>
+      <div class="card-label">Big Ideas</div>
+      <div class="card-title">One Sentence That Holds It All</div>
+      <div class="card-text">
+        What is the single most important idea behind Gold Standard PBL? Express it in one sentence. Then test it: does today's strongest exemplar embody it? Does your current practice embody it? What would need to change at Orion for this big idea to be fully realized?
+      </div>
+      <div class="card-pbl-tag">
+        <span class="tag">Gold Standard</span>
+        <span class="tag">Philosophy</span>
+        <span class="tag">Transfer</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 9. Multiple Perspectives -->
+
+  <div class="card theme-purple" onclick="toggleCard(this)">
+    <div class="card-accent"></div>
+    <div class="card-body">
+      <span class="card-icon">👁️</span>
+      <div class="card-label">Multiple Perspectives</div>
+      <div class="card-title">Four Seats at the Table</div>
+      <div class="card-text">
+        Choose one Design Element. Analyze it from four viewpoints: (1) a native English speaker, (2) a student in their 2nd year of ELD, (3) a parent who has never experienced PBL, (4) a community partner asked to be the authentic audience. What does Gold Standard feel like from each seat?
+      </div>
+      <div class="card-pbl-tag">
+        <span class="tag">Authenticity</span>
+        <span class="tag">Student Voice</span>
+        <span class="tag">Community</span>
+        <span class="tag">ELD Equity</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- EQUITY CALLOUT -->
+
+<div class="equity-bar">
+  <span class="label">EQUITY THREAD</span>
+  <span>Notice that <strong>Ethics</strong>, <strong>Multiple Perspectives</strong>, and <strong>Unanswered Questions</strong> are the three cells most likely to surface your multilingual learners' experience. If your team's debrief doesn't name a Spanish- or Karen-speaking student at least once, ask: whose perspective is still missing from this conversation?</span>
+</div>
+
+<!-- FACILITATOR DEBRIEF NOTE -->
+
+<div class="instruction-bar" style="margin-top: 16px; border-color: var(--teal);">
+  <span class="badge" style="background: var(--teal);">DEBRIEF MOVE</span>
+  After 12–15 minutes: go around and each person shares the one sentence from their work that most surprised them. Then ask the group: <em>"Which Design Element came up most often across everyone's responses — and what does that tell us about our collective blind spot?"</em>
+</div>
+
+<div class="footer">
+  Orion PBL Collective · Session 4 · Kaplan Depth &amp; Complexity Framework · Prepared with support from Claude (Anthropic)
+</div>
+
+<script>
+  let selectedCount = 0;
+
+  function toggleCard(card) {
+    const isSelected = card.classList.contains('selected');
+    if (!isSelected && selectedCount >= 3) {
+      // Flash the counter
+      const counter = document.getElementById('count');
+      counter.parentElement.parentElement.style.borderColor = '#C9860A';
+      setTimeout(() => counter.parentElement.parentElement.style.borderColor = '#DDE1E7', 800);
+      return;
+    }
+    if (isSelected) {
+      card.classList.remove('selected');
+      selectedCount--;
+    } else {
+      card.classList.add('selected');
+      selectedCount++;
+    }
+    document.getElementById('count').textContent = selectedCount;
+  }
+
+  function resetAll() {
+    document.querySelectorAll('.card.selected').forEach(c => c.classList.remove('selected'));
+    selectedCount = 0;
+    document.getElementById('count').textContent = 0;
+  }
+</script>
+
+</body>
+</html>

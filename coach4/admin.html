@@ -16,4 +16,50 @@
     <hr>
     <hr>
     <a href="https://psd1.net/coach4/test-stream.php?secret=amentum2025">*. Test Stream</a>
+    <hr>
+    <hr>
+    <a href="https://psd1.net/coach4/Pasco-Municipal-Code.html">*. Pasco Municipal Code</a>
+    <hr>
+    <hr>
+    <a href="https://psd1.net/coach4/Pasco-Municipal-Code-clean.html">*. Pasco Municipal Code (clean)</a>
+    <hr>
+    <hr>
+    In the same folder...when do I need to use cache-create.php.
+    I'm curious what it does differently from cache-ping.php?
+    <hr>
+    <hr>
+    Examined cache management scripts for Gemini Files API integration
+    Examined cache management scripts for Gemini Files API integration
+    
+    They both do the same core job — upload the Pasco Municipal Code to the Gemini Files API and save the resulting URI —
+    but they serve completely different roles:
+    <hr>
+    <hr>    
+    cache-create.php — One-time manual setup tool
+    Run it once, by hand, in a browser: cache-create.php?secret=amentum2025
+    Verbose human-readable output (progress messages, "SUCCESS!", next steps)
+    Supports ?key=2 to switch to an alternate API key if needed
+    300-second timeout for slow connections
+    When to use it:
+    The very first time you set up the tool
+    If the cron job has been broken for >48 hours and the URI has expired
+    If you need to switch API keys
+    After running strip-html.php to update the cleaned document
+    <hr>
+    <hr>
+    cache-ping.php — Automated daily cron job
+    Designed to be called by cron at 3am every day (not by a human in a browser)
+    Logs quietly to cache-ping.log instead of printing to screen
+    One extra thing cache-create.php doesn't do: it deletes the old file from Gemini before saving the new URI, to avoid
+    accumulating stale files against your quota
+    120-second timeout (cron environment)
+    Why this exists at all
+    The Gemini Files API stores uploaded files for only 48 hours. Since the Pasco Municipal Code is ~4.4MB (~875k tokens),
+    you don't want every student to re-send it with each request — instead, api-proxy.php just passes the stored URI to
+    Gemini, and Gemini reads it server-side. The cron keeps that URI fresh on a 24-hour cycle (well within the 48-hour
+    window).
+    <hr>
+    <hr>
+    Bottom line: You should only ever need to run cache-create.php manually when first deploying or recovering from an
+    outage. After that, cache-ping.php handles everything automatically and you never have to touch either one.
 </html>

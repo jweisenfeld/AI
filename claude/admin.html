@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Chatbot Admin</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 640px;
+      margin: 60px auto;
+      padding: 0 24px;
+      background: #f9f9f9;
+      color: #222;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 4px; }
+    .subtitle { color: #666; font-size: 0.9rem; margin-bottom: 36px; }
+    h2 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #888;
+      margin: 28px 0 10px;
+      border-bottom: 1px solid #e0e0e0;
+      padding-bottom: 4px;
+    }
+    ul { list-style: none; padding: 0; margin: 0; }
+    li { margin: 6px 0; }
+    a {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      color: #1a56db;
+      font-size: 0.95rem;
+    }
+    a:hover { text-decoration: underline; }
+    .tag {
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .tag-php  { background: #e8f0fe; color: #1a56db; }
+    .tag-html { background: #e6f4ea; color: #1e7e34; }
+    .tag-js   { background: #fff8e1; color: #b45309; }
+    .tag-json { background: #f3e8ff; color: #7c3aed; }
+    .tag-ext  { background: #fce8e8; color: #b91c1c; }
+    .file-note {
+      margin: 4px 0 10px 0;
+      padding: 8px 12px;
+      background: #f4f4f4;
+      border-left: 3px solid #d0d0d0;
+      border-radius: 0 4px 4px 0;
+      font-size: 0.82rem;
+      color: #444;
+      line-height: 1.5;
+    }
+    .file-note code {
+      background: #e8e8e8;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Claude Chatbot Admin</h1>
+  <p class="subtitle">Quick links to all supporting files and billing dashboards.</p>
+
+  <h2>Billing Dashboards</h2>
+  <ul>
+    <li>
+      <a href="https://claude.ai/settings/billing" target="_blank">
+        <span class="tag tag-ext">↗</span>
+        Settings Billing
+      </a>
+    </li>
+    <li>
+      <a href="https://platform.claude.com/workspaces/wrkspc_01FpRQf1QfChprKKLunoceyJ/cost" target="_blank">
+        <span class="tag tag-ext">↗</span>
+        Claude Developer Platform
+      </a>
+    </li>
+  </ul>
+
+  <h2>Chat Interface</h2>
+  <ul>
+    <li>
+      <a href="index.html">
+        <span class="tag tag-html">HTML</span>
+        index.html — Student-facing chat UI
+      </a>
+    </li>
+  </ul>
+
+  <h2>Analytics Dashboard</h2>
+  <ul>
+    <li>
+      <a href="dashboard.php">
+        <span class="tag tag-php">PHP</span>
+        dashboard.php — <strong>Live dashboard</strong> (reads claude_usage.log from server automatically)
+      </a>
+    </li>
+    <li>
+      <a href="dashboard.html">
+        <span class="tag tag-html">HTML</span>
+        dashboard.html — Offline fallback (requires manual file upload)
+      </a>
+    </li>
+  </ul>
+
+  <h2>PHP Scripts</h2>
+  <ul>
+    <li>
+      <a href="api-proxy.php">
+        <span class="tag tag-php">PHP</span>
+        api-proxy.php — Server-side API proxy (called automatically by the chatbot; you never open this directly)
+      </a>
+    </li>
+    <li>
+      <a href="update_models.php">
+        <span class="tag tag-php">PHP</span>
+        update_models.php — Model auto-healer
+      </a>
+      <p class="file-note">
+        Run this when students start getting errors like "model not available" after Anthropic retires a model.
+        It pings the API to test which Claude versions actually respond, then promotes a working fallback to primary
+        in <code>model_config.json</code>. Each probe costs essentially nothing (1 token max).
+        Open it in the browser with <code>?key=YOUR_DASHBOARD_PASS</code> appended to the URL — it prints a live log.
+        Under normal circumstances you should never need this; the proxy already falls back automatically.
+      </p>
+    </li>
+    <li>
+      <a href="tests.php">
+        <span class="tag tag-php">PHP</span>
+        tests.php — Unit test suite (CLI only)
+      </a>
+      <p class="file-note">
+        Run this via SSH after editing <code>api-proxy.php</code> to make sure nothing is broken.
+        Command: <code>php tests.php</code> from the <code>claude/</code> folder.
+        It is not designed to be opened in a browser — it validates internal logic like model tier checks,
+        request validation, school-hours rules, conversation caps, and config file structure.
+        You don't need to run it unless you've made code changes.
+      </p>
+    </li>
+  </ul>
+
+  <h2>JavaScript &amp; Config</h2>
+  <ul>
+    <li>
+      <a href="tests.js">
+        <span class="tag tag-js">JS</span>
+        tests.js — Client-side tests
+      </a>
+    </li>
+    <li>
+      <a href="model_config.json">
+        <span class="tag tag-json">JSON</span>
+        model_config.json — Model configuration
+      </a>
+    </li>
+  </ul>
+
+</body>
+</html>

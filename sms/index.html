@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stevens Middle School — Staff Hub</title>
+  <style>
+    :root {
+      --tiger-orange: #E8651A;
+      --tiger-black: #1A1A1A;
+      --accent:       #F5A623;
+      --bg:           #F7F8FA;
+      --card-bg:      #FFFFFF;
+      --border:       #E2E6EA;
+      --text:         #2D3748;
+      --muted:        #718096;
+      --success:      #2D6A4F;
+      --success-bg:   #D8F3DC;
+      --warn:         #7B4B00;
+      --warn-bg:      #FFF3CD;
+      --info:         #1A4E7A;
+      --info-bg:      #DBEAFE;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--tiger-black);
+      color: #fff;
+      padding: 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,.4);
+    }
+
+    .header-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .paw {
+      font-size: 2rem;
+      line-height: 1;
+    }
+
+    .brand-text h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: .5px;
+      color: #fff;
+    }
+
+    .brand-text p {
+      font-size: .78rem;
+      color: var(--accent);
+      letter-spacing: .8px;
+      text-transform: uppercase;
+    }
+
+    .last-updated {
+      font-size: .75rem;
+      color: #aaa;
+      text-align: right;
+    }
+
+    /* ── HERO BANNER ── */
+    .hero {
+      background: linear-gradient(135deg, var(--tiger-orange) 0%, #C0420E 100%);
+      color: #fff;
+      text-align: center;
+      padding: 40px 20px 36px;
+    }
+
+    .hero h2 {
+      font-size: 1.9rem;
+      font-weight: 800;
+      letter-spacing: .5px;
+      margin-bottom: 8px;
+    }
+
+    .hero p {
+      font-size: 1rem;
+      opacity: .9;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+
+    /* ── LAYOUT ── */
+    main {
+      max-width: 1100px;
+      margin: 32px auto;
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 720px) {
+      main { grid-template-columns: 1fr; }
+    }
+
+    .full-width { grid-column: 1 / -1; }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+
+    .card-header {
+      background: var(--tiger-black);
+      color: #fff;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: .3px;
+    }
+
+    .card-header .icon { font-size: 1.15rem; }
+
+    .card-header.orange { background: var(--tiger-orange); }
+    .card-header.green  { background: var(--success); }
+    .card-header.blue   { background: var(--info); }
+
+    .card-body { padding: 16px 18px; }
+
+    /* ── WEEKLY EVENTS ── */
+    .day-block { margin-bottom: 14px; }
+    .day-block:last-child { margin-bottom: 0; }
+
+    .day-label {
+      font-weight: 700;
+      font-size: .85rem;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: var(--tiger-orange);
+      margin-bottom: 4px;
+    }
+
+    .day-events {
+      list-style: none;
+      padding-left: 4px;
+    }
+
+    .day-events li {
+      font-size: .9rem;
+      padding: 3px 0 3px 14px;
+      position: relative;
+      color: var(--text);
+    }
+
+    .day-events li::before {
+      content: '▸';
+      position: absolute;
+      left: 0;
+      color: var(--tiger-orange);
+      font-size: .75rem;
+      top: 5px;
+    }
+
+    .day-events li.sub {
+      padding-left: 28px;
+      color: var(--muted);
+      font-size: .85rem;
+    }
+
+    .day-events li.sub::before { content: '–'; left: 14px; color: var(--muted); }
+
+    /* ── ALERT BADGES ── */
+    .alert {
+      display: inline-block;
+      font-size: .7rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    .alert-red  { background: #FEE2E2; color: #991B1B; }
+    .alert-warn { background: var(--warn-bg); color: var(--warn); }
+
+    /* ── UPCOMING DATES ── */
+    .date-item {
+      display: flex;
+      gap: 14px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .date-item:last-child { border-bottom: none; }
+
+    .date-chip {
+      min-width: 58px;
+      text-align: center;
+      background: var(--tiger-orange);
+      color: #fff;
+      border-radius: 8px;
+      padding: 6px 4px;
+      font-size: .72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      line-height: 1.3;
+      align-self: flex-start;
+    }
+
+    .date-chip.blue   { background: var(--info); }
+    .date-chip.green  { background: var(--success); }
+    .date-chip.black  { background: var(--tiger-black); }
+
+    .date-info strong {
+      display: block;
+      font-size: .9rem;
+      margin-bottom: 2px;
+    }
+
+    .date-info p {
+      font-size: .82rem;
+      color: var(--muted);
+    }
+
+    /* ── DOCUMENTS GRID ── */
+    .doc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+      gap: 12px;
+    }
+
+    .doc-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 14px 12px;
+      text-decoration: none;
+      color: var(--text);
+      background: var(--card-bg);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: box-shadow .15s, transform .15s, border-color .15s;
+    }
+
+    .doc-card:hover {
+      box-shadow: 0 4px 14px rgba(232,101,26,.18);
+      border-color: var(--tiger-orange);
+      transform: translateY(-2px);
+    }
+
+    .doc-icon { font-size: 1.6rem; }
+
+    .doc-name {
+      font-size: .88rem;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    .doc-meta {
+      font-size: .75rem;
+      color: var(--muted);
+    }
+
+    /* ── QUICK LINKS ── */
+    .link-list { list-style: none; }
+
+    .link-list li {
+      border-bottom: 1px solid var(--border);
+    }
+
+    .link-list li:last-child { border-bottom: none; }
+
+    .link-list a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 4px;
+      text-decoration: none;
+      color: var(--text);
+      font-size: .9rem;
+      transition: color .15s;
+    }
+
+    .link-list a:hover { color: var(--tiger-orange); }
+
+    .link-list .licon { font-size: 1.1rem; min-width: 24px; text-align: center; }
+    .link-list .larrow { margin-left: auto; color: var(--muted); font-size: .8rem; }
+
+    /* ── ANNOUNCEMENT BANNER ── */
+    .announcement {
+      background: var(--warn-bg);
+      border: 1px solid #f5c842;
+      border-radius: 10px;
+      padding: 14px 18px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .announcement .ann-icon { font-size: 1.4rem; }
+
+    .announcement strong { display: block; margin-bottom: 3px; font-size: .95rem; }
+    .announcement p { font-size: .87rem; color: #5a4000; }
+
+    /* ── BELL SCHEDULE PREVIEW ── */
+    .bell-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .82rem;
+    }
+
+    .bell-table th {
+      background: var(--tiger-orange);
+      color: #fff;
+      padding: 7px 10px;
+      text-align: left;
+      font-weight: 600;
+    }
+
+    .bell-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .bell-table tr:last-child td { border-bottom: none; }
+    .bell-table tr:nth-child(even) td { background: #fafafa; }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center;
+      padding: 28px 20px;
+      font-size: .8rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      margin-top: 20px;
+    }
+
+    footer a { color: var(--tiger-orange); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════ HEADER -->
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <div class="paw">🐾</div>
+      <div class="brand-text">
+        <h1>Stevens Middle School</h1>
+        <p>Staff Information Hub &mdash; Go Tigers!</p>
+      </div>
+    </div>
+    <div class="last-updated">
+      Last updated<br><strong id="datestamp">—</strong>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════════ HERO -->
+<div class="hero">
+  <h2>One Stop. All the Info.</h2>
+  <p>Weekly events, key dates, schedules, and documents &mdash; all in one place so you can stop searching your inbox.</p>
+</div>
+
+<!-- ══════════════════════════════════════════ MAIN GRID -->
+<main>
+
+  <!-- ── ANNOUNCEMENT (spans full width) ── -->
+  <div class="full-width">
+    <div class="announcement">
+      <div class="ann-icon">📢</div>
+      <div>
+        <strong>SAEBRS Screener — Make-Up Window Open</strong>
+        <p>Students who missed the screener should complete make-up testing as soon as possible. Contact your grade-level team lead for scheduling support.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── THIS WEEK ── -->
+  <div class="card">
+    <div class="card-header orange">
+      <span class="icon">📅</span>
+      Week of February 23 – 27, 2026
+    </div>
+    <div class="card-body">
+
+      <div class="day-block">
+        <div class="day-label">Monday, Feb 23</div>
+        <ul class="day-events">
+          <li>Assembly — Guest Speaker: Juan Cangas
+            <span class="alert alert-warn">See schedule below</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="day-block">
+        <div class="day-label">Tuesday, Feb 24</div>
+        <ul class="day-events">
+          <li>Regular Day</li>
+        </ul>
+      </div>
+
+      <div class="day-block">
+        <div class="day-label">Wednesday, Feb 25</div>
+        <ul class="day-events">
+          <li>Early Release <strong>@ 10:35 AM</strong></li>
+          <li>PD in Commons 11:45 AM – 2:45 PM</li>
+        </ul>
+      </div>
+
+      <div class="day-block">
+        <div class="day-label">Thursday, Feb 26</div>
+        <ul class="day-events">
+          <li>Early Dismissal <strong>@ 1:35 PM</strong></li>
+          <li>PLT 1:45 PM – 2:45 PM</li>
+        </ul>
+      </div>
+
+      <div class="day-block">
+        <div class="day-label">Friday, Feb 27</div>
+        <ul class="day-events">
+          <li>Regular Day</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── UPCOMING DATES ── -->
+  <div class="card">
+    <div class="card-header blue">
+      <span class="icon">📌</span>
+      Important Upcoming Dates
+    </div>
+    <div class="card-body">
+
+      <div class="date-item">
+        <div class="date-chip blue">Mar<br>2–4</div>
+        <div class="date-info">
+          <strong>WIDA Testing</strong>
+          <p>Listening, Reading, Writing in all classrooms. Speaking in small groups with support staff.<br>
+          <strong>3-Hour Delay Schedule</strong> for testing days.</p>
+        </div>
+      </div>
+
+      <div class="date-item">
+        <div class="date-chip green">Mar<br>10</div>
+        <div class="date-info">
+          <strong>ELA / History MS Calibration</strong>
+          <p>Team at Booth — district calibration event.</p>
+        </div>
+      </div>
+
+      <div class="date-item">
+        <div class="date-chip black">Mar<br>11</div>
+        <div class="date-info">
+          <strong>No School</strong>
+          <p>No students or staff on campus.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── BELL SCHEDULE ── -->
+  <div class="card">
+    <div class="card-header">
+      <span class="icon">🔔</span>
+      Bell Schedule — Regular Day (Mon / Tue / Wed)
+    </div>
+    <div class="card-body">
+      <table class="bell-table">
+        <thead>
+          <tr>
+            <th>Period</th>
+            <th>6th Grade</th>
+            <th>7th Grade</th>
+            <th>8th Grade</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Assembly / 1</td><td>7:40 – 8:06</td><td>7:40 – 8:27</td><td>7:48 – 8:35</td></tr>
+          <tr><td>2</td><td>8:44 – 9:31</td><td>8:31 – 9:18</td><td>8:31 – 9:18</td></tr>
+          <tr><td>3 / 4</td><td>9:35 – 10:22</td><td>9:22 – 10:09</td><td>9:22 – 10:09</td></tr>
+          <tr><td>Lunch</td><td>10:26 – 10:56</td><td>—</td><td>—</td></tr>
+          <tr><td>4 / 5</td><td>11:00 – 11:47</td><td>10:26 – 11:15</td><td>10:15 – 11:00</td></tr>
+          <tr><td>Lunch (7th)</td><td>—</td><td>11:17 – 11:47</td><td>—</td></tr>
+          <tr><td>5 / 6</td><td>11:51 – 12:38</td><td>11:51 – 12:38</td><td>11:04 – 11:51</td></tr>
+          <tr><td>Lunch (8th)</td><td>—</td><td>—</td><td>12:00 – 12:36</td></tr>
+          <tr><td>6 / 7</td><td>12:42 – 1:30</td><td>12:42 – 1:30</td><td>12:42 – 1:30</td></tr>
+          <tr><td>7 / 8</td><td>1:34 – 2:22</td><td>1:34 – 2:22</td><td>1:34 – 2:22</td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:10px; font-size:.78rem; color:var(--muted);">Early-release and PLT days use adjusted schedules — see the Bell Schedule PDF below.</p>
+    </div>
+  </div>
+
+  <!-- ── QUICK LINKS ── -->
+  <div class="card">
+    <div class="card-header green">
+      <span class="icon">🔗</span>
+      Quick Links
+    </div>
+    <div class="card-body" style="padding:0 18px;">
+      <ul class="link-list">
+        <li>
+          <a href="https://psd1.net" target="_blank">
+            <span class="licon">🌐</span>
+            PSD1 Staff Portal
+            <span class="larrow">↗</span>
+          </a>
+        </li>
+        <li>
+          <a href="#" target="_blank">
+            <span class="licon">📋</span>
+            SmartSheet / PLT Agendas
+            <span class="larrow">↗</span>
+          </a>
+        </li>
+        <li>
+          <a href="#" target="_blank">
+            <span class="licon">📊</span>
+            PowerSchool (Grades / Attendance)
+            <span class="larrow">↗</span>
+          </a>
+        </li>
+        <li>
+          <a href="#" target="_blank">
+            <span class="licon">🩺</span>
+            SAEBRS Screener Portal
+            <span class="larrow">↗</span>
+          </a>
+        </li>
+        <li>
+          <a href="#" target="_blank">
+            <span class="licon">🧪</span>
+            WIDA Testing Resources
+            <span class="larrow">↗</span>
+          </a>
+        </li>
+        <li>
+          <a href="#" target="_blank">
+            <span class="licon">📧</span>
+            Submit an Item for Next Week
+            <span class="larrow">↗</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ── DOCUMENTS / RESOURCES (full width) ── -->
+  <div class="card full-width">
+    <div class="card-header orange">
+      <span class="icon">📁</span>
+      Documents &amp; Resources
+    </div>
+    <div class="card-body">
+      <div class="doc-grid">
+
+        <a class="doc-card" href="#" title="Student group assignments and calendar">
+          <div class="doc-icon">🗓️</div>
+          <div class="doc-name">Groups Calendar</div>
+          <div class="doc-meta">Small-group schedule — Jan 2026</div>
+        </a>
+
+        <a class="doc-card" href="#" title="2025–26 Bell Schedule (updated)">
+          <div class="doc-icon">🔔</div>
+          <div class="doc-name">Bell Schedule 25–26</div>
+          <div class="doc-meta">Updated — all bell configurations</div>
+        </a>
+
+        <a class="doc-card" href="#" title="SMS Testing Calendar">
+          <div class="doc-icon">📝</div>
+          <div class="doc-name">SMS Testing Calendar</div>
+          <div class="doc-meta">WIDA, SBA, and interim windows</div>
+        </a>
+
+        <a class="doc-card" href="#" title="Assessment Calendar">
+          <div class="doc-icon">📊</div>
+          <div class="doc-name">Assessment Calendar</div>
+          <div class="doc-meta">District and state assessments</div>
+        </a>
+
+        <a class="doc-card" href="#" title="Committee Meeting Calendar">
+          <div class="doc-icon">🏛️</div>
+          <div class="doc-name">Committee Calendar</div>
+          <div class="doc-meta">Leadership and committee meetings</div>
+        </a>
+
+        <a class="doc-card" href="#" title="Committee Meeting Schedule">
+          <div class="doc-icon">📋</div>
+          <div class="doc-name">Committee Meeting Schedule</div>
+          <div class="doc-meta">Agendas and times</div>
+        </a>
+
+        <a class="doc-card" href="#" title="WICOR / Hattie Biliteracy Crosswalk">
+          <div class="doc-icon">📖</div>
+          <div class="doc-name">WICOR–Hattie Biliteracy Crosswalk</div>
+          <div class="doc-meta">4 Large Domains reference doc</div>
+        </a>
+
+        <a class="doc-card" href="#" title="Gear Up After-School Tutoring">
+          <div class="doc-icon">🎓</div>
+          <div class="doc-name">Tiger Tutoring — Gear Up</div>
+          <div class="doc-meta">7th &amp; 8th grade • Mon–Fri 3–4 PM</div>
+        </a>
+
+        <a class="doc-card" href="#" title="Reporting Dates SY 25–26">
+          <div class="doc-icon">📅</div>
+          <div class="doc-name">Reporting Dates 25–26</div>
+          <div class="doc-meta">Quarter ends, grades-due, report cards</div>
+        </a>
+
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ══════════════════════════════════════════ FOOTER -->
+<footer>
+  Stevens Middle School Staff Hub &mdash; Pasco School District &mdash;
+  <a href="https://psd1.net" target="_blank">psd1.net</a><br>
+  <span style="margin-top:4px;display:inline-block;">
+    Questions or updates? Contact the main office or
+    <a href="mailto:Donahue@psd1.org">Kristen Donahue</a>.
+  </span>
+</footer>
+
+<script>
+  // Show today's date as the "last updated" timestamp
+  const d = new Date();
+  document.getElementById('datestamp').textContent =
+    d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+</script>
+
+</body>
+</html>

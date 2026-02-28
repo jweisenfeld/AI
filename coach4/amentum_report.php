@@ -123,7 +123,7 @@ $remaining = $grantAmount - $estCost;
     </div>
 
     <div class="card">
-        <h2>Recent Activity & Logs</h2>
+        <h2>Recent Activity & Logs (click Student to see prompt & response)</h2>
         <table>
             <thead>
                 <tr>

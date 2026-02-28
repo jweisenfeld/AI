@@ -110,7 +110,6 @@ $remaining = $grantAmount - $estCost;
         </div>
         <div class="card">
             <div class="label">Grant Remaining</div>
-//            <div class="big-num">$<?php echo number_format($remaining, 2); ?></div>
             <div class="big-num">$Weisenfeld</div>
         </div>
         <div class="card">

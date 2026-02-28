@@ -99,7 +99,7 @@ $remaining = $grantAmount - $estCost;
 <body>
 
     <header style="display:flex; justify-content: space-between; align-items: center;">
-        <h1>📊 OHS Engineering Grant Status</h1>
+        <h1>📊 OHS Engineering Project Grant Status</h1>
         <button onclick="window.location.reload()" class="card" style="cursor:pointer">🔄 Refresh Data</button>
     </header>
 
@@ -110,7 +110,8 @@ $remaining = $grantAmount - $estCost;
         </div>
         <div class="card">
             <div class="label">Grant Remaining</div>
-            <div class="big-num">$<?php echo number_format($remaining, 2); ?></div>
+//            <div class="big-num">$<?php echo number_format($remaining, 2); ?></div>
+            <div class="big-num">$Weisenfeld</div>
         </div>
         <div class="card">
             <div class="label">Total Interactions</div>

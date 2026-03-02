@@ -14,7 +14,11 @@
       "Bash(git pull:*)",
       "Bash(git stash:*)",
       "WebFetch(domain:docs.inceptionlabs.ai)",
-      "WebFetch(domain:www.inceptionlabs.ai)"
+      "WebFetch(domain:www.inceptionlabs.ai)",
+      "Bash(curl -s -w \"\\\\n\\\\nHTTP_STATUS:%{http_code}\" https://api.inceptionlabs.ai/v1/chat/completions -H \"Content-Type: application/json\" -H \"Authorization: Bearer sk_7c012b5f685dec7217f536b3e8c07265\" -d '{\"\"model\"\":\"\"mercury-2\"\",\"\"messages\"\":[{\"\"role\"\":\"\"user\"\",\"\"content\"\":\"\"Reply with exactly: Mercury 2 is working.\"\"}],\"\"max_tokens\"\":30}')",
+      "Bash(powershell -Command \":*)",
+      "Bash(powershell.exe -Command \"$key=''sk_7c012b5f685dec7217f536b3e8c07265''; $b=''{\"\"model\"\":\"\"mercury-2\"\",\"\"messages\"\":[{\"\"role\"\":\"\"user\"\",\"\"content\"\":\"\"Reply: Mercury 2 is working.\"\"}],\"\"max_tokens\"\":30}''; try { $r=Invoke-RestMethod -Uri ''https://api.inceptionlabs.ai/v1/chat/completions'' -Method Post -Headers @{Authorization=\"\"Bearer $key\"\";''Content-Type''=''application/json''} -Body $b; Write-Host ''STATUS: 200''; Write-Host \\(''REPLY: '' + $r.choices[0].message.content\\); Write-Host \\(''TOKENS in/out: '' + $r.usage.prompt_tokens + ''/'' + $r.usage.completion_tokens\\) } catch { Write-Host \\(''ERROR: '' + $_Exception.Message\\) }\")",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\jweisenfeld\\\\AppData\\\\Local\\\\Temp\\\\test_mercury.ps1\")"
     ]
   }
 }

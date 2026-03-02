@@ -12,7 +12,9 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(git pull:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "WebFetch(domain:docs.inceptionlabs.ai)",
+      "WebFetch(domain:www.inceptionlabs.ai)"
     ]
   }
 }

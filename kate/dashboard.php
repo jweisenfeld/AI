@@ -15,7 +15,7 @@ $accountRoot = dirname($_SERVER['DOCUMENT_ROOT']);
 $secretsFile = $accountRoot . '/.secrets/claudekey.php';
 $secrets = is_readable($secretsFile) ? require $secretsFile : [];
 $validUser = $secrets['DASHBOARD_USER'] ?? 'Admin';
-$validPass = $secrets['DASHBOARD_PASS'] ?? 'Pas99301!';
+$validPass = $secrets['DASHBOARD_PASS'] ?? 'Manson98831!';
 
 // --- Handle logout ---
 if (isset($_GET['logout'])) {
@@ -39,7 +39,7 @@ if (empty($_SESSION['dashboard_auth'])) {
     ?><!DOCTYPE html>
     <html lang="en"><head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Login</title>
+    <title>Dashboard Login Username: Admin Password: Manson12345! (zip code of Manson not 12345)</title>
     <style>
         body { font-family: -apple-system, system-ui, sans-serif; background: #0f172a; color: #e2e8f0;
                display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }

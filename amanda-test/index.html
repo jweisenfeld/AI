@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Claude API Feature Demo</title>
+    <title>6As Project Coach</title>
     <!-- KaTeX for math rendering -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
@@ -795,8 +795,8 @@
     <header class="header">
         <div class="header-content">
             <div>
-                <h1>Claude API Feature Demo</h1>
-                <div class="header-subtitle">Explore Claude's capabilities through interactive examples</div>
+                <h1>6As Project Coach</h1>
+                <div class="header-subtitle">Your AI guide through the 6As Protocol for Projects</div>
             </div>
             <div class="api-status">
                 <div class="status-dot"></div>
@@ -818,10 +818,7 @@
                     <h3>Vision <span class="feature-badge">Multimodal</span></h3>
                     <p>Analyze and understand images with text</p>
                 </div>
-                <div class="feature-item" data-feature="system" onclick="selectFeature('system')">
-                    <h3>System Prompts</h3>
-                    <p>Define Claude's behavior and personality</p>
-                </div>
+
                 <div class="feature-item" data-feature="models" onclick="selectFeature('models')">
                     <h3>Model Selection</h3>
                     <p>Choose between Opus, Sonnet, and Haiku</p>
@@ -863,20 +860,7 @@
                 </div>
             </div>
 
-            <!-- System Prompt Section (collapsible) -->
-            <div class="system-prompt-section" id="system-prompt-section" style="display: none;">
-                <div class="system-prompt-header">
-                    <h3>System Prompt</h3>
-                    <button class="toggle-btn" onclick="toggleSystemPrompt()">Hide</button>
-                </div>
-                <textarea class="system-prompt-textarea" id="system-prompt" placeholder="Define Claude's behavior, personality, or role...">You are a helpful AI assistant demonstrating Claude's API capabilities. Be concise but thorough in your responses.</textarea>
-                <div class="system-prompt-presets">
-                    <button class="preset-btn" onclick="setSystemPreset('helpful')">Helpful Assistant</button>
-                    <button class="preset-btn" onclick="setSystemPreset('tutor')">Patient Tutor</button>
-                    <button class="preset-btn" onclick="setSystemPreset('coder')">Code Expert</button>
-                    <button class="preset-btn" onclick="setSystemPreset('creative')">Creative Writer</button>
-                </div>
-            </div>
+
 
             <!-- Chat Header -->
             <div class="chat-header">
@@ -914,15 +898,8 @@
                         <span>Claude</span>
                     </div>
                     <div class="message-content">
-                        <p>Welcome to the Claude API Feature Demo! I'm here to showcase the capabilities available through the Claude API.</p>
-                        <p><strong>Select a feature</strong> from the left panel to explore different capabilities, or just start chatting!</p>
-                        <p>Key features you can try:</p>
-                        <ul>
-                            <li><strong>Vision</strong> - Paste (Ctrl+V), drag & drop, or click the camera button to add images</li>
-                            <li><strong>System Prompts</strong> - Click "System Prompts" to customize my behavior</li>
-                            <li><strong>Model Selection</strong> - Switch between Haiku, Sonnet, and Opus above</li>
-                            <li><strong>Temperature</strong> - Adjust the slider to control creativity</li>
-                        </ul>
+                        <p>👋 Hi! I'm your <strong>6As Project Coach</strong>. I'm here to help you work through your project step by step using the 6As Protocol.</p>
+                        <p>To get started — <strong>tell me a little about your project.</strong> What's it about, and where do you feel like you are in it right now?</p>
                     </div>
                 </div>
             </div>
@@ -936,9 +913,6 @@
                         <div class="input-actions">
                             <button class="input-btn" onclick="document.getElementById('file-input').click()" title="Upload Image">
                                 📷
-                            </button>
-                            <button class="input-btn" onclick="toggleSystemPrompt()" title="System Prompt">
-                                ⚙️
                             </button>
                         </div>
                         <input type="file" id="file-input" accept="image/*" multiple onchange="handleFileSelect(event)">
@@ -975,6 +949,74 @@
         // ============================================
         // STATE MANAGEMENT
         // ============================================
+
+        // ============================================
+        // HARD-WIRED SYSTEM PROMPT (6As Protocol)
+        // ============================================
+        const SYSTEM_PROMPT_6AS = `You are a friendly and encouraging project coach helping high school students work through the 6As Protocol for Projects. Your job is to figure out where a student is in their project, keep them moving forward, and make sure they don't skip important steps.
+
+## The 6As Protocol Stages
+
+**Stage 1 – ASK**
+The student is defining their project. They should be able to answer:
+- What is our driving question or problem?
+- Who is the audience or end user?
+- What does success look like?
+- What are the project requirements or constraints?
+Signs a student is here: They say things like "we just got assigned the project," "I don't really know what to do yet," or they describe a vague topic without a clear question.
+
+**Stage 2 – ACQUIRE**
+The student is gathering information, background knowledge, and resources. They should be able to answer:
+- What do I already know? What do I need to find out?
+- What sources am I using?
+- What do experts or real-world examples say about this?
+- What are the key concepts I need to understand?
+Signs a student is here: They are researching but haven't started building or designing yet.
+
+**Stage 3 – APPLY**
+The student is planning and designing their solution or product. They should be able to answer:
+- What is my plan or design?
+- What steps will I take and in what order?
+- What materials, tools, or methods will I use?
+- How does my plan connect to what I learned in Stage 2?
+Signs a student is here: They have knowledge but haven't started making yet.
+
+**Stage 4 – ANALYZE**
+The student is building, creating, experimenting, or testing. They should be able to answer:
+- What is working? What is not working?
+- What did I discover when I tried it?
+- What data or evidence do I have?
+- What problems did I run into and how did I try to solve them?
+Signs a student is here: They are in the middle of making and encountering real challenges.
+
+**Stage 5 – ASSESS**
+The student is evaluating their work and getting feedback. They should be able to answer:
+- How does my work measure up against the original criteria?
+- What feedback have I gotten from my teacher, peers, or an expert?
+- What needs to be improved before the final presentation?
+- Have I addressed the driving question?
+Signs a student is here: They have a draft or prototype and are revising.
+
+**Stage 6 – ACHIEVE**
+The student is finalizing, presenting, and reflecting. They should be able to answer:
+- Is my final product complete and polished?
+- Am I ready to present to my audience?
+- What did I learn from this project?
+- What would I do differently next time?
+Signs a student is here: They are in the final days of the project or have already presented.
+
+---
+
+## Your Behavior Rules
+
+**1. Diagnose first, then help.**
+At the start of every conversation, ask the student to describe where they are in their project. Based on what they say, identify which stage they appear to be in. Name the stage you think they're in and ask them to confirm. Example: "It sounds like you're in Stage 2 – Acquire, where you're gathering information. Does that sound right?"
+
+**2. Never skip stages.**
+If a student wants to jump ahead (e.g., they want to start building without a plan), gently redirect them. Help them complete the current stage before moving on. Explain *why* the current stage matters in plain language.
+
+**3. Ask one question at a time.**
+Do not overwhelm students with a list of questions. Ask one focused question to help them move forward. When they answer, ask the next most important question.`;
 
         let messages = [];
         let pendingImages = [];
@@ -1016,12 +1058,7 @@
                 description: 'Claude can analyze images alongside text. Paste (Ctrl+V), drag & drop, or upload a photo, diagram, chart, or screenshot.',
                 prompt: 'Paste a screenshot (Ctrl+V) and ask "What do you see in this image? Describe it in detail."'
             },
-            system: {
-                title: 'System Prompts',
-                description: 'System prompts let you define Claude\'s behavior, personality, and constraints. Click the gear icon or expand below.',
-                prompt: 'Set a system prompt like "You are a pirate. Respond to everything in pirate speak." then chat!',
-                showSystemPrompt: true
-            },
+
             models: {
                 title: 'Model Selection',
                 description: 'Choose the right model for your task: Haiku (fastest, cheapest), Sonnet (balanced), or Opus (most capable).',
@@ -1049,12 +1086,6 @@
             }
         };
 
-        const systemPresets = {
-            helpful: 'You are a helpful AI assistant demonstrating Claude\'s API capabilities. Be concise but thorough in your responses.',
-            tutor: 'You are a patient and encouraging tutor. Explain concepts step by step, check for understanding, and use examples. Never give direct answers to practice problems - guide the student to discover the answer.',
-            coder: 'You are an expert software engineer. Write clean, well-documented code. Always explain your approach before coding. Consider edge cases and best practices.',
-            creative: 'You are a creative writing assistant with a flair for vivid descriptions and engaging narratives. Use metaphors, sensory details, and varied sentence structures.'
-        };
 
         // ============================================
         // FEATURE SELECTION
@@ -1099,19 +1130,6 @@
             document.getElementById('temp-display').textContent = value.toFixed(1);
         }
 
-        // ============================================
-        // SYSTEM PROMPT
-        // ============================================
-
-        function toggleSystemPrompt() {
-            const section = document.getElementById('system-prompt-section');
-            showSystemPrompt = !showSystemPrompt;
-            section.style.display = showSystemPrompt ? 'block' : 'none';
-        }
-
-        function setSystemPreset(preset) {
-            document.getElementById('system-prompt').value = systemPresets[preset];
-        }
 
         // ============================================
         // IMAGE HANDLING
@@ -1217,19 +1235,15 @@
 
             try {
                 const temperature = Math.round(parseFloat(document.getElementById('temperature').value)) / 100;
-                const systemPrompt = document.getElementById('system-prompt').value.trim();
 
                 const requestBody = {
                     model: currentModel,
                     max_tokens: 4096,
                     messages: messages,
                     temperature: temperature,
-                    student_id: studentId
+                    student_id: studentId,
+                    system: SYSTEM_PROMPT_6AS
                 };
-
-                if (systemPrompt) {
-                    requestBody.system = systemPrompt;
-                }
 
                 const response = await fetch('api-proxy.php', {
                     method: 'POST',

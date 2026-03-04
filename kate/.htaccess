@@ -1,0 +1,4 @@
+# Deny direct HTTP access to config and log files
+<FilesMatch "\.(json|log)$">
+    Require all denied
+</FilesMatch>

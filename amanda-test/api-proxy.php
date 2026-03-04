@@ -284,7 +284,7 @@ $logEntry = [
     'image_count' => $imageInfo['count'],
     'image_types' => $imageInfo['types'],
     'user_text_length' => strlen($lastUserText),
-    'user_text' => mb_substr($lastUserText, 0, 500),  // first 500 chars of user prompt
+    'user_text' => $lastUserText,
     'is_school_hours' => $isSchoolHours,
 ];
 if (isset($modelDowngraded) && $modelDowngraded) {
@@ -345,11 +345,24 @@ if (isModelError($httpCode, $responseData)) {
     }
 }
 
-// Log response token usage
+// Log response token usage and assistant text
 if (is_array($responseData) && isset($responseData['usage'])) {
     $logEntry['input_tokens'] = $responseData['usage']['input_tokens'] ?? 0;
     $logEntry['output_tokens'] = $responseData['usage']['output_tokens'] ?? 0;
 }
+
+// Extract and log the full assistant response text (already in memory, zero extra I/O)
+$assistantText = '';
+if ($httpCode === 200 && is_array($responseData) && isset($responseData['content'])) {
+    foreach ($responseData['content'] as $block) {
+        if (($block['type'] ?? '') === 'text') {
+            $assistantText .= $block['text'] ?? '';
+        }
+    }
+}
+$logEntry['assistant_text_length'] = strlen($assistantText);
+$logEntry['assistant_text'] = $assistantText;
+
 $logEntry['http_status'] = $httpCode;
 $logEntry['model'] = $resolvedModel;
 $logEntry['model_healed'] = $modelHealed;

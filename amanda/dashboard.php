@@ -15,7 +15,7 @@ $accountRoot = dirname($_SERVER['DOCUMENT_ROOT']);
 $secretsFile = $accountRoot . '/.secrets/claudekey.php';
 $secrets = is_readable($secretsFile) ? require $secretsFile : [];
 $validUser = $secrets['DASHBOARD_USER'] ?? 'Admin';
-$validPass = $secrets['DASHBOARD_PASS'] ?? 'Dav99122!';
+$validPass = $secrets['DASHBOARD_PASS'] ?? 'Davenport99122!';
     header('Location: dashboard.php');
     exit;
 }

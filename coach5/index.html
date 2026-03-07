@@ -100,9 +100,9 @@
     <header class="header">
         <div style="font-weight:bold; color:var(--primary)">OHS Engineering Firm</div>
         <div style="display:flex; gap:10px;">
-            <select id="model-select">
-                <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash (Workhorse)</option>
-                <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (Fastest)</option>
+            <select id="model-select" title="Tip: Switch to Gemini Flash for longer, more detailed responses">
+                <option value="gemini-2.5-flash-lite" selected>Gemini 2.5 Flash-Lite ⚡ (Fastest)</option>
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash (More detailed responses)</option>
                 <option value="gemini-2.5-pro">Gemini 2.5 Pro (Best Quality)</option>
                 <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
                 <option value="gemini-3-pro-preview">Gemini 3 Pro Preview</option>
@@ -406,16 +406,33 @@
             const text = input.value.trim();
             if (!text && PENDING_IMAGES.length === 0) return;
 
+            // Snapshot image count now — PENDING_IMAGES is cleared below
+            const imageCount = PENDING_IMAGES.length;
+
             appendBubble('user', text || "(Image Uploaded)");
 
-            const userContent = [];
-            if (text) userContent.push({ text: text });
-            PENDING_IMAGES.forEach(img => userContent.push(img));
+            // ── API parts: include real image data for THIS call only ─────────────
+            const apiParts = [];
+            if (text) apiParts.push({ text: text });
+            PENDING_IMAGES.forEach(img => apiParts.push(img));
 
-            HISTORY.push({ role: 'user', parts: userContent });
+            // ── HISTORY parts: text-only — images replaced by a readable placeholder.
+            // This keeps HISTORY lean (no base64 blobs) and ensures the log shows
+            // exactly what students shared. The model has already processed the image
+            // in the turn it was sent; re-sending it on every future turn wastes tokens.
+            const historyParts = [];
+            if (text) historyParts.push({ text: text });
+            if (imageCount > 0) historyParts.push({ text: `[student uploaded ${imageCount} image(s)]` });
+
+            HISTORY.push({ role: 'user', parts: historyParts });
             input.value = '';
             document.getElementById('image-previews').innerHTML = '';
             PENDING_IMAGES = [];
+
+            // Build log-friendly user label (used later in logToTeacher)
+            const logUserText = imageCount > 0
+                ? (text ? `${text} [+ ${imageCount} image(s)]` : `[${imageCount} image(s) uploaded]`)
+                : text;
 
             const phaseIdx = document.getElementById('phase-select').value;
             // Keep system prompt constant so Gemini's implicit prefix cache stays stable.
@@ -423,11 +440,20 @@
             // HISTORY already has the new user message pushed, so length===1 means first turn.
             const sessionFlag = HISTORY.length === 1 ? '[FIRST_MESSAGE]' : '[FOLLOW_UP]';
             const phasePrefix = { role: 'user', parts: [{ text: `[Context: Phase ${phaseIdx} | ${sessionFlag}]` }] };
-            const messagesWithPhase = [phasePrefix, ...HISTORY];
+
+            // Build the API payload: previous turns from HISTORY (text-only), but replace
+            // the current (last) turn with apiParts so the real image goes to the model.
+            const messagesWithPhase = [
+                phasePrefix,
+                ...HISTORY.slice(0, -1),                    // prior turns — text only
+                { role: 'user', parts: apiParts }           // current turn — with image(s)
+            ];
 
             // ── Hard payload size guard (catches paste-back exploits) ─────────────
-            // Check before sending so we can pop the user message back out of HISTORY.
-            const historyChars = JSON.stringify(messagesWithPhase).length;
+            // HISTORY is now text-only, so this check is fast and accurate.
+            // We measure [phasePrefix, ...HISTORY] — the stored representation —
+            // not messagesWithPhase, which may include large image data this turn.
+            const historyChars = JSON.stringify([phasePrefix, ...HISTORY]).length;
             if (historyChars > MAX_HISTORY_CHARS) {
                 // Roll back the push we just did — don't leave a dangling user turn
                 HISTORY.pop();
@@ -573,7 +599,8 @@
                 if (accumulated) {
                     LAST_RESPONSE_TEXT = accumulated;
                     HISTORY.push({ role: 'model', parts: [{ text: accumulated }] });
-                    logToTeacher(text, accumulated, ttfbMs);
+                    logToTeacher(logUserText, accumulated, ttfbMs);
+                    if (imageCount > 0) logImages(apiParts, logUserText);
                     checkConversationLength();
                 }
 
@@ -597,7 +624,8 @@
                         LAST_RESPONSE_TEXT = reply;
                         appendBubble('assistant', reply);
                         HISTORY.push({ role: 'model', parts: [{ text: reply }] });
-                        logToTeacher(text, reply, null);
+                        logToTeacher(logUserText, reply, null);
+                        if (imageCount > 0) logImages(apiParts, logUserText);
                         checkConversationLength();
                     } else {
                         appendBubble('assistant', "⚠️ Error: " + (data.error?.message || "Connection failed."));
@@ -617,6 +645,26 @@
                     student_id: STUDENT_ID,
                     ttfb_ms: ttfbMs,
                     log: `USER: ${userText}\n${ttfbNote}BOT: ${botReply}\n---\n`
+                })
+            });
+        }
+
+        // Fire-and-forget: save student-uploaded images to server for moderation review.
+        // Images are stored in student_logs/images/ (blocked from direct web access).
+        // Filename pattern: {studentID}_{YYYYMMDD_HHMMSS}_{index}.{ext}
+        function logImages(parts, context) {
+            const images = parts
+                .filter(p => p.inline_data)
+                .map(p => ({ mime_type: p.inline_data.mime_type, data: p.inline_data.data }));
+            if (images.length === 0) return;
+            fetch('api-proxy.php', {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'log_image',
+                    student_id: STUDENT_ID,
+                    student_name: STUDENT_NAME,
+                    context: context,   // text the student typed alongside the image (if any)
+                    images: images
                 })
             });
         }

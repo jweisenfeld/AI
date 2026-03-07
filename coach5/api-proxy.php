@@ -183,6 +183,47 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
         return;
     }
 
+    // ── Cold-start auto-retry ─────────────────────────────────────────────────
+    // Flash-Lite (and some other models) return Out:1 on the very first request
+    // after the implicit KV cache has expired (~5-10 min inactivity), especially
+    // with a large context like the 1M-token municipal code file.  The first call
+    // still warms the cache, so an immediate retry almost always gets a CACHE_HIT
+    // and returns a real response.  Guard: only retry when a file was in the
+    // payload (large context is the trigger) and output was suspiciously tiny.
+    if ($fileUri !== null) {
+        $firstPassOut    = 0;
+        $firstPassCached = 0;
+        foreach (preg_split('/\r?\n/', $rawBody) as $rl) {
+            if (strncmp($rl, 'data: ', 6) !== 0) continue;
+            $rp = json_decode(substr($rl, 6), true);
+            if ($rp === null) continue;
+            if (isset($rp['usageMetadata'])) {
+                $firstPassOut    = (int)($rp['usageMetadata']['candidatesTokenCount']    ?? 0);
+                $firstPassCached = (int)($rp['usageMetadata']['cachedContentTokenCount'] ?? 0);
+            }
+        }
+        if ($firstPassOut <= 5 && $firstPassCached === 0) {
+            file_put_contents(__DIR__ . '/gemini_usage.log',
+                date('Y-m-d H:i:s') . " | AUTO_RETRY | cold-start dud (Out:{$firstPassOut}, Cached:0) — retrying\n",
+                FILE_APPEND);
+            $ch2 = curl_init($url);
+            curl_setopt($ch2, CURLOPT_POST,           true);
+            curl_setopt($ch2, CURLOPT_POSTFIELDS,     json_encode($payload));
+            curl_setopt($ch2, CURLOPT_HTTPHEADER,     ['Content-Type: application/json']);
+            curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch2, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch2, CURLOPT_TIMEOUT,        120);
+            $retryBody  = curl_exec($ch2);
+            $retryErrno = curl_errno($ch2);
+            $retryInfo  = curl_getinfo($ch2);
+            curl_close($ch2);
+            // Only swap in the retry body if it actually succeeded
+            if (!$retryErrno && $retryInfo['http_code'] === 200) {
+                $rawBody = $retryBody;
+            }
+        }
+    }
+
     // ── Parse SSE lines, re-emit text deltas, collect usageMetadata ──────────
     $usageMeta = null;
     $lines     = preg_split('/\r?\n/', $rawBody);
@@ -349,6 +390,56 @@ if (isset($data['action']) && $data['action'] === 'verify_login') {
     }
     fclose($handle);
     send_error("Invalid credentials.");
+}
+
+// --- 2a. STUDENT IMAGE LOGGING (moderation archive) ---
+// Saves uploaded images to student_logs/images/ for teacher review.
+// Directory is blocked from direct web access via .htaccess written on first use.
+if (isset($data['action']) && $data['action'] === 'log_image') {
+    $studentId   = preg_replace('/[^a-z0-9_]/i', '_', $data['student_id']   ?? 'unknown');
+    $studentName = $data['student_name'] ?? 'Unknown';
+    $context     = substr($data['context'] ?? '', 0, 200); // cap for log line safety
+    $images      = $data['images'] ?? [];
+
+    $imageDir = __DIR__ . '/student_logs/images';
+    if (!is_dir($imageDir)) { mkdir($imageDir, 0755, true); }
+
+    // Block direct browser access to the image archive
+    $htaccess = $imageDir . '/.htaccess';
+    if (!file_exists($htaccess)) {
+        file_put_contents($htaccess, "Require all denied\n");
+    }
+
+    $mimeToExt = [
+        'image/jpeg' => 'jpg',  'image/jpg'  => 'jpg',
+        'image/png'  => 'png',  'image/gif'  => 'gif',
+        'image/webp' => 'webp', 'image/heic' => 'heic',
+        'image/heif' => 'heif', 'image/bmp'  => 'bmp',
+    ];
+
+    $timestamp = date('Ymd_His');
+    $saved = [];
+    foreach ($images as $i => $img) {
+        $mimeType = $img['mime_type'] ?? 'image/jpeg';
+        $ext      = $mimeToExt[$mimeType] ?? 'jpg';
+        $b64      = $img['data'] ?? '';
+        if (empty($b64)) continue;
+        $decoded = base64_decode($b64, true);
+        if ($decoded === false) continue;
+        $filename = "{$studentId}_{$timestamp}_{$i}.{$ext}";
+        file_put_contents($imageDir . '/' . $filename, $decoded);
+        $saved[] = $filename;
+    }
+
+    // Append a line to the usage log so you have a searchable audit trail
+    if (!empty($saved)) {
+        $logLine = date('Y-m-d H:i:s') . " | $studentName | IMAGE_SAVED | "
+                 . implode(',', $saved) . " | Context: $context\n";
+        file_put_contents(__DIR__ . '/gemini_usage.log', $logLine, FILE_APPEND);
+    }
+
+    echo json_encode(['success' => true, 'saved' => $saved]);
+    exit;
 }
 
 // --- 2. STUDENT INTERACTION LOGGING ---

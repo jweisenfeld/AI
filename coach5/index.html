@@ -93,7 +93,16 @@
             <input type="text" id="uid" class="login-input" placeholder="Student ID" autofocus>
             <input type="password" id="pwd" class="login-input" placeholder="Password">
             <button class="btn" style="width:100%" onclick="handleLogin()">Login to Project</button>
-            <p style="margin:18px 0 0; font-size:0.75em; color:#aaa;">coach5 &nbsp;·&nbsp; vBUILD_DATE &nbsp;·&nbsp; BUILD_TIMESTAMP</p>
+            <p id="build-stamp" style="margin:18px 0 0; font-size:0.75em; color:#aaa;">coach5</p>
+            <script>
+                (function() {
+                    const d = new Date(document.lastModified);
+                    const date = d.toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' });
+                    const time = d.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
+                    document.getElementById('build-stamp').innerHTML =
+                        'coach5 &nbsp;·&nbsp; v' + date + ' &nbsp;·&nbsp; ' + time;
+                })();
+            </script>
         </div>
     </div>
 

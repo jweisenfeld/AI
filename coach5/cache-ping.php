@@ -15,7 +15,7 @@
  *   Day:     *
  *   Month:   *
  *   Weekday: *
- *   Command: /usr/local/bin/php /home2/fikrttmy/public_html/coach4/cache-ping.php >> /home2/fikrttmy/public_html/coach4/cache-ping.log 2>&1
+ *   Command: /usr/local/bin/php /home2/fikrttmy/public_html/coach5/cache-ping.php >> /home2/fikrttmy/public_html/coach5/cache-ping.log 2>&1
  */
 
 set_time_limit(120);

@@ -7,7 +7,7 @@
  *
  * Usage:
  *   CLI:  php test-stream.php
- *   Web:  https://psd1.net/coach4/test-stream.php?secret=amentum2025
+ *   Web:  https://psd1.net/coach5/test-stream.php?secret=amentum2025
  */
 
 if (php_sapi_name() !== 'cli' && ($_GET['secret'] ?? '') !== 'amentum2025') {
@@ -68,7 +68,7 @@ $TEST_PAYLOAD = json_encode([
     ],
 ]);
 
-$BASE_URL = 'https://psd1.net/coach4/api-proxy.php';
+$BASE_URL = 'https://psd1.net/coach5/api-proxy.php';
 
 // ============================================================
 // Helper: extract a text delta from a single SSE line.

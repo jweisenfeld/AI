@@ -15,9 +15,9 @@ HTML, PHP, JavaScript (frontend/backend), Python (data sync)
 ## Major Projects
 | Folder | Purpose |
 |--------|---------|
-| `claude/`, `claude2/` | Claude AI chat interfaces for students |
+| `claude/`, `claude2/` | General-purpose Claude AI chat interfaces for students (Anthropic Claude LLM) |
 | `chatgpt/`, `chatgpt2/` | ChatGPT interfaces |
-| `coach2/`, `coach3/`, `coach4/` | Progressive AI coaching tools |
+| `coach2/`, `coach3/`, `coach4/`, `coach5/` | "Engineering Project Coach" — progressive AI coaching tools (Google Gemini LLM) |
 | `gemini/` | Google Gemini interface |
 | `email-tracking/` | Email open-rate tracking system |
 | `physicsgrades/` | Per-student physics grade pages (158 students) |

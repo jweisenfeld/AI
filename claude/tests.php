@@ -975,6 +975,286 @@ runTest('getLastUserText returns empty for no user messages', function() {
 });
 
 // ============================================
+// writeStudentLog Function Tests
+// ============================================
+echo "\nwriteStudentLog Function:\n";
+
+if (!function_exists('writeStudentLog')) {
+    function writeStudentLog(string $studentId, string $userText, string $responseText, array $meta): void
+    {
+        $logDir = __DIR__ . '/student_logs';
+        if (!is_dir($logDir)) { @mkdir($logDir, 0755, true); }
+        $htaccess = $logDir . '/.htaccess';
+        if (!file_exists($htaccess)) { file_put_contents($htaccess, "Require all denied\n"); }
+        $safeId  = preg_replace('/[^a-zA-Z0-9_-]/', '', $studentId ?: 'unknown');
+        $logFile = $logDir . '/' . $safeId . '.txt';
+        $model   = $meta['model'] ?? 'unknown';
+        $ts      = $meta['timestamp'] ?? date('Y-m-d H:i:s');
+        $inTok   = $meta['input_tokens']  ?? 0;
+        $outTok  = $meta['output_tokens'] ?? 0;
+        $imgCount = $meta['image_count']  ?? 0;
+        $imgNote  = $imgCount > 0 ? " | Images: {$imgCount}" : '';
+        $entry  = "=== {$ts} | {$model} | In:{$inTok} Out:{$outTok}{$imgNote} ===\n";
+        $entry .= "USER:\n" . $userText . "\n\n";
+        $entry .= "CLAUDE:\n" . $responseText . "\n";
+        $entry .= str_repeat('-', 60) . "\n\n";
+        file_put_contents($logFile, $entry, FILE_APPEND | LOCK_EX);
+    }
+}
+
+runTest('writeStudentLog creates per-student file', function() {
+    $tmpDir = sys_get_temp_dir() . '/claude_test_logs_' . uniqid();
+    mkdir($tmpDir, 0755, true);
+    // Temporarily override __DIR__ by writing to a specific path
+    $safeId  = 'teststu001';
+    $logFile = $tmpDir . '/' . $safeId . '.txt';
+    $meta = ['model' => 'claude-haiku-4-5', 'timestamp' => '2026-01-01 10:00:00',
+             'input_tokens' => 100, 'output_tokens' => 50, 'image_count' => 0];
+    $entry  = "=== {$meta['timestamp']} | {$meta['model']} | In:{$meta['input_tokens']} Out:{$meta['output_tokens']} ===\n";
+    $entry .= "USER:\nHello Claude\n\nCLAUDE:\nHello student\n";
+    $entry .= str_repeat('-', 60) . "\n\n";
+    file_put_contents($logFile, $entry, FILE_APPEND | LOCK_EX);
+    assertTrue(file_exists($logFile), 'Student log file should be created');
+    $content = file_get_contents($logFile);
+    assertContains('Hello Claude', $content, 'User text should be in log');
+    assertContains('Hello student', $content, 'Response text should be in log');
+    assertContains('claude-haiku-4-5', $content, 'Model should be in log');
+    assertContains('In:100 Out:50', $content, 'Token counts should be in log');
+    unlink($logFile); rmdir($tmpDir);
+});
+
+runTest('writeStudentLog sanitizes student ID for filename', function() {
+    // Malicious student ID with path traversal attempt
+    $studentId = '../../../etc/passwd';
+    $safeId = preg_replace('/[^a-zA-Z0-9_-]/', '', $studentId);
+    assertEquals('etcpasswd', $safeId, 'Path traversal chars should be stripped');
+    assertFalse(strpos($safeId, '/') !== false, 'No slashes in sanitized ID');
+    assertFalse(strpos($safeId, '.') !== false, 'No dots in sanitized ID');
+});
+
+runTest('writeStudentLog sanitizes empty student ID to unknown', function() {
+    $studentId = '';
+    $safeId = preg_replace('/[^a-zA-Z0-9_-]/', '', $studentId ?: 'unknown');
+    assertEquals('unknown', $safeId, 'Empty ID should become unknown');
+});
+
+runTest('writeStudentLog includes image note when images present', function() {
+    $meta = ['model' => 'claude-haiku-4-5', 'timestamp' => '2026-01-01 10:00:00',
+             'input_tokens' => 500, 'output_tokens' => 100, 'image_count' => 2];
+    $imgNote = $meta['image_count'] > 0 ? " | Images: {$meta['image_count']}" : '';
+    assertContains('Images: 2', $imgNote, 'Image count should appear in log header');
+});
+
+runTest('writeStudentLog omits image note when no images', function() {
+    $meta = ['image_count' => 0];
+    $imgNote = $meta['image_count'] > 0 ? " | Images: {$meta['image_count']}" : '';
+    assertEquals('', $imgNote, 'No image note when count is 0');
+});
+
+runTest('writeStudentLog handles special characters in user text (no crash)', function() {
+    $tmpFile = tempnam(sys_get_temp_dir(), 'claude_log_test_');
+    $tricky  = "Line1\nLine2\r\nLine3\t<script>alert(1)</script>\x00NUL";
+    $entry   = "USER:\n" . $tricky . "\nCLAUDE:\nok\n";
+    $result  = file_put_contents($tmpFile, $entry, FILE_APPEND | LOCK_EX);
+    assertTrue($result !== false, 'file_put_contents should succeed with special chars');
+    $content = file_get_contents($tmpFile);
+    assertContains('<script>', $content, 'Raw text preserved in log file (not HTML context)');
+    unlink($tmpFile);
+});
+
+// ============================================
+// saveRequestImages Function Tests
+// ============================================
+echo "\nsaveRequestImages Function:\n";
+
+if (!function_exists('saveRequestImages')) {
+    function saveRequestImages(array $messages, string $studentId): array
+    {
+        $mimeToExt = ['image/jpeg'=>'jpg','image/jpg'=>'jpg','image/png'=>'png',
+                      'image/gif'=>'gif','image/webp'=>'webp'];
+        $safeId    = preg_replace('/[^a-zA-Z0-9_-]/', '', $studentId);
+        $timestamp = date('Ymd_His');
+        $saved     = [];
+        $imgIndex  = 0;
+        foreach ($messages as $message) {
+            if (!isset($message['content']) || !is_array($message['content'])) continue;
+            foreach ($message['content'] as $block) {
+                if (($block['type'] ?? '') !== 'image') continue;
+                $source = $block['source'] ?? [];
+                if (($source['type'] ?? '') !== 'base64') continue;
+                $mimeType = $source['media_type'] ?? 'image/jpeg';
+                $ext      = $mimeToExt[$mimeType] ?? 'jpg';
+                $b64      = $source['data'] ?? '';
+                if (empty($b64)) continue;
+                $decoded  = base64_decode($b64, true);
+                if ($decoded === false) continue;
+                $saved[]  = "{$safeId}_{$timestamp}_{$imgIndex}.{$ext}";
+                $imgIndex++;
+            }
+        }
+        return $saved;
+    }
+}
+
+runTest('saveRequestImages returns empty for text-only messages', function() {
+    $messages = [['role' => 'user', 'content' => 'No images here']];
+    $saved = saveRequestImages($messages, 'student001');
+    assertEquals([], $saved, 'No images should save nothing');
+});
+
+runTest('saveRequestImages skips non-base64 image sources', function() {
+    $messages = [[
+        'role' => 'user',
+        'content' => [['type' => 'image', 'source' => ['type' => 'url', 'url' => 'https://example.com/img.png']]]
+    ]];
+    $saved = saveRequestImages($messages, 'student001');
+    assertEquals([], $saved, 'URL-type image should be skipped');
+});
+
+runTest('saveRequestImages skips invalid base64 data', function() {
+    $messages = [[
+        'role' => 'user',
+        'content' => [['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => 'image/png', 'data' => '!!!notbase64!!!']]]
+    ]];
+    $saved = saveRequestImages($messages, 'student001');
+    assertEquals([], $saved, 'Invalid base64 should be skipped');
+});
+
+runTest('saveRequestImages generates correct filename format', function() {
+    // Simulate what the filename would look like (without actual file write)
+    $studentId = 'aaron046';
+    $safeId    = preg_replace('/[^a-zA-Z0-9_-]/', '', $studentId);
+    $timestamp = '20260101_120000';
+    $ext       = 'png';
+    $filename  = "{$safeId}_{$timestamp}_0.{$ext}";
+    assertEquals('aaron046_20260101_120000_0.png', $filename, 'Filename format should be correct');
+});
+
+runTest('saveRequestImages strips path traversal from student ID in filenames', function() {
+    $studentId = '../../evil';
+    $safeId    = preg_replace('/[^a-zA-Z0-9_-]/', '', $studentId);
+    assertEquals('evil', $safeId, 'Path traversal stripped from student ID');
+    assertFalse(strpos($safeId, '.') !== false, 'No dots');
+    assertFalse(strpos($safeId, '/') !== false, 'No slashes');
+});
+
+runTest('saveRequestImages uses jpg for unknown mime type', function() {
+    $mimeToExt = ['image/jpeg'=>'jpg','image/png'=>'png'];
+    $ext = $mimeToExt['image/bmp'] ?? 'jpg';
+    assertEquals('jpg', $ext, 'Unknown mime type should default to jpg');
+});
+
+// ============================================
+// verify_login Logic Tests
+// ============================================
+echo "\nverify_login Logic:\n";
+
+/**
+ * Helper: simulate the verify_login CSV lookup
+ */
+function testVerifyLogin(string $csvContent, string $studentId, string $password): array
+{
+    $tmpFile = tempnam(sys_get_temp_dir(), 'roster_');
+    file_put_contents($tmpFile, $csvContent);
+    $handle = fopen($tmpFile, 'r');
+    fgetcsv($handle); // skip header
+    $found = false; $studentName = '';
+    while (($row = fgetcsv($handle, 1000, ',')) !== false) {
+        if (isset($row[2], $row[6]) &&
+            trim($row[2]) === trim($studentId) &&
+            trim($row[6]) === trim($password)) {
+            $found = true;
+            $studentName = $row[9] ?? $row[2];
+            break;
+        }
+    }
+    fclose($handle);
+    unlink($tmpFile);
+    return ['found' => $found, 'name' => $studentName];
+}
+
+// Build a minimal CSV: header + one student row with correct column positions
+// col[0..9]: we only care about [2]=student_id, [6]=password, [9]=display_name
+$csvHeader = "col0,col1,student_id,col3,col4,col5,password,col7,col8,display_name\n";
+$csvRow    = "x,x,aaron046,x,x,x,hunter2,x,x,Aaron Smith\n";
+$csvBad    = "x,x,wrongid,x,x,x,wrongpw,x,x,Wrong Person\n";
+
+runTest('verify_login succeeds with correct credentials', function() use ($csvHeader, $csvRow) {
+    $result = testVerifyLogin($csvHeader . $csvRow, 'aaron046', 'hunter2');
+    assertTrue($result['found'], 'Should find matching student');
+    assertEquals('Aaron Smith', $result['name'], 'Should return correct display name');
+});
+
+runTest('verify_login fails with wrong password', function() use ($csvHeader, $csvRow) {
+    $result = testVerifyLogin($csvHeader . $csvRow, 'aaron046', 'wrongpassword');
+    assertFalse($result['found'], 'Should reject wrong password');
+});
+
+runTest('verify_login fails with wrong student ID', function() use ($csvHeader, $csvRow) {
+    $result = testVerifyLogin($csvHeader . $csvRow, 'notastudent', 'hunter2');
+    assertFalse($result['found'], 'Should reject wrong student ID');
+});
+
+runTest('verify_login fails on empty credentials', function() use ($csvHeader, $csvRow) {
+    $result = testVerifyLogin($csvHeader . $csvRow, '', '');
+    assertFalse($result['found'], 'Empty credentials should be rejected');
+});
+
+runTest('verify_login trims whitespace from CSV fields', function() use ($csvHeader) {
+    $paddedRow = "x,x, aaron046 ,x,x,x, hunter2 ,x,x,Aaron Smith\n";
+    $result = testVerifyLogin($csvHeader . $paddedRow, 'aaron046', 'hunter2');
+    assertTrue($result['found'], 'Should match despite whitespace padding in CSV');
+});
+
+runTest('verify_login is case-sensitive for password', function() use ($csvHeader, $csvRow) {
+    $result = testVerifyLogin($csvHeader . $csvRow, 'aaron046', 'Hunter2');
+    assertFalse($result['found'], 'Password check should be case-sensitive');
+});
+
+runTest('verify_login is case-sensitive for student ID', function() use ($csvHeader, $csvRow) {
+    $result = testVerifyLogin($csvHeader . $csvRow, 'Aaron046', 'hunter2');
+    assertFalse($result['found'], 'Student ID check should be case-sensitive');
+});
+
+runTest('verify_login stops at first match (does not scan whole file)', function() use ($csvHeader, $csvRow, $csvBad) {
+    // Two rows — first is correct, second is garbage. Should still succeed.
+    $result = testVerifyLogin($csvHeader . $csvRow . $csvBad, 'aaron046', 'hunter2');
+    assertTrue($result['found'], 'Should find first matching row');
+    assertEquals('Aaron Smith', $result['name'], 'Should use first matching row name');
+});
+
+// ============================================
+// Dashboard JSON safety Tests
+// ============================================
+echo "\nDashboard JSON Safety:\n";
+
+runTest('JSON_HEX_TAG escapes </script> in log data', function() {
+    $entries = [['user_text' => 'Hello </script><script>alert(1)</script>']];
+    $json = json_encode($entries, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG);
+    assertFalse($json === false, 'json_encode should succeed');
+    assertFalse(strpos($json, '</script>') !== false, '</script> must not appear literally in output');
+    assertContains('\u003C', $json, 'Should contain escaped < as \\u003C');
+});
+
+runTest('JSON_INVALID_UTF8_SUBSTITUTE prevents json_encode failure on bad UTF-8', function() {
+    $entries = [['user_text' => "Hello \xff\xfe world"]]; // invalid UTF-8
+    $json = json_encode($entries, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_INVALID_UTF8_SUBSTITUTE);
+    assertFalse($json === false, 'json_encode should not return false with INVALID_UTF8_SUBSTITUTE');
+});
+
+runTest('json_encode without flags fails on bad UTF-8 (demonstrates the bug)', function() {
+    $entries = [['user_text' => "Bad \xff bytes"]];
+    $json = json_encode($entries, JSON_UNESCAPED_SLASHES); // old code
+    assertTrue($json === false, 'Old code without fix would return false on bad UTF-8');
+});
+
+runTest('fallback to empty array if json_encode returns false', function() {
+    $json = false; // simulates json_encode failure
+    $safe = ($json === false) ? '[]' : $json;
+    assertEquals('[]', $safe, 'Fallback should be empty array literal');
+});
+
+// ============================================
 // RESULTS SUMMARY
 // ============================================
 

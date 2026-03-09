@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php tests.php:*)",
+      "Bash(where:*)",
+      "Bash(powershell -command:*)"
+    ]
+  }
+}

@@ -1,0 +1,485 @@
+cityalert.html
+
+
+Carter Meise
+
+​
+John C. Weisenfeld​
+<!DOCTYPE html>
+<html>
+<head>
+<title>Pasco Alert Bot</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #000080;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.chat-container {
+  background: #fff;
+  width: 400px;
+  max-width: 100%;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  height: 600px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+}
+
+.header {
+  padding: 15px;
+  background: #002080;
+  color: white;
+  border-radius: 10px 10px 0 0;
+  text-align: center;
+}
+
+.header h1 {
+  margin-bottom: 5px;
+}
+
+.header p {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.chat-box {
+  flex: 1;
+  padding: 15px;
+  overflow-y: auto;
+  background: #e6e6e6;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.message {
+  max-width: 70%;
+  padding: 10px 15px;
+  border-radius: 20px;
+  position: relative;
+  line-height: 1.4;
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.message.bot {
+  background: #002080;
+  color: white;
+  align-self: flex-start;
+  border-top-left-radius: 0;
+}
+
+.message.bot::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  left: -10px;
+  width: 0;
+  height: 0;
+  border-top: 10px solid transparent;
+  border-right: 10px solid #002080;
+  border-bottom: 10px solid transparent;
+}
+
+.message.user {
+  background: #0084ff;
+  color: white;
+  align-self: flex-end;
+  border-top-right-radius: 0;
+}
+
+.message.user::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  right: -10px;
+  width: 0;
+  height: 0;
+  border-top: 10px solid transparent;
+  border-left: 10px solid #0084ff;
+  border-bottom: 10px solid transparent;
+}
+
+.input-area {
+  display: flex;
+  padding: 10px;
+  border-top: 1px solid #ccc;
+}
+
+input[type="text"] {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #999;
+  border-radius: 20px;
+  font-size: 14px;
+  outline: none;
+}
+
+input[type="text"]:focus {
+  border-color: #0084ff;
+}
+
+button {
+  margin-left: 10px;
+  background: #0084ff;
+  border: none;
+  color: white;
+  padding: 0 20px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+button:hover {
+  background: #005bb5;
+}
+
+button:active {
+  transform: scale(0.95);
+}
+</style>
+</head>
+<body>
+
+<div class="chat-container">
+  <div class="header">
+    <h1>🚨 Pasco Alert Bot</h1>
+    <p>Get help with Pasco city issues</p>
+  </div>
+
+  <div class="chat-box" id="chatBox"></div>
+
+  <div class="input-area">
+    <input type="text" id="userInput" placeholder="Type a number or issue...">
+    <button onclick="sendMessage()">Send</button>
+  </div>
+</div>
+<script>
+// Track conversation state
+let conversationState = {
+  awaitingDetails: false,
+  issueType: null,
+  questionsAsked: 0,
+  userResponses: []
+};
+
+// Database of issues with follow-up questions
+const issueDatabase = {
+  "1": {
+    name: "Potholes",
+    emoji: "🕳️",
+    keywords: /pothole|road damage|broken road|cracked pavement|hole in road/,
+    response: "🕳️ POTHOLE REPORT\n\n📞 Call 311 or visit cityportal.gov\n📍 Location: Tell them exact street & address\n📸 Take a photo if possible\n⏱️ Fixed in 5-10 business days",
+    questions: [
+      "What street is the pothole on?",
+      "Is it blocking traffic or just a minor issue?",
+      "Have you already reported it, or is this your first time?"
+    ]
+  },
+  "2": {
+    name: "Noise Complaints",
+    emoji: "🔊",
+    keywords: /noise|loud|sound|music|barking|loud neighbors/,
+    response: "🔊 NOISE COMPLAINT\n\n📞 Call Non-Emergency Police: 311\n🏠 Your address: Required\n⏰ Time: Tell them when it happens\n📍 Type: Describe the noise\n✅ They'll send an officer",
+    questions: [
+      "What time does the noise usually happen?",
+      "What type of noise is it? (music, barking, construction, etc.)",
+      "Is it a one-time thing or does it happen regularly?"
+    ]
+  },
+  "3": {
+    name: "Streetlights",
+    emoji: "💡",
+    keywords: /streetlight|street light|broken light|lamp|dark street|no light/,
+    response: "💡 BROKEN STREETLIGHT\n\n📞 Call 311\n📍 Street: Which street & address\n🌙 Safety issue: Mention it's dark\n⏱️ Fixed in 3-5 business days",
+    questions: [
+      "Which street is the broken light on?",
+      "Is it completely out or just dim?",
+      "Is this a safety concern for your area?"
+    ]
+  },
+  "4": {
+    name: "Water/Flooding",
+    emoji: "💧",
+    keywords: /water|flood|leak|pipe|sewage|water main|burst pipe/,
+    response: "💧 WATER/FLOODING ISSUE\n\n📞 Small leak? Call 311\n🚨 MAJOR LEAK/FLOOD? Call 911 NOW\n📍 Location: Exact address\n⏱️ Emergency response is immediate",
+    questions: [
+      "Is this a small leak or a major flood?",
+      "Where is the water coming from? (street, your home, pipe, etc.)",
+      "Is it affecting other properties or just yours?"
+    ]
+  },
+  "5": {
+    name: "Trash/Garbage",
+    emoji: "🗑️",
+    keywords: /trash|garbage|waste|pickup|dumpster|recycling|missed pickup/,
+    response: "🗑️ MISSED TRASH PICKUP\n\n📞 Call Sanitation: 311\n🏠 Address: Your full address\n📅 Day: Tell them your pickup day\n✅ They'll pick it up within 24 hours",
+    questions: [
+      "What day is your normal pickup day?",
+      "Is this a one-time miss or a recurring problem?",
+      "Is it trash, recycling, or yard waste?"
+    ]
+  },
+  "6": {
+    name: "Graffiti",
+    emoji: "🎨",
+    keywords: /graffiti|vandalism|spray paint|tagged|wall art/,
+    response: "🎨 GRAFFITI REPORT\n\n📞 Call 311 or cityportal.gov\n📸 Photo: Take a picture\n📍 Location: Exact address\n⏱️ Removed within 1 week",
+    questions: [
+      "Where is the graffiti? (building, street sign, etc.)",
+      "Is it on public or private property?",
+      "Is it offensive or just a tag?"
+    ]
+  },
+  "7": {
+    name: "Pests/Animals",
+    emoji: "🐭",
+    keywords: /pest|rat|rodent|insect|cockroach|animal|stray|bedbug|termite/,
+    response: "🐭 PEST PROBLEM\n\n🏠 INSIDE HOME? Call an exterminator\n🏘️ NEIGHBORHOOD? Call 311\n🐀 RATS? Call Health Department: 311\n✅ They'll investigate & help",
+    questions: [
+      "Is this inside your home or in the neighborhood?",
+      "What type of pest? (rats, cockroaches, bed bugs, etc.)",
+      "How severe is the problem?"
+    ]
+  },
+  "8": {
+    name: "Parking Issues",
+    emoji: "🅿️",
+    keywords: /parking|parked|meter|ticket|violation|tow|towing/,
+    response: "🅿️ PARKING ISSUE\n\n🚗 Illegal parking? Call 311\n💰 Broken meter? Report on cityportal.gov\n📍 Location: Street & address\n✅ Parking Enforcement will handle it",
+    questions: [
+      "What's the parking issue? (illegal parking, broken meter, etc.)",
+      "Where is this happening?",
+      "Is it blocking traffic or a safety hazard?"
+    ]
+  },
+  "9": {
+    name: "Broken Sidewalks",
+    emoji: "🚶",
+    keywords: /sidewalk|curb|pavement|concrete|trip hazard|uneven/,
+    response: "🚶 BROKEN SIDEWALK\n\n📞 Call Public Works: 311\n📍 Location: Exact address\n⚠️ Safety hazard: Mention it\n🚨 URGENT - Someone could trip!",
+    questions: [
+      "Which street or address?",
+      "How bad is the damage? (crack, raised, hole, etc.)",
+      "Has anyone been injured?"
+    ]
+  },
+  "10": {
+    name: "Tree Problems",
+    emoji: "🌳",
+    keywords: /tree|branch|overgrown|vegetation|limb|foliage|fallen tree/,
+    response: "🌳 TREE PROBLEM\n\n📞 Call Parks Department: 311\n📍 Location: Street & address\n⚠️ Blocking street? Say it's urgent\n✅ They'll trim or remove it",
+    questions: [
+      "What's the problem? (overgrown, blocking street, fallen, etc.)",
+      "Where is the tree located?",
+      "Is it blocking traffic or a safety issue?"
+    ]
+  },
+  "11": {
+    name: "Power Outage",
+    emoji: "⚡",
+    keywords: /power|electric|electricity|outage|blackout|downed line/,
+    response: "⚡ POWER OUTAGE\n\n📞 Call your utility company NOW\n🌩️ Downed lines? Call 911\n📍 Address: Your location\n✅ Report immediately",
+    questions: [
+      "Is it just your home or the whole neighborhood?",
+      "Are there downed power lines?",
+      "How long has it been out?"
+    ]
+  },
+  "12": {
+    name: "Water Quality",
+    emoji: "💧",
+    keywords: /water quality|discolored water|brown water|dirty water|contaminated/,
+    response: "💧 WATER QUALITY ISSUE\n\n📞 Call Water Department: 311\n🚰 Sample: Save some water\n📍 Address: Your location\n⏱️ They'll test your water",
+    questions: [
+      "What does the water look like? (color, clarity)",
+      "Does it have a smell or taste?",
+      "Is it affecting hot water, cold water, or both?"
+    ]
+  },
+  "13": {
+    name: "Snow/Ice",
+    emoji: "❄️",
+    keywords: /snow|ice|slippery|winter|roads not salted|sidewalk ice/,
+    response: "❄️ SNOW/ICE PROBLEM\n\n📞 Call Public Works: 311\n🛣️ Streets: They prioritize main roads\n🚶 Sidewalks: Call Parks: 311\n⏱️ 24/7 response in winter",
+    questions: [
+      "Is it a street or sidewalk?",
+      "Is it a main road or residential street?",
+      "Is it a safety hazard?"
+    ]
+  },
+  "14": {
+    name: "Abandoned Cars",
+    emoji: "🚗",
+    keywords: /abandoned car|junk car|broken down car|non-running|parked for weeks/,
+    response: "🚗 ABANDONED CAR\n\n📞 Call Parking Enforcement: 311\n📍 Location: Street & address\n🚗 License plate: If visible\n✅ They'll investigate & tow",
+    questions: [
+      "Where is the car parked?",
+      "How long has it been there?",
+      "Do you know the license plate?"
+    ]
+  },
+  "15": {
+    name: "Illegal Dumping",
+    emoji: "🗑️",
+    keywords: /illegal dumping|dumping|trash pile|junk|debris/,
+    response: "🗑️ ILLEGAL DUMPING\n\n📞 Call Code Enforcement: 311\n📍 Location: Exact address\n📸 Photos: Take pictures\n🚨 Taken very seriously!",
+    questions: [
+      "Where is the dumping happening?",
+      "What type of debris? (trash, appliances, etc.)",
+      "Is it on public or private property?"
+    ]
+  }
+};
+
+// Initialize with welcome message
+window.addEventListener('load', function() {
+  addMessage("👋 Welcome to Pasco Alert Bot!\n\n🚨 Report city issues and get help fast.\n\nYou can:\n• Type a NUMBER (1-15)\n• Type the ISSUE NAME\n• Describe the PROBLEM\n\nType 'menu' to see all 15 options!", "bot");
+});
+
+function addMessage(text, sender) {
+  let chatBox = document.getElementById("chatBox");
+  let msg = document.createElement("div");
+  msg.className = "message " + sender;
+  msg.textContent = text;
+  chatBox.appendChild(msg);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+document.getElementById("userInput").addEventListener("keypress", function(event) {
+  if (event.key === "Enter") {
+    sendMessage();
+  }
+});
+</script>
+<script>
+function sendMessage() {
+  let input = document.getElementById("userInput").value;
+  if (!input) return;
+
+  addMessage(input, "user");
+  
+  // If waiting for details, process the answer
+  if (conversationState.awaitingDetails) {
+    processDetailAnswer(input.toLowerCase());
+  } else {
+    let response = getBotResponse(input.toLowerCase());
+    addMessage(response, "bot");
+  }
+  
+  document.getElementById("userInput").value = "";
+}
+
+function processDetailAnswer(input) {
+  // Store the user's response
+  conversationState.userResponses.push(input);
+  conversationState.questionsAsked++;
+  
+  // Ask next question if available
+  const currentIssue = issueDatabase[conversationState.issueType];
+  if (conversationState.questionsAsked < currentIssue.questions.length) {
+    let nextQuestion = currentIssue.questions[conversationState.questionsAsked];
+    addMessage(nextQuestion, "bot");
+  } else {
+    // All questions answered - provide final response
+    let finalMessage = currentIssue.response;
+    finalMessage += "\n\n📋 Summary of your issue:\n";
+    
+    for (let i = 0; i < conversationState.userResponses.length; i++) {
+      finalMessage += `• ${conversationState.userResponses[i]}\n`;
+    }
+    
+    finalMessage += "\n✅ Make sure to have this info when you call!";
+    
+    addMessage(finalMessage, "bot");
+    
+    // Reset conversation state
+    resetConversation();
+  }
+}
+
+function getBotResponse(input) {
+  // Check for menu/help
+  if (/help|menu|options|what can you help|list|all|show|what do you do/.test(input)) {
+    let menuText = "Cool! I can help with:\n\n";
+    for (let key in issueDatabase) {
+      menuText += `${key}. ${issueDatabase[key].emoji} ${issueDatabase[key].name}\n`;
+    }
+    menuText += "\nJust type the number or tell me what's wrong!";
+    return menuText;
+  }
+
+  // Check for emergency
+  if (/emergency|danger|urgent|fire|crime|accident|police|911/.test(input)) {
+    return "🚨 IF THIS IS AN EMERGENCY, CALL 911 RIGHT NOW!\n\nDon't wait. Fire, crime, accidents, injuries - call 911 immediately!";
+  }
+
+  // Check for greetings
+  if (/hello|hi|hey|greetings|good morning|good afternoon|good evening|what's up|yo/.test(input)) {
+    const greetings = [
+      "Hey there! What's going on in Pasco?",
+      "Hi! I'm here to help. What city issue are you dealing with?",
+      "Hey! What can I do for you today?",
+      "What's up? Tell me what's wrong with your area."
+    ];
+    return greetings[Math.floor(Math.random() * greetings.length)];
+  }
+
+  // Check if input is a number
+  if (/^\d+$/.test(input)) {
+    if (issueDatabase[input]) {
+      startDetailedQuestions(input);
+      return "Got it! Let me ask you a few questions to get more details.\n\n" + issueDatabase[input].questions[0];
+    } else {
+      return "Sorry, that number isn't in my list. Type 'menu' to see all options (1-15).";
+    }
+  }
+
+  // Check if input matches an issue name
+  for (let key in issueDatabase) {
+    if (input.includes(issueDatabase[key].name.toLowerCase())) {
+      startDetailedQuestions(key);
+      return "Got it! Let me ask you a few questions to get more details.\n\n" + issueDatabase[key].questions[0];
+    }
+  }
+
+  // Check keywords
+  for (let key in issueDatabase) {
+    if (issueDatabase[key].keywords.test(input)) {
+      startDetailedQuestions(key);
+      return "Got it! Let me ask you a few questions to get more details.\n\n" + issueDatabase[key].questions[0];
+    }
+  }
+
+  return "I'm not totally sure what you mean. Try typing a number (1-15), the issue name, or type 'menu' to see all options!";
+}
+
+function startDetailedQuestions(issueType) {
+  conversationState.awaitingDetails = true;
+  conversationState.issueType = issueType;
+  conversationState.questionsAsked = 0;
+  conversationState.userResponses = [];
+}
+
+function resetConversation() {
+  conversationState.awaitingDetails = false;
+  conversationState.issueType = null;
+  conversationState.questionsAsked = 0;
+  conversationState.userResponses = [];
+}
+</script>

@@ -1,13 +1,7 @@
-cityalert.html
-
-
-Carter Meise
-
-​
-John C. Weisenfeld​
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+<meta charset="UTF-8">
 <title>Pasco Alert Bot</title>
 <style>
 * {
@@ -169,6 +163,7 @@ button:active {
     <button onclick="sendMessage()">Send</button>
   </div>
 </div>
+
 <script>
 // Track conversation state
 let conversationState = {
@@ -353,8 +348,8 @@ window.addEventListener('load', function() {
 });
 
 function addMessage(text, sender) {
-  let chatBox = document.getElementById("chatBox");
-  let msg = document.createElement("div");
+  const chatBox = document.getElementById("chatBox");
+  const msg = document.createElement("div");
   msg.className = "message " + sender;
   msg.textContent = text;
   chatBox.appendChild(msg);
@@ -366,70 +361,55 @@ document.getElementById("userInput").addEventListener("keypress", function(event
     sendMessage();
   }
 });
-</script>
-<script>
+
 function sendMessage() {
-  let input = document.getElementById("userInput").value;
+  const input = document.getElementById("userInput").value.trim();
   if (!input) return;
 
   addMessage(input, "user");
-  
-  // If waiting for details, process the answer
+
   if (conversationState.awaitingDetails) {
     processDetailAnswer(input.toLowerCase());
   } else {
-    let response = getBotResponse(input.toLowerCase());
+    const response = getBotResponse(input.toLowerCase());
     addMessage(response, "bot");
   }
-  
+
   document.getElementById("userInput").value = "";
 }
 
 function processDetailAnswer(input) {
-  // Store the user's response
   conversationState.userResponses.push(input);
   conversationState.questionsAsked++;
-  
-  // Ask next question if available
+
   const currentIssue = issueDatabase[conversationState.issueType];
   if (conversationState.questionsAsked < currentIssue.questions.length) {
-    let nextQuestion = currentIssue.questions[conversationState.questionsAsked];
-    addMessage(nextQuestion, "bot");
+    addMessage(currentIssue.questions[conversationState.questionsAsked], "bot");
   } else {
-    // All questions answered - provide final response
-    let finalMessage = currentIssue.response;
-    finalMessage += "\n\n📋 Summary of your issue:\n";
-    
-    for (let i = 0; i < conversationState.userResponses.length; i++) {
-      finalMessage += `• ${conversationState.userResponses[i]}\n`;
+    let finalMessage = currentIssue.response + "\n\n📋 Summary of your issue:\n";
+    for (const response of conversationState.userResponses) {
+      finalMessage += `• ${response}\n`;
     }
-    
     finalMessage += "\n✅ Make sure to have this info when you call!";
-    
     addMessage(finalMessage, "bot");
-    
-    // Reset conversation state
     resetConversation();
   }
 }
 
 function getBotResponse(input) {
-  // Check for menu/help
   if (/help|menu|options|what can you help|list|all|show|what do you do/.test(input)) {
     let menuText = "Cool! I can help with:\n\n";
-    for (let key in issueDatabase) {
+    for (const key in issueDatabase) {
       menuText += `${key}. ${issueDatabase[key].emoji} ${issueDatabase[key].name}\n`;
     }
     menuText += "\nJust type the number or tell me what's wrong!";
     return menuText;
   }
 
-  // Check for emergency
   if (/emergency|danger|urgent|fire|crime|accident|police|911/.test(input)) {
     return "🚨 IF THIS IS AN EMERGENCY, CALL 911 RIGHT NOW!\n\nDon't wait. Fire, crime, accidents, injuries - call 911 immediately!";
   }
 
-  // Check for greetings
   if (/hello|hi|hey|greetings|good morning|good afternoon|good evening|what's up|yo/.test(input)) {
     const greetings = [
       "Hey there! What's going on in Pasco?",
@@ -440,7 +420,6 @@ function getBotResponse(input) {
     return greetings[Math.floor(Math.random() * greetings.length)];
   }
 
-  // Check if input is a number
   if (/^\d+$/.test(input)) {
     if (issueDatabase[input]) {
       startDetailedQuestions(input);
@@ -450,16 +429,14 @@ function getBotResponse(input) {
     }
   }
 
-  // Check if input matches an issue name
-  for (let key in issueDatabase) {
+  for (const key in issueDatabase) {
     if (input.includes(issueDatabase[key].name.toLowerCase())) {
       startDetailedQuestions(key);
       return "Got it! Let me ask you a few questions to get more details.\n\n" + issueDatabase[key].questions[0];
     }
   }
 
-  // Check keywords
-  for (let key in issueDatabase) {
+  for (const key in issueDatabase) {
     if (issueDatabase[key].keywords.test(input)) {
       startDetailedQuestions(key);
       return "Got it! Let me ask you a few questions to get more details.\n\n" + issueDatabase[key].questions[0];
@@ -483,3 +460,5 @@ function resetConversation() {
   conversationState.userResponses = [];
 }
 </script>
+</body>
+</html>

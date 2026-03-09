@@ -81,7 +81,8 @@ if (is_readable($logFile)) {
         }
     }
 }
-$entriesJson = json_encode($entries, JSON_UNESCAPED_SLASHES);
+$entriesJson = json_encode($entries, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_INVALID_UTF8_SUBSTITUTE);
+if ($entriesJson === false) { $entriesJson = '[]'; }
 $entryCount = count($entries);
 $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unknown') : 'no data';
 ?>

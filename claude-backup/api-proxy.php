@@ -36,10 +36,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 
 // Load API key from secrets file
 // The secrets file is stored outside public_html for security
-$accountRoot  = dirname($_SERVER['DOCUMENT_ROOT']);   // e.g. /home2/fikrttmy
-$secretsDir   = $accountRoot . '/.secrets';
-$secretsFile  = $secretsDir . '/claudekey.php';
-$studentFile  = $secretsDir . '/student_roster.csv';
+$accountRoot = dirname($_SERVER['DOCUMENT_ROOT']);   // e.g. /home2/fikrttmy
+$secretsDir  = $accountRoot . '/.secrets';
+$secretsFile = $secretsDir . '/claudekey.php';
 
 if (!is_readable($secretsFile)) {
     http_response_code(500);
@@ -65,37 +64,6 @@ $requestData = json_decode($input, true);
 if (!is_array($requestData)) {
     http_response_code(400);
     echo json_encode(['error' => 'Invalid JSON in request body']);
-    exit;
-}
-
-// ============================================
-// LOGIN ROUTE
-// ============================================
-if (isset($requestData['action']) && $requestData['action'] === 'verify_login') {
-    if (!is_readable($studentFile)) {
-        http_response_code(500);
-        echo json_encode(['error' => 'Roster file missing or not readable.']);
-        exit;
-    }
-    $handle = fopen($studentFile, 'r');
-    fgetcsv($handle); // skip header row
-    $found = false;
-    while (($row = fgetcsv($handle, 1000, ',')) !== false) {
-        if (isset($row[2], $row[6]) &&
-            trim($row[2]) === trim($requestData['student_id'] ?? '') &&
-            trim($row[6]) === trim($requestData['password'] ?? '')) {
-            $found = true;
-            $studentName = $row[9] ?? $row[2];
-            break;
-        }
-    }
-    fclose($handle);
-    if ($found) {
-        echo json_encode(['success' => true, 'student_name' => $studentName]);
-    } else {
-        http_response_code(401);
-        echo json_encode(['error' => 'Invalid credentials.']);
-    }
     exit;
 }
 
@@ -316,12 +284,9 @@ $logEntry = [
     'image_count' => $imageInfo['count'],
     'image_types' => $imageInfo['types'],
     'user_text_length' => strlen($lastUserText),
-    'user_text' => mb_substr($lastUserText, 0, 500),  // first 500 chars for summary log
+    'user_text' => mb_substr($lastUserText, 0, 500),  // first 500 chars of user prompt
     'is_school_hours' => $isSchoolHours,
 ];
-
-// Save images from this request as separate files tagged with student ID
-$savedImageFiles = saveRequestImages($requestData['messages'], $studentId);
 if (isset($modelDowngraded) && $modelDowngraded) {
     $logEntry['model_downgraded'] = true;
 }
@@ -388,24 +353,8 @@ if (is_array($responseData) && isset($responseData['usage'])) {
 $logEntry['http_status'] = $httpCode;
 $logEntry['model'] = $resolvedModel;
 $logEntry['model_healed'] = $modelHealed;
-if (!empty($savedImageFiles)) {
-    $logEntry['saved_images'] = $savedImageFiles;
-}
-
-// Write summary entry to the shared usage log
 $logFile = __DIR__ . '/claude_usage.log';
 file_put_contents($logFile, json_encode($logEntry) . "\n", FILE_APPEND | LOCK_EX);
-
-// Write full prompt + response to per-student log file
-$responseText = '';
-if (is_array($responseData) && isset($responseData['content'])) {
-    foreach ($responseData['content'] as $block) {
-        if (($block['type'] ?? '') === 'text') {
-            $responseText .= $block['text'] ?? '';
-        }
-    }
-}
-writeStudentLog($studentId, $lastUserText, $responseText, $logEntry);
 
 // If model was downgraded, inject a note into the response
 if (isset($modelDowngraded) && $modelDowngraded && is_array($responseData)) {
@@ -584,95 +533,6 @@ function getLastUserText(array $messages): string
         return implode(' ', $parts);
     }
     return '';
-}
-
-/**
- * Save base64 images from the messages array as files in student_logs/images/.
- * Returns array of saved filenames.
- */
-function saveRequestImages(array $messages, string $studentId): array
-{
-    $imageDir = __DIR__ . '/student_logs/images';
-    if (!is_dir($imageDir)) {
-        @mkdir($imageDir, 0755, true);
-    }
-
-    // Block direct web access to the image directory
-    $htaccess = $imageDir . '/.htaccess';
-    if (!file_exists($htaccess)) {
-        file_put_contents($htaccess, "Require all denied\n");
-    }
-
-    $mimeToExt = [
-        'image/jpeg' => 'jpg', 'image/jpg' => 'jpg',
-        'image/png'  => 'png', 'image/gif' => 'gif',
-        'image/webp' => 'webp', 'image/heic' => 'heic',
-        'image/heif' => 'heif', 'image/bmp'  => 'bmp',
-    ];
-
-    $safeId    = preg_replace('/[^a-zA-Z0-9_-]/', '', $studentId);
-    $timestamp = date('Ymd_His');
-    $saved     = [];
-    $imgIndex  = 0;
-
-    foreach ($messages as $message) {
-        if (!isset($message['content']) || !is_array($message['content'])) continue;
-        foreach ($message['content'] as $block) {
-            if (($block['type'] ?? '') !== 'image') continue;
-            $source    = $block['source'] ?? [];
-            $sourceType = $source['type'] ?? '';
-            if ($sourceType !== 'base64') continue;
-
-            $mimeType = $source['media_type'] ?? 'image/jpeg';
-            $ext      = $mimeToExt[$mimeType] ?? 'jpg';
-            $b64      = $source['data'] ?? '';
-            if (empty($b64)) continue;
-
-            $decoded = base64_decode($b64, true);
-            if ($decoded === false) continue;
-
-            $filename = "{$safeId}_{$timestamp}_{$imgIndex}.{$ext}";
-            file_put_contents($imageDir . '/' . $filename, $decoded);
-            $saved[] = $filename;
-            $imgIndex++;
-        }
-    }
-
-    return $saved;
-}
-
-/**
- * Write a full prompt+response entry to a per-student log file.
- */
-function writeStudentLog(string $studentId, string $userText, string $responseText, array $meta): void
-{
-    $logDir = __DIR__ . '/student_logs';
-    if (!is_dir($logDir)) {
-        @mkdir($logDir, 0755, true);
-    }
-
-    // Block direct web access
-    $htaccess = $logDir . '/.htaccess';
-    if (!file_exists($htaccess)) {
-        file_put_contents($htaccess, "Require all denied\n");
-    }
-
-    $safeId   = preg_replace('/[^a-zA-Z0-9_-]/', '', $studentId ?: 'unknown');
-    $logFile  = $logDir . '/' . $safeId . '.txt';
-
-    $model    = $meta['model'] ?? 'unknown';
-    $ts       = $meta['timestamp'] ?? date('Y-m-d H:i:s');
-    $inTok    = $meta['input_tokens']  ?? 0;
-    $outTok   = $meta['output_tokens'] ?? 0;
-    $imgCount = $meta['image_count']   ?? 0;
-    $imgNote  = $imgCount > 0 ? " | Images: {$imgCount}" : '';
-
-    $entry  = "=== {$ts} | {$model} | In:{$inTok} Out:{$outTok}{$imgNote} ===\n";
-    $entry .= "USER:\n" . $userText . "\n\n";
-    $entry .= "CLAUDE:\n" . $responseText . "\n";
-    $entry .= str_repeat('-', 60) . "\n\n";
-
-    file_put_contents($logFile, $entry, FILE_APPEND | LOCK_EX);
 }
 
 // (No closing PHP tag is recommended)

@@ -789,64 +789,9 @@
             color: #92400e;
             opacity: 0.8;
         }
-
-        /* Login overlay */
-        .login-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.85);
-            z-index: 999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(4px);
-        }
-        .login-card {
-            background: white;
-            padding: 40px;
-            border-radius: 12px;
-            width: 320px;
-            text-align: center;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-        }
-        .login-card h2 {
-            margin-top: 0;
-            color: var(--primary);
-        }
-        .login-input {
-            width: 100%;
-            padding: 12px;
-            margin-bottom: 15px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            box-sizing: border-box;
-            font-size: 1rem;
-            font-family: inherit;
-        }
-        .login-input:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-        .login-error {
-            color: var(--error);
-            font-size: 0.85rem;
-            margin-top: 8px;
-            min-height: 1.2em;
-        }
     </style>
 </head>
 <body>
-    <!-- Login overlay -->
-    <div id="login-modal" class="login-overlay">
-        <div class="login-card">
-            <h2>Claude AI Chat</h2>
-            <input type="text" id="login-uid" class="login-input" placeholder="Student ID" autocomplete="username" spellcheck="false">
-            <input type="password" id="login-pwd" class="login-input" placeholder="Password" autocomplete="current-password">
-            <button class="btn" style="width:100%; padding:12px;" id="login-btn" onclick="handleLogin()">Sign In</button>
-            <p class="login-error" id="login-error"></p>
-        </div>
-    </div>
-
     <header class="header">
         <div class="header-content">
             <div>
@@ -902,11 +847,11 @@
 
         <!-- Chat Container -->
         <main class="chat-container">
-            <!-- Student ID Bar (hidden after login; kept for fallback display) -->
-            <div class="student-id-bar" id="student-id-bar" style="display:none;">
-                <label for="student-id">Logged in as:</label>
-                <input type="text" id="student-id" readonly style="background:#fff8e1; cursor:default;">
-                <span class="student-hint" id="student-name-display"></span>
+            <!-- Student ID Bar -->
+            <div class="student-id-bar">
+                <label for="student-id">Student ID:</label>
+                <input type="text" id="student-id" placeholder="e.g. aaron046" autocomplete="off" spellcheck="false">
+                <span class="student-hint">Required to send messages</span>
             </div>
 
             <!-- Feature Info Banner -->
@@ -1038,54 +983,26 @@
         let sessionTokens = { total: 0, lastInput: 0, lastOutput: 0 };
         let showSystemPrompt = false;
 
-        // ── Login state ──────────────────────────────────────────────────────────
-        let STUDENT_ID   = null;
-        let STUDENT_NAME = null;
+        // Student ID: read from URL param, then localStorage fallback
+        (function initStudentId() {
+            const params = new URLSearchParams(window.location.search);
+            const urlStudent = params.get('student');
+            const savedStudent = localStorage.getItem('claude_student_id');
+            const input = document.getElementById('student-id');
 
-        async function handleLogin() {
-            const id  = document.getElementById('login-uid').value.trim();
-            const pw  = document.getElementById('login-pwd').value;
-            const err = document.getElementById('login-error');
-            const btn = document.getElementById('login-btn');
-
-            if (!id || !pw) { err.textContent = 'Please enter your Student ID and password.'; return; }
-
-            btn.disabled = true;
-            btn.textContent = 'Signing in…';
-            err.textContent = '';
-
-            try {
-                const res  = await fetch('api-proxy.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'verify_login', student_id: id, password: pw })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    STUDENT_ID   = id;
-                    STUDENT_NAME = data.student_name;
-                    document.getElementById('login-modal').style.display = 'none';
-                    // Show logged-in identity in the student bar
-                    document.getElementById('student-id').value = id;
-                    document.getElementById('student-name-display').textContent = data.student_name;
-                    document.getElementById('student-id-bar').style.display = 'flex';
-                } else {
-                    err.textContent = 'Invalid credentials. Please try again.';
-                }
-            } catch (e) {
-                err.textContent = 'Login error: ' + e.message;
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Sign In';
+            if (urlStudent) {
+                input.value = urlStudent;
+                localStorage.setItem('claude_student_id', urlStudent);
+            } else if (savedStudent) {
+                input.value = savedStudent;
             }
-        }
 
-        // Enter key on login fields
-        ['login-uid', 'login-pwd'].forEach(id =>
-            document.getElementById(id).addEventListener('keydown', e => {
-                if (e.key === 'Enter') { e.preventDefault(); handleLogin(); }
-            })
-        );
+            // Save on change
+            input.addEventListener('input', function() {
+                localStorage.setItem('claude_student_id', this.value.trim());
+                this.classList.remove('invalid');
+            });
+        })();
 
         // Feature configurations
         const features = {
@@ -1232,12 +1149,15 @@
         async function sendMessage() {
             if (isLoading) return;
 
-            // Require login
-            if (!STUDENT_ID) {
-                document.getElementById('login-modal').style.display = 'flex';
+            // Require student ID
+            const studentInput = document.getElementById('student-id');
+            const studentId = studentInput.value.trim();
+            if (!studentId) {
+                studentInput.classList.add('invalid');
+                studentInput.focus();
+                updateStatus('Please enter your Student ID');
                 return;
             }
-            const studentId = STUDENT_ID;
 
             const input = document.getElementById('message-input');
             const text = input.value.trim();

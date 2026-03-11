@@ -51,9 +51,11 @@ test('buildRequestPayload formats system and messages', () => {
     maxTokens: 128,
   });
 
-  assertEqual(payload.system, 'Be helpful', 'System message mismatch');
+  assert(payload.system.startsWith('Be helpful'), 'System message should start with user instructions');
   assertEqual(payload.messages.length, 2, 'Message count mismatch');
   assertEqual(payload.messages[0].content, 'Hi', 'Message content mismatch');
+
+  assert(payload.system.includes('complete runnable code'), 'System message should include coding help preference');
 });
 
 test('saveTranscript and loadTranscript round-trip', () => {

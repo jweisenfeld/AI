@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Sample ChatGPT Classroom Chatbot</title>
+  <title>Carter Coding ChatGPT Tutor</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <main class="page">
     <header class="header">
       <div>
-        <h1>Sample ChatGPT Classroom Chatbot</h1>
+        <h1>Carter Coding ChatGPT Tutor</h1>
         <p class="subtitle">
-          A fully commented example that uses a PHP proxy and a simple unit-testable JS core.
+          Coding-focused tutoring assistant for Orion High School students.
         </p>
       </div>
       <button id="themeToggle" class="secondary" type="button">Toggle Theme</button>
@@ -24,9 +24,9 @@
         <label>
           Model
           <select id="model">
-            <option value="gpt-4.1-mini">gpt-4.1-mini (fast)</option>
-            <option value="gpt-4.1">gpt-4.1 (quality)</option>
-            <option value="gpt-4.1-nano">gpt-4.1-nano (small/cheap)</option>
+            <option value="gpt-4.1-mini" selected>gpt-4.1-mini (recommended: best quality/cost for student web coding)</option>
+            <option value="gpt-4.1-nano">gpt-4.1-nano (lowest cost, may need more follow-up prompts)</option>
+            <option value="gpt-4.1">gpt-4.1 (highest quality, highest cost)</option>
           </select>
         </label>
         <label>
@@ -35,12 +35,19 @@
         </label>
         <label>
           Max Output Tokens
-          <input id="maxTokens" type="number" min="64" max="2048" step="32" value="512" />
+          <input id="maxTokens" type="number" min="64" max="4096" step="32" value="900" />
         </label>
       </div>
       <label class="full">
         System Message (instructions for the assistant)
-        <textarea id="systemMessage" rows="3">You are a friendly tutoring assistant. Use simple language and ask clarifying questions.</textarea>
+        <textarea id="systemMessage" rows="8">You are ChatGPT, a patient coding tutor for Carter Meise (9th grade, Orion High School).
+
+Always help with programming tasks by giving COMPLETE, runnable code when asked (not partial snippets).
+When Carter asks for JavaScript, HTML, or CSS, provide full files in separate code blocks with clear labels.
+If he asks for fixes, show the corrected full version first, then briefly explain what changed.
+Use beginner-friendly explanations, define technical words, and break steps into short numbered lists.
+Ask at most one clarifying question only if required to continue.
+Encourage learning, but do not refuse to provide code that is safe and school-appropriate.</textarea>
       </label>
     </section>
 
@@ -68,6 +75,7 @@
         <li>The response is appended to the chat log and saved for later refreshes.</li>
       </ol>
       <p class="notes">Open <code>tests.html</code> to run the unit tests.</p>
+      <p class="notes">Cost tip: start with <code>gpt-4.1-mini</code> and ~900 max tokens, then only switch to <code>gpt-4.1</code> for harder debugging tasks.</p>
       <p class="notes">Note: model availability depends on your API project and billing tier.</p>
     </section>
   </main>

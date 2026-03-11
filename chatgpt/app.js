@@ -7,6 +7,10 @@
 
 const CHAT_STORAGE_KEY = 'sample-chatgpt-history-v1';
 
+const CODING_HELP_SUFFIX = `
+
+Student preference: For coding requests, provide complete runnable code (full JS/HTML/CSS files) instead of partial snippets.`;
+
 /**
  * Return a sanitized string the UI can safely display.
  * This is a light escape since we only insert as textContent.
@@ -19,11 +23,13 @@ function sanitizeUserText(text) {
  * Build the request payload expected by chat_api.php.
  */
 function buildRequestPayload({ systemMessage, messages, model, temperature, maxTokens }) {
+  const combinedSystemMessage = `${sanitizeUserText(systemMessage)}${CODING_HELP_SUFFIX}`;
+
   return {
     model,
     temperature,
     max_output_tokens: maxTokens,
-    system: sanitizeUserText(systemMessage),
+    system: combinedSystemMessage,
     messages: messages.map((message) => ({
       role: message.role,
       content: sanitizeUserText(message.content),

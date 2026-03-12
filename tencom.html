@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ten Commandments Summary</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f9f9f9;
+            margin: 20px;
+            color: #333;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+        }
+
+        .commandment {
+            background: white;
+            border: 2px solid #2c3e50;
+            border-radius: 8px;
+            margin: 10px auto;
+            max-width: 600px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            padding: 15px;
+        }
+
+        .commandment:hover {
+            background-color: #ecf0f1;
+        }
+
+        .title {
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .content {
+            margin-top: 10px;
+            display: none;
+            font-size: 16px;
+            color: #34495e;
+        }
+
+        .content img {
+            margin-top: 10px;
+            width: 80px;
+            height: 80px;
+            display: block;
+        }
+
+        .expanded .content {
+            display: block;
+        }
+
+        .arrow {
+            font-size: 20px;
+            transition: transform 0.3s ease;
+        }
+
+        .expanded .arrow {
+            transform: rotate(90deg);
+        }
+    </style>
+</head>
+
+<body>
+    <h1>The Ten Commandments</h1>
+    <div class="commandment" onclick="toggleExpand(this)">
+        <div class="title"> 1. You shall have no other gods before Me. <span class="arrow">▶</span> </div>
+        <div class="content"> Worship only God and do not put other things above Him. <img
+                src="https://cdn-icons-png.flaticon.com/512/616/616408.png" alt="God icon" /> </div>
+    </div>
+    <div class="commandment" onclick="toggleExpand(this)">
+        <div class="title"> 2. You shall not make idols. <span class="arrow">▶</span> </div>
+        <div class="content"> Do not worship statues or images as gods. <img
+                src="https://cdn-icons-png.flaticon.com/512/3144/3144456.png" alt="No idols icon" /> </div>
+    </div>
+    <div class="commandment" onclick="toggleExpand(this)">
+        <div class="title"> 3. You shall not take the name of the Lord your God in vain. <span class="arrow">▶</span>
+        </div>
+        <div class="content"> Always respect God's name and speak it with honor. <img
+                src="https://cdn-icons-png.flaticon.com/512/2917/2917994.png" alt="Respect icon" /> </div>
+    </div>
+    <div class="commandment" onclick="toggleExpand(this)">
+        <div class="title"> 4. Remember the Sabbath day, to keep it holy. <span class="arrow">▶</span> </div>
+        <div class="content"> Take a day of rest to honor God and refresh yourself. <img
+                src="https://cdn-icons-png.flaticon.com/512/2913/2913467.png" alt="Sabbath icon" /> </div>
+    </div>
+    <div class="commandment" onclick="toggleExpand(this)">
+        <div class="title"> 5. Honor your father and your mother. <span class="arrow">▶</span> </div>
+        <div class="content"> Respect and obey your parents. <img
+                src="https://cdn-icons-png.flaticon.com/512/616/616408.png" alt="Parents icon" /> </div>
+    </div>
+    <div class="commandment" onclick="toggleExpand(this)">
+        <div class="title"> 6. You shall not murder. <span class="arrow">▶</span> </div>
+        <div class="content"> Respect the life of every person. <img
+                src="https://cdn-icons-png.flaticon.com/512/2965/2965567.png" alt="No murder icon" /> </div>
+    </div>
+    <div class="commandment" onclick="toggleExpand(this)">
+        <div class="title"> 7. You shall not commit adultery. <span class="arrow">▶</span> </div>
+        <div class="content"> Be faithful in marriage and relationships. <img
+                src="https://cdn-icons-png.flaticon.com/512/2921/2921822.png" alt="Faithfulness icon" /> </div>
+    </div>
+    <div class="commandment" onclick="toggleExpand(this)">
+        <div class="title"> 8. You shall not steal. <span class="arrow">▶</span> </div>
+        <div class="content"> Respect other people's property and do not take what isn't yours. <img
+                src="https://cdn-icons-png.flaticon.com/512/2566/2566659.png" alt="No stealing icon" /> </div>
+    </div>
+    <div class="commandment" onclick="toggleExpand(this)">
+        <div class="title"> 9. You shall not bear false witness against your neighbor. <span class="arrow">▶</span>
+        </div>
+        <div class="content"> Always tell the truth and do not lie about others. <img
+                src="https://cdn-icons-png.flaticon.com/512/2913/2913435.png" alt="Truth icon" /> </div>
+    </div>
+    <div class="commandment" onclick="toggleExpand(this)">
+        <div class="title"> 10. You shall not covet anything that belongs to your neighbor. <span class="arrow">▶</span>
+        </div>
+        <div class="content"> Be happy with what you have and don’t envy others. <img
+                src="https://cdn-icons-png.flaticon.com/512/2913/2913479.png" alt="Contentment icon" /> </div>
+    </div>
+    <script> function toggleExpand(element) { element.classList.toggle("expanded"); } </script>
+</body>
+
+</html>

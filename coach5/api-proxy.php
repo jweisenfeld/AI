@@ -39,6 +39,99 @@ function send_error($msg, $details = null) {
 // Keep in sync with MAX_HISTORY_CHARS in index.html.
 define('MAX_HISTORY_CHARS', 40_000);
 
+// ── Explicit Context Cache ────────────────────────────────────────────────────
+// TTL for explicit cache entries. 4 hours covers a full school day's classes
+// without mid-day renewal. The underlying Files API URI is separate (48h TTL,
+// managed by cache-create.php + cron).
+//
+// Only models listed in EXPLICIT_CACHE_MODELS receive guaranteed cache hits.
+// Others fall back to Files API + implicit caching (random hit/miss).
+// Expand after verifying additional models via test-explicit-cache-all-models.php.
+define('EXPLICIT_CACHE_TTL', 4 * 3600);
+define('EXPLICIT_CACHE_MODELS_JSON', json_encode(['gemini-2.5-flash-lite']));
+
+/**
+ * Returns a valid explicit cachedContent name for $model, creating one if needed.
+ * Uses a file lock to prevent duplicate creation when two requests arrive
+ * simultaneously on a cold start.  Returns null on failure — caller falls back
+ * to Files API (implicit caching) with no disruption to the student.
+ */
+function get_or_create_explicit_cache(string $model, string $fileUri, string $fileMime, string $apiKey, string $accountRoot): ?string {
+    $safeModel  = preg_replace('/[^a-z0-9\-]/', '-', $model);
+    $nameFile   = $accountRoot . '/.secrets/gemini_explicit_cache_' . $safeModel . '.txt';
+    $expiryFile = $nameFile . '.expires';
+    $lockFile   = $nameFile . '.lock';
+
+    // ── Valid cache already exists? ───────────────────────────────────────────
+    if (file_exists($nameFile) && file_exists($expiryFile)) {
+        $expireTime = (int)trim(file_get_contents($expiryFile));
+        if (time() < $expireTime) {
+            $cacheName = trim(file_get_contents($nameFile));
+            if (!empty($cacheName)) return $cacheName;
+        }
+    }
+
+    // ── Acquire file lock — one creator at a time ─────────────────────────────
+    $lock = fopen($lockFile, 'c');
+    if (!$lock) return null;  // can't lock — fall back gracefully
+
+    if (!flock($lock, LOCK_EX | LOCK_NB)) {
+        // Another request is already creating the cache — wait for it to finish
+        flock($lock, LOCK_EX);
+        fclose($lock);
+        // Re-read: the other request should have written the cache name by now
+        if (file_exists($nameFile) && file_exists($expiryFile)) {
+            $expireTime = (int)trim(file_get_contents($expiryFile));
+            if (time() < $expireTime) {
+                $cacheName = trim(file_get_contents($nameFile));
+                if (!empty($cacheName)) return $cacheName;
+            }
+        }
+        return null;
+    }
+
+    // ── We hold the lock — create the cache ──────────────────────────────────
+    $createUrl = "https://generativelanguage.googleapis.com/v1beta/cachedContents?key=$apiKey";
+    $createPayload = [
+        'model'    => "models/$model",
+        'contents' => [[
+            'role'  => 'user',
+            'parts' => [['fileData' => ['mimeType' => $fileMime, 'fileUri' => $fileUri]]]
+        ]],
+        'ttl' => EXPLICIT_CACHE_TTL . 's',
+    ];
+
+    $ch = curl_init($createUrl);
+    curl_setopt($ch, CURLOPT_POST,           true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS,     json_encode($createPayload));
+    curl_setopt($ch, CURLOPT_HTTPHEADER,     ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT,        60);
+    $body = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    $cacheName = null;
+    $result    = json_decode($body, true);
+    if ($code === 200 && isset($result['name'])) {
+        $cacheName  = $result['name'];
+        $expireTime = time() + EXPLICIT_CACHE_TTL - 60;  // 1-min safety buffer
+        file_put_contents($nameFile,   $cacheName);
+        file_put_contents($expiryFile, (string)$expireTime);
+        file_put_contents(__DIR__ . '/gemini_usage.log',
+            date('Y-m-d H:i:s') . " | EXPLICIT_CACHE_CREATED | $model | $cacheName | expires:" . date('Y-m-d H:i:s', $expireTime) . "\n",
+            FILE_APPEND);
+    } else {
+        file_put_contents(__DIR__ . '/gemini_usage.log',
+            date('Y-m-d H:i:s') . " | EXPLICIT_CACHE_FAIL | $model | HTTP:$code | " . substr($body ?? '', 0, 200) . "\n",
+            FILE_APPEND);
+    }
+
+    flock($lock, LOCK_UN);
+    fclose($lock);
+    return $cacheName;
+}
+
 // --- STREAMING HANDLER ---
 function handle_stream($data, $secretsFile, $cacheNameFile) {
 
@@ -66,16 +159,15 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     require_once($secretsFile); // defines $GEMINI_API_KEY
 
     $modelMap = [
-        "gemini-2.5-flash"      => "gemini-2.5-flash",
         "gemini-2.5-flash-lite" => "gemini-2.5-flash-lite",
+        "gemini-2.5-flash"      => "gemini-2.5-flash",
         "gemini-2.5-pro"        => "gemini-2.5-pro",
         "gemini-3-flash-preview"=> "gemini-3-flash-preview",
         "gemini-3-pro-preview"  => "gemini-3-pro-preview",
-        "gemini-2.0-flash"      => "gemini-2.0-flash",
-        "gemini-2.0-flash-lite" => "gemini-2.0-flash-lite",
+        // gemini-2.0-flash and gemini-2.0-flash-lite removed — deprecated (404 on inference)
     ];
-    $requested   = $data['model'] ?? 'gemini-2.5-flash';
-    $actualModel = $modelMap[$requested] ?? "gemini-2.5-flash";
+    $requested   = $data['model'] ?? 'gemini-2.5-flash-lite';
+    $actualModel = $modelMap[$requested] ?? "gemini-2.5-flash-lite";
 
     // Streaming endpoint
     $url = "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -104,6 +196,20 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
             }
             // If no expiry file exists, assume stale — don't risk a 400 error
         }
+    }
+
+    // ── Explicit cache lookup ─────────────────────────────────────────────────
+    // For supported models with a valid Files API URI, try to get (or lazily
+    // create) a persistent explicit context cache.  On success, the file URI
+    // is NOT prepended to contents — the cache replaces it.  On failure the
+    // code falls through to the Files API path with no student-visible impact.
+    $explicitCacheName = null;
+    $explicitModels    = json_decode(EXPLICIT_CACHE_MODELS_JSON, true);
+    if ($fileUri !== null && in_array($actualModel, $explicitModels)) {
+        $accountRootLocal  = dirname(dirname($cacheNameFile));  // derive: .secrets/../ = account root
+        $explicitCacheName = get_or_create_explicit_cache(
+            $actualModel, $fileUri, $fileMimeType, trim($GEMINI_API_KEY), $accountRootLocal
+        );
     }
 
     // ── Build contents array (identical to non-streaming route) ──────────────
@@ -136,23 +242,33 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
         return;
     }
 
-    // ── Prepend file URI as first user turn ───────────────────────────────────
-    if ($fileUri !== null) {
-        array_unshift($contents, [
-            'role'  => 'user',
-            'parts' => [[ 'file_data' => [ 'mime_type' => $fileMimeType, 'file_uri' => $fileUri ] ]]
-        ]);
-    }
+    // ── Build payload — explicit cache path vs. Files API fallback ───────────
+    $systemInstruction = ["parts" => [["text" => $data['system'] ?? "You are a civil engineer."]]];
+    $generationConfig  = ["maxOutputTokens" => 2000];
 
-    $payload = [
-        "contents"          => $contents,
-        "systemInstruction" => ["parts" => [["text" => $data['system'] ?? "You are a civil engineer."]]],
-        // Hard cap on output tokens — keeps responses concise and reduces latency.
-        // 2000 tokens gives thinking models (e.g. Gemini 3 Pro) room to reason
-        // AND produce a complete visible response. The system prompt instructs
-        // ≤500 words so this is a safety net rather than a primary limiter.
-        "generationConfig"  => ["maxOutputTokens" => 2000]
-    ];
+    if ($explicitCacheName !== null) {
+        // Explicit cache: send conversation only — the cache already holds the file.
+        // Do NOT prepend the file URI; 'cachedContent' replaces it.
+        $payload = [
+            "cachedContent"     => $explicitCacheName,
+            "contents"          => $contents,
+            "systemInstruction" => $systemInstruction,
+            "generationConfig"  => $generationConfig,
+        ];
+    } else {
+        // Files API fallback: prepend file as first user turn (implicit caching).
+        if ($fileUri !== null) {
+            array_unshift($contents, [
+                'role'  => 'user',
+                'parts' => [[ 'file_data' => [ 'mime_type' => $fileMimeType, 'file_uri' => $fileUri ] ]]
+            ]);
+        }
+        $payload = [
+            "contents"          => $contents,
+            "systemInstruction" => $systemInstruction,
+            "generationConfig"  => $generationConfig,
+        ];
+    }
 
     // ── Fetch the full SSE response with RETURNTRANSFER ──────────────────────
     // CURLOPT_WRITEFUNCTION closures are silently ignored on some shared hosts
@@ -191,7 +307,8 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     // still warms the cache, so an immediate retry almost always gets a CACHE_HIT
     // and returns a real response.  Guard: only retry when a file was in the
     // payload (large context is the trigger) and output was suspiciously tiny.
-    if ($fileUri !== null) {
+    // Skip entirely when using explicit cache — a cache hit is guaranteed there.
+    if ($fileUri !== null && $explicitCacheName === null) {
         $firstPassOut    = 0;
         $firstPassCached = 0;
         foreach (preg_split('/\r?\n/', $rawBody) as $rl) {
@@ -269,14 +386,14 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     flush();
 
     // ── Usage logging (same format as non-streaming route) ───────────────────
-    $studentName   = $data['student_name'] ?? 'Unknown';
-    $studentID     = $data['student_id']   ?? 'unknown';
-    $fileFlag      = $fileUri ? "FILE_URI" : "NO_FILE";
-    $inTokens      = $usageMeta['promptTokenCount']        ?? 0;
-    $outTokens     = $usageMeta['candidatesTokenCount']    ?? 0;
-    $cachedTokens  = $usageMeta['cachedContentTokenCount'] ?? 0;
-    $cacheFlag     = $cachedTokens > 0 ? "CACHE_HIT:{$cachedTokens}" : "CACHE_MISS";
-    $logLine       = date('Y-m-d H:i:s') . " | $studentName | $actualModel | In:$inTokens | Out:$outTokens | Cached:$cachedTokens | $fileFlag | $cacheFlag | ID:$studentID\n";
+    $studentName  = $data['student_name'] ?? 'Unknown';
+    $studentID    = $data['student_id']   ?? 'unknown';
+    $inTokens     = $usageMeta['promptTokenCount']        ?? 0;
+    $outTokens    = $usageMeta['candidatesTokenCount']    ?? 0;
+    $cachedTokens = $usageMeta['cachedContentTokenCount'] ?? 0;
+    $cacheType    = $explicitCacheName !== null ? 'EXPLICIT_CACHE' : ($fileUri ? 'FILE_URI' : 'NO_FILE');
+    $cacheFlag    = $cachedTokens > 0 ? "CACHE_HIT:{$cachedTokens}" : "CACHE_MISS";
+    $logLine      = date('Y-m-d H:i:s') . " | $studentName | $actualModel | In:$inTokens | Out:$outTokens | Cached:$cachedTokens | $cacheType | $cacheFlag | ID:$studentID\n";
     file_put_contents(__DIR__ . '/gemini_usage.log', $logLine, FILE_APPEND);
 }
 
@@ -472,17 +589,16 @@ if (!file_exists($secretsFile)) send_error("API Key file missing.");
 require_once($secretsFile);
 
 $modelMap = [
-    "gemini-2.5-flash"      => "gemini-2.5-flash",
     "gemini-2.5-flash-lite" => "gemini-2.5-flash-lite",
+    "gemini-2.5-flash"      => "gemini-2.5-flash",
     "gemini-2.5-pro"        => "gemini-2.5-pro",
     "gemini-3-flash-preview"=> "gemini-3-flash-preview",
     "gemini-3-pro-preview"  => "gemini-3-pro-preview",
-    "gemini-2.0-flash"      => "gemini-2.0-flash",
-    "gemini-2.0-flash-lite" => "gemini-2.0-flash-lite",
+    // gemini-2.0-flash and gemini-2.0-flash-lite removed — deprecated (404 on inference)
 ];
 
-$requested   = $data['model'] ?? 'gemini-2.5-flash';
-$actualModel = $modelMap[$requested] ?? "gemini-2.5-flash";
+$requested   = $data['model'] ?? 'gemini-2.5-flash-lite';
+$actualModel = $modelMap[$requested] ?? "gemini-2.5-flash-lite";
 
 // ── Files API URI lookup ──────────────────────────────────────────────────────
 $fileUri      = null;
@@ -544,25 +660,41 @@ if (strlen(json_encode($contents)) > MAX_HISTORY_CHARS) {
     send_error('History too large. Please refresh and start a new session.');
 }
 
-// ── Prepend the municipal code file as the first user turn ───────────────────
-if ($fileUri !== null) {
-    array_unshift($contents, [
-        'role'  => 'user',
-        'parts' => [[
-            'file_data' => [
-                'mime_type' => $fileMimeType,
-                'file_uri'  => $fileUri
-            ]
-        ]]
-    ]);
+// ── Explicit cache lookup ─────────────────────────────────────────────────────
+$explicitCacheName = null;
+$explicitModels    = json_decode(EXPLICIT_CACHE_MODELS_JSON, true);
+if ($fileUri !== null && in_array($actualModel, $explicitModels)) {
+    $explicitCacheName = get_or_create_explicit_cache(
+        $actualModel, $fileUri, $fileMimeType, trim($GEMINI_API_KEY), $accountRoot
+    );
 }
 
-$payload = [
-    "contents"          => $contents,
-    "systemInstruction" => ["parts" => [["text" => $data['system'] ?? "You are a civil engineer."]]],
-    // Hard cap on output tokens — same as streaming route for consistency.
-    "generationConfig"  => ["maxOutputTokens" => 2000]
-];
+// ── Build payload — explicit cache path vs. Files API fallback ───────────────
+$systemInstruction = ["parts" => [["text" => $data['system'] ?? "You are a civil engineer."]]];
+$generationConfig  = ["maxOutputTokens" => 2000];
+
+if ($explicitCacheName !== null) {
+    // Explicit cache: send conversation only — the cache holds the file.
+    $payload = [
+        "cachedContent"     => $explicitCacheName,
+        "contents"          => $contents,
+        "systemInstruction" => $systemInstruction,
+        "generationConfig"  => $generationConfig,
+    ];
+} else {
+    // Files API fallback: prepend file as first user turn (implicit caching).
+    if ($fileUri !== null) {
+        array_unshift($contents, [
+            'role'  => 'user',
+            'parts' => [[ 'file_data' => [ 'mime_type' => $fileMimeType, 'file_uri' => $fileUri ] ]]
+        ]);
+    }
+    $payload = [
+        "contents"          => $contents,
+        "systemInstruction" => $systemInstruction,
+        "generationConfig"  => $generationConfig,
+    ];
+}
 
 $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -578,12 +710,12 @@ $responseData = json_decode($response, true);
 $usage = $responseData['usageMetadata'] ?? [];
 $studentName  = $data['student_name'] ?? 'Unknown';
 $studentID    = $data['student_id']   ?? 'unknown';
-$fileFlag     = $fileUri ? "FILE_URI" : "NO_FILE";
 $inTokens     = $usage['promptTokenCount']        ?? 0;
 $outTokens    = $usage['candidatesTokenCount']    ?? 0;
 $cachedTokens = $usage['cachedContentTokenCount'] ?? 0;
+$cacheType    = $explicitCacheName !== null ? 'EXPLICIT_CACHE' : ($fileUri ? 'FILE_URI' : 'NO_FILE');
 $cacheFlag    = $cachedTokens > 0 ? "CACHE_HIT:{$cachedTokens}" : "CACHE_MISS";
-$logLine      = date('Y-m-d H:i:s') . " | $studentName | $actualModel | In:$inTokens | Out:$outTokens | Cached:$cachedTokens | $fileFlag | $cacheFlag | ID:$studentID\n";
+$logLine      = date('Y-m-d H:i:s') . " | $studentName | $actualModel | In:$inTokens | Out:$outTokens | Cached:$cachedTokens | $cacheType | $cacheFlag | ID:$studentID\n";
 file_put_contents('gemini_usage.log', $logLine, FILE_APPEND);
 
 http_response_code($httpCode);

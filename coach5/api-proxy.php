@@ -148,9 +148,10 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
         "contents"          => $contents,
         "systemInstruction" => ["parts" => [["text" => $data['system'] ?? "You are a civil engineer."]]],
         // Hard cap on output tokens — keeps responses concise and reduces latency.
-        // 800 tokens ≈ 600 words; the system prompt instructs ≤500 words so this
-        // is a safety net rather than a primary limiter.
-        "generationConfig"  => ["maxOutputTokens" => 800]
+        // 2000 tokens gives thinking models (e.g. Gemini 3 Pro) room to reason
+        // AND produce a complete visible response. The system prompt instructs
+        // ≤500 words so this is a safety net rather than a primary limiter.
+        "generationConfig"  => ["maxOutputTokens" => 2000]
     ];
 
     // ── Fetch the full SSE response with RETURNTRANSFER ──────────────────────
@@ -560,7 +561,7 @@ $payload = [
     "contents"          => $contents,
     "systemInstruction" => ["parts" => [["text" => $data['system'] ?? "You are a civil engineer."]]],
     // Hard cap on output tokens — same as streaming route for consistency.
-    "generationConfig"  => ["maxOutputTokens" => 800]
+    "generationConfig"  => ["maxOutputTokens" => 2000]
 ];
 
 $ch = curl_init($url);

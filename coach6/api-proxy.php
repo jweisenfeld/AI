@@ -47,6 +47,148 @@ if (!file_exists($htaccess)) {
 $data = json_decode(file_get_contents('php://input'), true) ?? [];
 
 // =============================================================================
+// HELPER: Download a SharePoint/OneDrive "Anyone with the link" share
+// Uses the official OneDrive Shares API (works from server IPs; no auth needed
+// for anonymous shares). Falls back to direct &download=1 if the API returns
+// an error.  Returns ['bytes'=>..., 'method'=>...] or calls send_error().
+// =============================================================================
+function download_sharepoint(string $shareUrl): array {
+    // ── Method 1: OneDrive Shares API ────────────────────────────────────────
+    // Encode the share URL as base64url with "u!" prefix (Microsoft's scheme).
+    $shareId     = 'u!' . rtrim(strtr(base64_encode($shareUrl), '+/', '-_'), '=');
+    $apiUrl      = "https://api.onedrive.com/v1.0/shares/{$shareId}/root/content";
+
+    $bytes = curl_get_bytes($apiUrl);
+    if ($bytes !== null && strlen($bytes) > 4 && substr($bytes, 0, 2) === 'PK') {
+        return ['bytes' => $bytes, 'method' => 'shares_api'];
+    }
+
+    // ── Method 2: Direct &download=1 (fallback) ──────────────────────────────
+    $sep   = strpos($shareUrl, '?') !== false ? '&' : '?';
+    $dlUrl = $shareUrl . $sep . 'download=1';
+
+    $bytes = curl_get_bytes($dlUrl);
+    if ($bytes !== null && strlen($bytes) > 4 && substr($bytes, 0, 2) === 'PK') {
+        return ['bytes' => $bytes, 'method' => 'download1'];
+    }
+
+    // ── Both failed — detect reason ──────────────────────────────────────────
+    // If we got HTML back it's a login wall; otherwise it's a bad/missing link.
+    if ($bytes !== null && (stripos($bytes, '<!DOCTYPE') !== false || stripos($bytes, '<html') !== false)) {
+        send_error('restricted_link', [
+            'message'    => 'This link requires sign-in. Change sharing to "Anyone with the link" and try again.',
+            'video_help' => BAD_LINK_VIDEO,
+        ]);
+    }
+    send_error(
+        'Could not download your presentation. Check that the link is correct and sharing is set to "Anyone with the link".',
+        ['video_help' => BAD_LINK_VIDEO]
+    );
+}
+
+/**
+ * cURL helper — returns raw body string or null on network/HTTP error.
+ * Follows redirects, uses a real browser UA.
+ */
+function curl_get_bytes(string $url): ?string {
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_MAXREDIRS      => 10,
+        CURLOPT_TIMEOUT        => 60,
+        CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $body     = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr  = curl_errno($ch);
+    curl_close($ch);
+
+    if ($curlErr || $httpCode >= 400) return null;
+    return $body ?: null;
+}
+
+// =============================================================================
+// ROUTE: test_link  (diagnostic — secret-protected)
+// POST {"action":"test_link","secret":"coach6test","url":"https://..."}
+// =============================================================================
+if (($data['action'] ?? '') === 'test_link') {
+    if (($data['secret'] ?? '') !== 'coach6test') send_error('Forbidden');
+    $url = trim($data['url'] ?? '');
+    if (empty($url)) send_error('url required');
+
+    // Try Shares API
+    $shareId  = 'u!' . rtrim(strtr(base64_encode($url), '+/', '-_'), '=');
+    $apiUrl   = "https://api.onedrive.com/v1.0/shares/{$shareId}/root/content";
+    $apiBytes = curl_get_bytes($apiUrl);
+
+    // Try &download=1
+    $sep      = strpos($url, '?') !== false ? '&' : '?';
+    $dlUrl    = $url . $sep . 'download=1';
+    $dlBytes  = curl_get_bytes($dlUrl);
+
+    echo json_encode([
+        'shares_api' => [
+            'url'          => $apiUrl,
+            'bytes'        => $apiBytes !== null ? strlen($apiBytes) : null,
+            'starts_with'  => $apiBytes !== null ? bin2hex(substr($apiBytes, 0, 4)) : null,
+            'is_zip'       => $apiBytes !== null && substr($apiBytes, 0, 2) === 'PK',
+            'looks_like_html' => $apiBytes !== null && stripos($apiBytes, '<!DOCTYPE') !== false,
+            'first_100'    => $apiBytes !== null ? substr($apiBytes, 0, 100) : null,
+        ],
+        'download1' => [
+            'url'          => $dlUrl,
+            'bytes'        => $dlBytes !== null ? strlen($dlBytes) : null,
+            'starts_with'  => $dlBytes !== null ? bin2hex(substr($dlBytes, 0, 4)) : null,
+            'is_zip'       => $dlBytes !== null && substr($dlBytes, 0, 2) === 'PK',
+            'looks_like_html' => $dlBytes !== null && stripos($dlBytes, '<!DOCTYPE') !== false,
+            'first_100'    => $dlBytes !== null ? substr($dlBytes, 0, 100) : null,
+        ],
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
+
+// =============================================================================
+// ROUTE: test_email  (diagnostic — secret-protected)
+// POST {"action":"test_email","secret":"coach6test","to":"student@..."}
+// =============================================================================
+if (($data['action'] ?? '') === 'test_email') {
+    if (($data['secret'] ?? '') !== 'coach6test') send_error('Forbidden');
+    if (!file_exists($smtpFile)) send_error('smtp_credentials.php missing from .secrets/');
+    require_once($smtpFile);
+
+    $to      = trim($data['to'] ?? $SMTP_FROM);
+    $subject = 'coach6 Email Test — ' . date('Y-m-d H:i:s');
+    $body    = '<html><body style="font-family:sans-serif;padding:20px;">'
+             . '<h2 style="color:#1a73e8;">coach6 Email Test</h2>'
+             . '<p>If you can read this, Gmail SMTP is working correctly.</p>'
+             . '<p>Sent: ' . date('Y-m-d H:i:s T') . '</p>'
+             . '<p>To: ' . htmlspecialchars($to) . '</p>'
+             . '</body></html>';
+
+    $sent = send_smtp_email(
+        $SMTP_HOST, $SMTP_PORT, $SMTP_USER, $SMTP_PASS,
+        $SMTP_FROM, $SMTP_FROM_NAME,
+        $to, $TEACHER_CC,
+        $subject, $body
+    );
+
+    echo json_encode([
+        'success'    => $sent,
+        'to'         => $to,
+        'cc'         => $TEACHER_CC,
+        'smtp_host'  => $SMTP_HOST,
+        'smtp_port'  => $SMTP_PORT,
+        'smtp_user'  => $SMTP_USER,
+        'log_tail'   => file_exists(__DIR__ . '/grader.log')
+            ? implode('', array_slice(file(__DIR__ . '/grader.log'), -5))
+            : '(no log yet)',
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
+
+// =============================================================================
 // ROUTE: verify_login
 // =============================================================================
 if (($data['action'] ?? '') === 'verify_login') {
@@ -84,53 +226,9 @@ if (($data['action'] ?? '') === 'grade_presentation') {
     $sourceType = 'unknown';
 
     if (!empty($shareUrl)) {
-        // OneDrive / SharePoint share link — append &download=1
-        $downloadUrl = $shareUrl;
-        if (strpos($downloadUrl, '?') !== false) {
-            $downloadUrl .= '&download=1';
-        } else {
-            $downloadUrl .= '?download=1';
-        }
-
-        $ch = curl_init($downloadUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_MAXREDIRS,      10);
-        curl_setopt($ch, CURLOPT_TIMEOUT,        60);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (compatible; coach6-grader/1.0)');
-        // Capture response headers to check Content-Type
-        $responseHeaders = [];
-        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function($curl, $header) use (&$responseHeaders) {
-            $len = strlen($header);
-            $h   = explode(':', $header, 2);
-            if (count($h) === 2) {
-                $responseHeaders[strtolower(trim($h[0]))] = trim($h[1]);
-            }
-            return $len;
-        });
-        $body     = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlErr  = curl_errno($ch);
-        curl_close($ch);
-
-        if ($curlErr || $httpCode >= 400) {
-            send_error(
-                'Could not download your presentation. Check that the link is correct and set to "Anyone with the link".',
-                ['http_code' => $httpCode, 'video_help' => BAD_LINK_VIDEO]
-            );
-        }
-
-        $contentType = $responseHeaders['content-type'] ?? '';
-        // If we got HTML back, the link requires authentication
-        if (stripos($contentType, 'text/html') !== false || stripos($body, '<!DOCTYPE') !== false) {
-            send_error(
-                'restricted_link',
-                ['message' => 'This link requires sign-in. Change sharing to "Anyone with the link" and try again.', 'video_help' => BAD_LINK_VIDEO]
-            );
-        }
-
-        $pptxBytes  = $body;
-        $sourceType = 'url';
+        $result     = download_sharepoint($shareUrl); // calls send_error() on failure
+        $pptxBytes  = $result['bytes'];
+        $sourceType = 'url:' . $result['method'];
 
     } elseif (!empty($data['file_data'])) {
         // Base64-encoded file upload from the browser

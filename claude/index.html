@@ -1331,7 +1331,8 @@
                     } else if (data.error.type === 'rate_limit_error') {
                         showTip('rate-limit', 'You\'ve sent too many messages. Take a short break and try again soon.');
                     }
-                    throw new Error(data.error.message || JSON.stringify(data.error));
+                    const knownTypes = ['input_too_large', 'conversation_too_long', 'rate_limit_error'];
+                    throw Object.assign(new Error(data.error.message || JSON.stringify(data.error)), { known: knownTypes.includes(data.error.type) });
                 }
 
                 // Extract response
@@ -1377,7 +1378,8 @@
 
             } catch (error) {
                 loadingDiv.remove();
-                appendMessage('assistant', `Error: ${error.message}\n\nPlease check your API configuration and try again.`);
+                const suffix = error.known ? '' : '\n\nPlease check your API configuration and try again.';
+                appendMessage('assistant', `Error: ${error.message}${suffix}`);
                 updateStatus('Error occurred');
             }
 

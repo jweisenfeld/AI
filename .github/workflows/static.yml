@@ -54,6 +54,8 @@ jobs:
             **/__pycache__/**
             # Protect runtime-generated log files from being wiped on deploy
             **/student_logs/**
+            **/student_submissions/**
             **/gemini_usage.log
             **/claude_usage.log
+            **/grader.log
 

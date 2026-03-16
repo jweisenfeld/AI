@@ -110,6 +110,72 @@ function curl_get_bytes(string $url): ?string {
 }
 
 // =============================================================================
+// ROUTE: get_log  (diagnostic — secret-protected)
+// POST {"action":"get_log","secret":"coach6test","lines":30}
+// =============================================================================
+if (($data['action'] ?? '') === 'get_log') {
+    if (($data['secret'] ?? '') !== 'coach6test') send_error('Forbidden');
+    $logFile = __DIR__ . '/grader.log';
+    if (!file_exists($logFile)) {
+        echo json_encode(['log' => '(grader.log does not exist yet)']);
+        exit;
+    }
+    $n     = max(1, min(200, (int)($data['lines'] ?? 50)));
+    $lines = file($logFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $tail  = array_slice($lines, -$n);
+    echo json_encode(['log' => implode("\n", $tail), 'total_lines' => count($lines)]);
+    exit;
+}
+
+// =============================================================================
+// ROUTE: test_gemini  (diagnostic — secret-protected)
+// POST {"action":"test_gemini","secret":"coach6test"}
+// Tests: API key valid, model reachable, Files API upload with a tiny file
+// =============================================================================
+if (($data['action'] ?? '') === 'test_gemini') {
+    if (($data['secret'] ?? '') !== 'coach6test') send_error('Forbidden');
+    if (!file_exists($secretsFile)) send_error('API key file missing.');
+    require_once($secretsFile);
+    $apiKey = trim($GEMINI_API_KEY);
+
+    // ── Step A: simple text generation (no file) ─────────────────────────────
+    $textUrl     = "https://generativelanguage.googleapis.com/v1beta/models/" . GEMINI_MODEL . ":generateContent?key={$apiKey}";
+    $textPayload = ['contents' => [['role'=>'user','parts'=>[['text'=>'Say OK']]]]];
+    $ch = curl_init($textUrl);
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_POST=>true,
+        CURLOPT_POSTFIELDS=>json_encode($textPayload), CURLOPT_TIMEOUT=>30,
+        CURLOPT_HTTPHEADER=>['Content-Type: application/json']]);
+    $textBody = curl_exec($ch);
+    $textCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    $textResult = json_decode($textBody, true);
+    $textReply  = $textResult['candidates'][0]['content']['parts'][0]['text'] ?? null;
+
+    // ── Step B: Files API upload (tiny fake PPTX — just the ZIP header) ──────
+    // A real PPTX is needed; use a minimal 22-byte ZIP stub just to test auth.
+    $minimalZip  = "\x50\x4B\x05\x06" . str_repeat("\x00", 18); // End-of-central-directory
+    $uploadUrl   = "https://generativelanguage.googleapis.com/upload/v1beta/files?key={$apiKey}";
+    $ch2 = curl_init($uploadUrl);
+    curl_setopt_array($ch2, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_POST=>true,
+        CURLOPT_POSTFIELDS=>$minimalZip, CURLOPT_TIMEOUT=>30,
+        CURLOPT_HTTPHEADER=>[
+            'Content-Type: ' . PPTX_MIME,
+            'X-Goog-Upload-Protocol: raw',
+            'X-Goog-Upload-Header-Content-Type: ' . PPTX_MIME,
+        ]]);
+    $uploadBody = curl_exec($ch2);
+    $uploadCode = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
+    curl_close($ch2);
+
+    echo json_encode([
+        'model'       => GEMINI_MODEL,
+        'text_test'   => ['http_code'=>$textCode, 'reply'=>$textReply, 'raw'=>substr($textBody,0,300)],
+        'upload_test' => ['http_code'=>$uploadCode, 'raw'=>substr($uploadBody,0,300)],
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
+
+// =============================================================================
 // ROUTE: test_link  (diagnostic — secret-protected)
 // POST {"action":"test_link","secret":"coach6test","url":"https://..."}
 // =============================================================================

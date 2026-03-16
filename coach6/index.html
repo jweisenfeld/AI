@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OHS Engineering Presentation Coach</title>
+  <style>
+    :root {
+      --primary: #1a73e8;
+      --primary-dark: #1557b0;
+      --success: #1a7340;
+      --warning: #e65100;
+      --bg: #f4f6fb;
+      --card: #ffffff;
+      --border: #dadce0;
+      --text: #202124;
+      --muted: #5f6368;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: var(--bg);
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+    }
+
+    /* ── Login overlay ── */
+    .login-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.82);
+      z-index: 999;
+      display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+    .login-card {
+      background: white;
+      padding: 44px 40px 36px;
+      border-radius: 14px;
+      width: 340px;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    }
+    .login-card h2 { margin: 0 0 6px; font-size: 1.3em; color: var(--primary); }
+    .login-card p  { margin: 0 0 24px; color: var(--muted); font-size: 0.9em; }
+    .login-input {
+      width: 100%; padding: 12px 14px;
+      margin-bottom: 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 1em;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .login-input:focus { border-color: var(--primary); }
+    .btn-primary {
+      width: 100%; padding: 13px;
+      background: var(--primary);
+      color: white; border: none;
+      border-radius: 8px; font-size: 1em;
+      font-weight: 600; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-primary:hover  { background: var(--primary-dark); }
+    .btn-primary:disabled { background: #aaa; cursor: not-allowed; }
+    .login-error {
+      color: #c0392b; font-size: 0.88em;
+      margin-top: 10px; min-height: 20px;
+    }
+
+    /* ── App header ── */
+    .header {
+      background: white;
+      padding: 14px 28px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .header-title { font-weight: 700; font-size: 1.1em; color: var(--primary); }
+    .header-user  { font-size: 0.88em; color: var(--muted); }
+
+    /* ── Main layout ── */
+    .main {
+      max-width: 760px;
+      margin: 36px auto;
+      padding: 0 16px;
+    }
+
+    /* ── Upload card ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 1.15em;
+      color: var(--primary);
+    }
+    .card .subtitle {
+      color: var(--muted);
+      font-size: 0.9em;
+      margin: 0 0 24px;
+    }
+
+    /* URL input row */
+    .url-row { display: flex; gap: 10px; align-items: stretch; }
+    .url-input {
+      flex: 1;
+      padding: 12px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95em;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .url-input:focus  { border-color: var(--primary); }
+    .url-input::placeholder { color: #aaa; }
+
+    /* Divider */
+    .or-divider {
+      display: flex; align-items: center; gap: 12px;
+      margin: 18px 0; color: var(--muted); font-size: 0.85em;
+    }
+    .or-divider::before, .or-divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
+    /* File drop zone */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 28px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      color: var(--muted);
+      font-size: 0.92em;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--primary);
+      background: #f0f7ff;
+      color: var(--primary);
+    }
+    .drop-zone svg { display: block; margin: 0 auto 10px; opacity: 0.5; }
+    .drop-zone strong { display: block; font-size: 1em; margin-bottom: 4px; }
+    #file-input { display: none; }
+    .file-chosen {
+      margin-top: 10px;
+      font-size: 0.85em;
+      color: var(--success);
+      font-weight: 600;
+    }
+
+    /* Submit button row */
+    .submit-row { margin-top: 22px; }
+    .btn-submit {
+      width: 100%; padding: 14px;
+      background: var(--primary);
+      color: white; border: none;
+      border-radius: 8px; font-size: 1.05em;
+      font-weight: 700; cursor: pointer;
+      transition: background 0.15s;
+      letter-spacing: 0.02em;
+    }
+    .btn-submit:hover    { background: var(--primary-dark); }
+    .btn-submit:disabled { background: #aaa; cursor: not-allowed; }
+
+    /* Error / info banners */
+    .banner {
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 16px;
+      font-size: 0.92em;
+      line-height: 1.5;
+    }
+    .banner.error   { background: #fce8e6; color: #c0392b; border: 1px solid #f5c6c4; }
+    .banner.info    { background: #e8f0fe; color: #1a55a3; border: 1px solid #c5d6f5; }
+    .banner.success { background: #e8f5e9; color: var(--success); border: 1px solid #b2dfdb; }
+    .banner a { color: inherit; font-weight: 600; }
+
+    /* Loading state */
+    .loading-card {
+      text-align: center;
+      padding: 48px 32px;
+    }
+    .spinner {
+      width: 48px; height: 48px;
+      border: 5px solid #e0e0e0;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-steps { font-size: 0.9em; color: var(--muted); margin-top: 10px; }
+
+    /* ── Results ── */
+    #results { display: none; }
+    .score-row {
+      display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap;
+    }
+    .score-box {
+      flex: 1; min-width: 140px;
+      border-radius: 10px; padding: 20px;
+      text-align: center;
+    }
+    .score-box.design  { background: #e8f5e9; }
+    .score-box.grammar { background: #fff3e0; }
+    .score-box .num    { font-size: 2.6em; font-weight: 700; }
+    .score-box.design  .num { color: var(--success); }
+    .score-box.grammar .num { color: var(--warning); }
+    .score-box .denom  { color: var(--muted); font-size: 0.9em; }
+    .score-box .label  { font-size: 0.8em; color: var(--muted); margin-top: 2px; }
+
+    .overall-comment {
+      background: #f0f7ff;
+      border-left: 4px solid var(--primary);
+      padding: 14px 18px;
+      border-radius: 4px;
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    /* Category cards */
+    .category {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+    .category-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 18px;
+      background: #f8f9fa;
+      cursor: pointer;
+      user-select: none;
+    }
+    .category-header:hover { background: #f0f4fa; }
+    .cat-label { flex: 1; font-weight: 600; font-size: 0.97em; }
+    .cat-score { font-size: 0.88em; color: var(--muted); white-space: nowrap; }
+    .stars { color: #f4a800; font-size: 1.1em; letter-spacing: 1px; }
+    .cat-body {
+      padding: 16px 18px;
+      border-top: 1px solid var(--border);
+      display: none;
+      font-size: 0.92em;
+      line-height: 1.6;
+    }
+    .cat-body.open { display: block; }
+    .cat-good    { color: var(--success); margin-bottom: 10px; }
+    .cat-improve { color: #7d4000; }
+    .cat-good::before    { content: '✅  '; }
+    .cat-improve::before { content: '💡  '; }
+
+    /* TODO answers */
+    .todo-section { margin-bottom: 24px; }
+    .todo-item {
+      background: #fffde7;
+      border: 1px solid #ffe082;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 10px;
+      font-size: 0.92em;
+      line-height: 1.6;
+    }
+    .todo-item .todo-q { color: #7d5a00; font-weight: 600; margin-bottom: 6px; }
+    .todo-item .todo-a { color: var(--text); }
+    .todo-item .todo-slide { font-size: 0.8em; color: #aaa; margin-bottom: 4px; }
+
+    /* Grammar errors */
+    .grammar-table {
+      width: 100%; border-collapse: collapse;
+      font-size: 0.88em;
+    }
+    .grammar-table th {
+      background: #fff3e0;
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 2px solid #ffe0b2;
+      color: var(--warning);
+    }
+    .grammar-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #f3e5d0;
+      vertical-align: top;
+    }
+    .grammar-table .original { color: #c0392b; }
+    .grammar-table .suggest  { color: var(--success); }
+    .grammar-table .slide-hint { color: #aaa; font-size: 0.82em; }
+
+    .email-confirm {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85em;
+      margin-top: 8px;
+    }
+
+    /* Section headings inside results */
+    .section-heading {
+      font-size: 1em;
+      font-weight: 700;
+      color: var(--primary);
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 5px;
+      margin: 24px 0 14px;
+    }
+    .section-heading.grammar-head {
+      color: var(--warning);
+      border-color: var(--warning);
+    }
+
+    /* Resubmit button */
+    .btn-resubmit {
+      background: none;
+      border: 1.5px solid var(--primary);
+      color: var(--primary);
+      padding: 10px 22px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.92em;
+      font-weight: 600;
+      margin-top: 8px;
+      transition: background 0.15s;
+    }
+    .btn-resubmit:hover { background: #e8f0fe; }
+
+    .rubric-version { font-size: 0.78em; color: #aaa; margin-top: 4px; }
+
+    @media (max-width: 600px) {
+      .main { margin: 16px auto; }
+      .card { padding: 20px; }
+      .url-row { flex-direction: column; }
+      .score-row { gap: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Login overlay ── -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-card">
+    <h2>Engineering Coach</h2>
+    <p>Sign in to submit your presentation for feedback</p>
+    <input class="login-input" type="text"     id="login-id"   placeholder="Student ID"  autocomplete="username">
+    <input class="login-input" type="password" id="login-pass" placeholder="Password"    autocomplete="current-password">
+    <button class="btn-primary" id="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- ── Header ── -->
+<div class="header">
+  <div class="header-title">OHS Engineering Presentation Coach</div>
+  <div class="header-user" id="header-user"></div>
+</div>
+
+<!-- ── Main ── -->
+<div class="main">
+
+  <!-- Error / info banners -->
+  <div id="banner-area"></div>
+
+  <!-- Upload card -->
+  <div class="card" id="upload-card">
+    <h2>Submit Your Presentation</h2>
+    <p class="subtitle">
+      Share your PowerPoint from OneDrive and paste the link below.
+      Need help? <a href="http://orionhs.us/anyonewiththelink" target="_blank">Watch this short video →</a>
+    </p>
+
+    <!-- URL paste -->
+    <div class="url-row">
+      <input class="url-input" type="url" id="share-url"
+        placeholder="Paste your OneDrive 'Anyone with the link' URL here…">
+    </div>
+
+    <!-- OR divider -->
+    <div class="or-divider">or upload a file directly</div>
+
+    <!-- File drop zone -->
+    <div class="drop-zone" id="drop-zone"
+         onclick="document.getElementById('file-input').click()"
+         ondragover="handleDragOver(event)"
+         ondragleave="handleDragLeave(event)"
+         ondrop="handleDrop(event)">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <strong>Drag and drop your .pptx file here</strong>
+      or click to browse
+      <div class="file-chosen" id="file-chosen"></div>
+    </div>
+    <input type="file" id="file-input" accept=".pptx,.ppt" onchange="handleFileSelect(event)">
+
+    <div class="submit-row">
+      <button class="btn-submit" id="submit-btn" onclick="submitPresentation()">
+        Submit for Grading
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading card -->
+  <div class="card loading-card" id="loading-card" style="display:none;">
+    <div class="spinner"></div>
+    <strong>Grading your presentation…</strong>
+    <div class="loading-steps" id="loading-step">Uploading your file…</div>
+    <p style="color:#aaa;font-size:0.82em;margin-top:16px;">
+      This usually takes 30–90 seconds. Please don't close this tab.
+    </p>
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+    <div class="card">
+
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+        <div>
+          <h2 style="margin:0;font-size:1.2em;">Your Feedback</h2>
+          <div class="rubric-version" id="rubric-version-tag"></div>
+        </div>
+        <button class="btn-resubmit" onclick="resetToUpload()">Submit Another Presentation</button>
+      </div>
+
+      <!-- Score summary -->
+      <div class="score-row">
+        <div class="score-box design">
+          <div class="num" id="res-design-score">—</div>
+          <div class="denom">out of 20</div>
+          <div class="label">Engineering Design</div>
+        </div>
+        <div class="score-box grammar">
+          <div class="num" id="res-grammar-score">—</div>
+          <div class="denom">out of 10</div>
+          <div class="label">Grammar &amp; Spelling</div>
+        </div>
+      </div>
+
+      <!-- Overall comment -->
+      <div class="overall-comment" id="res-overall"></div>
+
+      <!-- Rubric categories -->
+      <div class="section-heading">Rubric Breakdown</div>
+      <div id="res-categories"></div>
+
+      <!-- TODO answers -->
+      <div id="res-todos"></div>
+
+      <!-- Grammar -->
+      <div class="section-heading grammar-head">Grammar &amp; Spelling</div>
+      <div id="res-grammar"></div>
+
+      <!-- Email confirmation -->
+      <div class="email-confirm" id="res-email-confirm"></div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────────────────────────────────────
+let studentId    = '';
+let studentName  = '';
+let studentEmail = '';
+let selectedFile = null; // File object from file picker
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Login
+// ─────────────────────────────────────────────────────────────────────────────
+function doLogin() {
+  const idEl   = document.getElementById('login-id');
+  const passEl = document.getElementById('login-pass');
+  const errEl  = document.getElementById('login-error');
+  const btn    = document.getElementById('login-btn');
+
+  errEl.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+
+  fetch('api-proxy.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action:     'verify_login',
+      student_id: idEl.value.trim(),
+      password:   passEl.value
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      studentId    = idEl.value.trim();
+      studentName  = data.student_name;
+      studentEmail = data.student_email || '';
+      document.getElementById('login-overlay').style.display = 'none';
+      document.getElementById('header-user').textContent = 'Signed in as ' + studentName;
+    } else {
+      errEl.textContent = data.error || 'Invalid student ID or password.';
+    }
+  })
+  .catch(() => { errEl.textContent = 'Network error. Please try again.'; })
+  .finally(() => {
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+  });
+}
+
+// Allow Enter key on login form
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('login-overlay').style.display !== 'none') {
+    doLogin();
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// File handling
+// ─────────────────────────────────────────────────────────────────────────────
+function handleDragOver(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.add('drag-over');
+}
+function handleDragLeave(e) {
+  document.getElementById('drop-zone').classList.remove('drag-over');
+}
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag-over');
+  const files = e.dataTransfer.files;
+  if (files.length) setFile(files[0]);
+}
+function handleFileSelect(e) {
+  if (e.target.files.length) setFile(e.target.files[0]);
+}
+function setFile(file) {
+  selectedFile = file;
+  document.getElementById('file-chosen').textContent = '📎 ' + file.name;
+  document.getElementById('share-url').value = ''; // clear URL if file chosen
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Submit
+// ─────────────────────────────────────────────────────────────────────────────
+async function submitPresentation() {
+  clearBanners();
+  const shareUrl = document.getElementById('share-url').value.trim();
+
+  if (!shareUrl && !selectedFile) {
+    showBanner('error', 'Please paste a OneDrive share link or choose a .pptx file to upload.');
+    return;
+  }
+
+  // Show loading, hide upload form
+  document.getElementById('upload-card').style.display  = 'none';
+  document.getElementById('loading-card').style.display = 'block';
+  document.getElementById('results').style.display      = 'none';
+
+  setLoadingStep('Preparing your file…');
+
+  let body;
+
+  if (selectedFile) {
+    // Read file as base64
+    setLoadingStep('Reading file…');
+    const b64 = await fileToBase64(selectedFile);
+    body = {
+      action:        'grade_presentation',
+      student_id:    studentId,
+      student_name:  studentName,
+      student_email: studentEmail,
+      file_data:     b64,
+    };
+  } else {
+    body = {
+      action:        'grade_presentation',
+      student_id:    studentId,
+      student_name:  studentName,
+      student_email: studentEmail,
+      share_url:     shareUrl,
+    };
+  }
+
+  setLoadingStep('Submitting to AI for grading… (this takes 30–90 seconds)');
+
+  let data;
+  try {
+    const resp = await fetch('api-proxy.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    data = await resp.json();
+  } catch (err) {
+    showUploadError('Network error while submitting. Please try again.');
+    return;
+  }
+
+  if (data.error) {
+    if (data.error === 'restricted_link') {
+      showUploadError(
+        `This link requires sign-in. You need to change your sharing settings to <strong>"Anyone with the link"</strong>. ` +
+        `<a href="http://orionhs.us/anyonewiththelink" target="_blank">Watch the how-to video →</a>`
+      );
+    } else {
+      showUploadError(data.error + (data.details?.message ? ' — ' + data.details.message : ''));
+    }
+    return;
+  }
+
+  // Render results
+  renderResults(data);
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      // result is "data:...;base64,XXXX" — strip the prefix
+      const b64 = reader.result.split(',')[1];
+      resolve(b64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function setLoadingStep(msg) {
+  document.getElementById('loading-step').textContent = msg;
+}
+
+function showUploadError(html) {
+  document.getElementById('loading-card').style.display = 'none';
+  document.getElementById('upload-card').style.display  = 'block';
+  showBanner('error', html);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Render results
+// ─────────────────────────────────────────────────────────────────────────────
+function renderResults(data) {
+  document.getElementById('loading-card').style.display = 'none';
+  document.getElementById('results').style.display      = 'block';
+
+  const g = data.grading;
+  const gr = data.grammar;
+
+  // Scores
+  document.getElementById('res-design-score').textContent  = g.total_score ?? '—';
+  document.getElementById('res-grammar-score').textContent = gr.grammar_score ?? 10;
+  document.getElementById('rubric-version-tag').textContent = 'Rubric ' + (g.rubric_version || 'v1.0');
+
+  // Overall comment
+  document.getElementById('res-overall').textContent = g.overall_comments || '';
+
+  // Categories
+  const catLabels = {
+    define_the_problem:  'Define the Problem',
+    generate_concepts:   'Generate Concepts',
+    develop_a_solution:  'Develop a Solution',
+    construct_and_test:  'Construct and Test the Prototype',
+    evaluate:            'Evaluate',
+  };
+  const catContainer = document.getElementById('res-categories');
+  catContainer.innerHTML = '';
+  for (const [key, label] of Object.entries(catLabels)) {
+    const cat   = (g.categories || {})[key] || {};
+    const score = cat.score || 0;
+    const stars = '★'.repeat(score) + '☆'.repeat(4 - score);
+    const div   = document.createElement('div');
+    div.className = 'category';
+    div.innerHTML = `
+      <div class="category-header" onclick="toggleCat(this)">
+        <span class="stars">${stars}</span>
+        <span class="cat-label">${label}</span>
+        <span class="cat-score">${score}/4</span>
+        <span style="color:#aaa;font-size:0.8em;">▼</span>
+      </div>
+      <div class="cat-body open">
+        <div class="cat-good">${escHtml(cat.what_was_done_well || 'No notes.')}</div>
+        <div class="cat-improve">${escHtml(cat.what_to_improve || 'Keep up the great work!')}</div>
+      </div>`;
+    catContainer.appendChild(div);
+  }
+
+  // TODO answers
+  const todoContainer = document.getElementById('res-todos');
+  todoContainer.innerHTML = '';
+  const todos = g.todo_answers || [];
+  if (todos.length > 0) {
+    const heading = document.createElement('div');
+    heading.className = 'section-heading';
+    heading.textContent = 'Your TODO Questions — Answered';
+    todoContainer.appendChild(heading);
+    todos.forEach(t => {
+      const div = document.createElement('div');
+      div.className = 'todo-item';
+      div.innerHTML = `
+        <div class="todo-slide">${escHtml(t.slide_context || '')}</div>
+        <div class="todo-q">${escHtml(t.todo_text || '')}</div>
+        <div class="todo-a">${escHtml(t.answer || '')}</div>`;
+      todoContainer.appendChild(div);
+    });
+  }
+
+  // Grammar
+  const grammarContainer = document.getElementById('res-grammar');
+  grammarContainer.innerHTML = '';
+  const errors = gr.errors || [];
+  if (errors.length === 0) {
+    grammarContainer.innerHTML = '<p style="color:var(--success);font-weight:600;">✅ No grammar or spelling errors found! Great work.</p>';
+  } else {
+    const table = document.createElement('table');
+    table.className = 'grammar-table';
+    table.innerHTML = `<thead><tr>
+      <th>Slide</th><th>Error Found</th><th>Issue</th><th>Suggestion</th>
+    </tr></thead>`;
+    const tbody = document.createElement('tbody');
+    errors.forEach(err => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="slide-hint">${escHtml(err.slide_hint || '')}</td>
+        <td class="original">${escHtml(err.original_text || '')}</td>
+        <td>${escHtml(err.issue || '')}</td>
+        <td class="suggest">${escHtml(err.suggestion || '')}</td>`;
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    grammarContainer.appendChild(table);
+  }
+
+  // Email confirmation
+  const emailDiv = document.getElementById('res-email-confirm');
+  if (data.email_sent) {
+    emailDiv.innerHTML = `📧 Feedback emailed to <strong>${escHtml(studentEmail)}</strong> (Mr. Weisenfeld CC'd)`;
+  } else if (studentEmail) {
+    emailDiv.innerHTML = data.email_error
+      ? `⚠️ ${escHtml(data.email_error)}`
+      : '⚠️ Email could not be sent, but your results are shown above.';
+  }
+
+  // Scroll to results
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function toggleCat(header) {
+  const body = header.nextElementSibling;
+  body.classList.toggle('open');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Utility
+// ─────────────────────────────────────────────────────────────────────────────
+function resetToUpload() {
+  document.getElementById('upload-card').style.display  = 'block';
+  document.getElementById('loading-card').style.display = 'none';
+  document.getElementById('results').style.display      = 'none';
+  document.getElementById('share-url').value = '';
+  document.getElementById('file-chosen').textContent = '';
+  selectedFile = null;
+  clearBanners();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showBanner(type, html) {
+  const area = document.getElementById('banner-area');
+  const div  = document.createElement('div');
+  div.className = 'banner ' + type;
+  div.innerHTML = html;
+  area.appendChild(div);
+}
+
+function clearBanners() {
+  document.getElementById('banner-area').innerHTML = '';
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>

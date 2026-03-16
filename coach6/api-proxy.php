@@ -324,40 +324,19 @@ if (($data['action'] ?? '') === 'grade_presentation') {
     $logLine = date('Y-m-d H:i:s') . " | SUBMISSION | $studentName | $studentId | $filename | src:$sourceType | " . strlen($pptxBytes) . " bytes\n";
     file_put_contents(__DIR__ . '/grader.log', $logLine, FILE_APPEND);
 
-    // ── Step 3: Upload to Gemini Files API ────────────────────────────────────
+    // ── Step 3: Extract text + images from PPTX ──────────────────────────────
     if (!file_exists($secretsFile)) send_error('API key file missing.');
     require_once($secretsFile); // defines $GEMINI_API_KEY
 
-    $apiKey = trim($GEMINI_API_KEY);
+    $apiKey    = trim($GEMINI_API_KEY);
+    $extracted = extract_pptx($pptxBytes);
 
-    // Upload file
-    $uploadUrl = "https://generativelanguage.googleapis.com/upload/v1beta/files?key={$apiKey}";
+    file_put_contents(__DIR__ . '/grader.log',
+        date('Y-m-d H:i:s') . " | EXTRACTED | $studentId | slides:{$extracted['slide_count']} | images:" . count($extracted['images']) . " | text_chars:" . strlen($extracted['text']) . "\n",
+        FILE_APPEND);
 
-    $ch = curl_init($uploadUrl);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST,           true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS,     $pptxBytes);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Content-Type: ' . PPTX_MIME,
-        'X-Goog-Upload-Protocol: raw',
-        'X-Goog-Upload-Header-Content-Type: ' . PPTX_MIME,
-    ]);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 120);
-    $uploadBody = curl_exec($ch);
-    $uploadCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($uploadCode !== 200) {
-        file_put_contents(__DIR__ . '/grader.log',
-            date('Y-m-d H:i:s') . " | UPLOAD_FAIL | $studentId | HTTP:$uploadCode | " . substr($uploadBody, 0, 300) . "\n",
-            FILE_APPEND);
-        send_error('Failed to upload file to AI service. Please try again in a moment.');
-    }
-
-    $uploadResult = json_decode($uploadBody, true);
-    $fileUri      = $uploadResult['file']['uri'] ?? null;
-    if (!$fileUri) {
-        send_error('File upload succeeded but no URI returned. Please try again.');
+    if (empty($extracted['text']) && empty($extracted['images'])) {
+        send_error('Could not extract any content from this file. Please make sure it is a valid .pptx PowerPoint file.');
     }
 
     // ── Step 4: Load rubric ───────────────────────────────────────────────────
@@ -424,14 +403,9 @@ Return ONLY a valid JSON object in exactly this structure:
 If there are no TODO items, return an empty array for "todo_answers".
 PROMPT;
 
+    $gradingParts = build_gemini_parts($extracted, $gradingPrompt);
     $gradingPayload = [
-        'contents' => [[
-            'role'  => 'user',
-            'parts' => [
-                ['file_data' => ['mime_type' => PPTX_MIME, 'file_uri' => $fileUri]],
-                ['text'      => $gradingPrompt],
-            ],
-        ]],
+        'contents'          => [['role' => 'user', 'parts' => $gradingParts]],
         'systemInstruction' => ['parts' => [['text' => $systemPrompt]]],
         'generationConfig'  => ['responseMimeType' => 'application/json'],
     ];
@@ -487,14 +461,9 @@ Return ONLY a valid JSON object:
 If no errors are found, return an empty array for "errors" and error_count of 0 and grammar_score of 10.
 PROMPT;
 
+    $grammarParts = build_gemini_parts($extracted, $grammarPrompt);
     $grammarPayload = [
-        'contents' => [[
-            'role'  => 'user',
-            'parts' => [
-                ['file_data' => ['mime_type' => PPTX_MIME, 'file_uri' => $fileUri]],
-                ['text'      => $grammarPrompt],
-            ],
-        ]],
+        'contents'          => [['role' => 'user', 'parts' => $grammarParts]],
         'systemInstruction' => ['parts' => [['text' => 'You are a precise grammar and spelling checker. Return only valid JSON as instructed.']]],
         'generationConfig'  => ['responseMimeType' => 'application/json'],
     ];
@@ -571,6 +540,133 @@ PROMPT;
 // =============================================================================
 // HELPERS
 // =============================================================================
+
+// =============================================================================
+// ROUTE: test_extract  (diagnostic — secret-protected)
+// POST {"action":"test_extract","secret":"coach6test","filename":"12345_20260316_001909.pptx"}
+// Runs extract_pptx on a saved submission and reports what was found.
+// =============================================================================
+if (($data['action'] ?? '') === 'test_extract') {
+    if (($data['secret'] ?? '') !== 'coach6test') send_error('Forbidden');
+    $filename = basename($data['filename'] ?? '');
+    if (empty($filename)) {
+        // Use most recently saved file if none specified
+        $files = glob(SUBMISSIONS_DIR . '/*.pptx');
+        if (empty($files)) send_error('No submissions found.');
+        usort($files, fn($a,$b) => filemtime($b) - filemtime($a));
+        $filename = basename($files[0]);
+    }
+    $path = SUBMISSIONS_DIR . '/' . $filename;
+    if (!file_exists($path)) send_error("File not found: $filename");
+    $bytes     = file_get_contents($path);
+    $extracted = extract_pptx($bytes);
+    echo json_encode([
+        'filename'    => $filename,
+        'file_bytes'  => strlen($bytes),
+        'slide_count' => $extracted['slide_count'],
+        'image_count' => count($extracted['images']),
+        'image_names' => array_column($extracted['images'], 'name'),
+        'image_mimes' => array_column($extracted['images'], 'mime_type'),
+        'text_chars'  => strlen($extracted['text']),
+        'text_preview'=> substr($extracted['text'], 0, 800),
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
+
+/**
+ * Extract all slide text and embedded images from a PPTX (ZIP) byte string.
+ * Returns ['text'=>string, 'images'=>[['mime_type','data','name']], 'slide_count'=>int]
+ */
+function extract_pptx(string $pptxBytes): array {
+    $tmpFile = sys_get_temp_dir() . '/coach6_' . uniqid() . '.pptx';
+    file_put_contents($tmpFile, $pptxBytes);
+
+    $zip = new ZipArchive();
+    if ($zip->open($tmpFile) !== true) {
+        @unlink($tmpFile);
+        return ['text' => '', 'images' => [], 'slide_count' => 0];
+    }
+
+    // ── Collect and sort slide files ─────────────────────────────────────────
+    $slideFiles = [];
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $name = $zip->getNameIndex($i);
+        if (preg_match('#^ppt/slides/slide(\d+)\.xml$#', $name, $m)) {
+            $slideFiles[(int)$m[1]] = $name;
+        }
+    }
+    ksort($slideFiles);
+
+    // ── Extract text from each slide ─────────────────────────────────────────
+    $slideTexts = [];
+    foreach ($slideFiles as $num => $slideName) {
+        $xml = $zip->getFromName($slideName);
+        if ($xml === false) continue;
+        $dom = new DOMDocument();
+        @$dom->loadXML($xml);
+        // All text runs live in <a:t> elements (DrawingML namespace)
+        $nodes = $dom->getElementsByTagNameNS(
+            'http://schemas.openxmlformats.org/drawingml/2006/main', 't'
+        );
+        $parts = [];
+        foreach ($nodes as $node) {
+            $t = trim($node->textContent);
+            if ($t !== '') $parts[] = $t;
+        }
+        if (!empty($parts)) {
+            $slideTexts[] = "=== Slide {$num} ===\n" . implode("\n", $parts);
+        }
+    }
+
+    // ── Extract images from ppt/media/ ───────────────────────────────────────
+    $mimeMap = [
+        'jpg'  => 'image/jpeg', 'jpeg' => 'image/jpeg',
+        'png'  => 'image/png',  'gif'  => 'image/gif',
+        'webp' => 'image/webp',
+    ];
+    $images = [];
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $name = $zip->getNameIndex($i);
+        if (!preg_match('#^ppt/media/(.+)$#', $name, $m)) continue;
+        $ext  = strtolower(pathinfo($m[1], PATHINFO_EXTENSION));
+        if (!isset($mimeMap[$ext])) continue;
+        $imgBytes = $zip->getFromName($name);
+        if ($imgBytes === false || strlen($imgBytes) < 100) continue;
+        // Skip images > 4 MB (base64 would be ~5.3 MB — Gemini inline limit)
+        if (strlen($imgBytes) > 4 * 1024 * 1024) continue;
+        $images[] = [
+            'mime_type' => $mimeMap[$ext],
+            'data'      => base64_encode($imgBytes),
+            'name'      => $m[1],
+        ];
+        // Cap at 20 images to keep payload size manageable
+        if (count($images) >= 20) break;
+    }
+
+    $zip->close();
+    @unlink($tmpFile);
+
+    return [
+        'text'        => implode("\n\n", $slideTexts),
+        'images'      => $images,
+        'slide_count' => count($slideFiles),
+    ];
+}
+
+/**
+ * Build a Gemini 'parts' array: slide text + all images + the prompt text.
+ */
+function build_gemini_parts(array $extracted, string $prompt): array {
+    $parts = [];
+    if (!empty($extracted['text'])) {
+        $parts[] = ['text' => "PRESENTATION SLIDE CONTENT:\n\n" . $extracted['text']];
+    }
+    foreach ($extracted['images'] as $img) {
+        $parts[] = ['inlineData' => ['mimeType' => $img['mime_type'], 'data' => $img['data']]];
+    }
+    $parts[] = ['text' => $prompt];
+    return $parts;
+}
 
 /**
  * Build the HTML email body from grading results.

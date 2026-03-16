@@ -105,20 +105,6 @@
       margin: 0 0 24px;
     }
 
-    /* URL input row */
-    .url-row { display: flex; gap: 10px; align-items: stretch; }
-    .url-input {
-      flex: 1;
-      padding: 12px 14px;
-      border: 1.5px solid var(--border);
-      border-radius: 8px;
-      font-size: 0.95em;
-      outline: none;
-      transition: border-color 0.15s;
-    }
-    .url-input:focus  { border-color: var(--primary); }
-    .url-input::placeholder { color: #aaa; }
-
     /* Divider */
     .or-divider {
       display: flex; align-items: center; gap: 12px;
@@ -402,19 +388,6 @@
     </div>
     <input type="file" id="file-input" accept=".pptx,.ppt" onchange="handleFileSelect(event)">
 
-    <!-- OR divider -->
-    <div class="or-divider">or paste a OneDrive share link</div>
-
-    <!-- URL paste — SECONDARY -->
-    <div class="url-row">
-      <input class="url-input" type="url" id="share-url"
-        placeholder="Paste 'Anyone with the link' URL here…">
-    </div>
-    <div style="font-size:0.8em;color:#aaa;margin-top:6px;">
-      Note: OneDrive links may not work from all networks.
-      If yours fails, use the file upload above.
-      <a href="http://orionhs.us/anyonewiththelink" target="_blank" style="color:#1a73e8;">How to share →</a>
-    </div>
 
     <div class="submit-row">
       <button class="btn-submit" id="submit-btn" onclick="submitPresentation()">
@@ -567,10 +540,9 @@ function setFile(file) {
 // ─────────────────────────────────────────────────────────────────────────────
 async function submitPresentation() {
   clearBanners();
-  const shareUrl = document.getElementById('share-url').value.trim();
 
-  if (!shareUrl && !selectedFile) {
-    showBanner('error', 'Please paste a OneDrive share link or choose a .pptx file to upload.');
+  if (!selectedFile) {
+    showBanner('error', 'Please choose a .pptx file to upload.');
     return;
   }
 
@@ -581,28 +553,16 @@ async function submitPresentation() {
 
   setLoadingStep('Preparing your file…');
 
-  let body;
-
-  if (selectedFile) {
-    // Read file as base64
-    setLoadingStep('Reading file…');
-    const b64 = await fileToBase64(selectedFile);
-    body = {
-      action:        'grade_presentation',
-      student_id:    studentId,
-      student_name:  studentName,
-      student_email: studentEmail,
-      file_data:     b64,
-    };
-  } else {
-    body = {
-      action:        'grade_presentation',
-      student_id:    studentId,
-      student_name:  studentName,
-      student_email: studentEmail,
-      share_url:     shareUrl,
-    };
-  }
+  // Read file as base64
+  setLoadingStep('Reading file…');
+  const b64 = await fileToBase64(selectedFile);
+  const body = {
+    action:        'grade_presentation',
+    student_id:    studentId,
+    student_name:  studentName,
+    student_email: studentEmail,
+    file_data:     b64,
+  };
 
   setLoadingStep('Submitting to AI for grading… (this takes 30–90 seconds)');
 
@@ -778,7 +738,6 @@ function resetToUpload() {
   document.getElementById('upload-card').style.display  = 'block';
   document.getElementById('loading-card').style.display = 'none';
   document.getElementById('results').style.display      = 'none';
-  document.getElementById('share-url').value = '';
   document.getElementById('file-chosen').textContent = '';
   selectedFile = null;
   clearBanners();

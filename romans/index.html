@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Romans Chapter Quiz</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Georgia', serif;
+      background: #1a1a2e;
+      color: #e8e0d0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    header {
+      text-align: center;
+      padding: 30px 0 20px;
+    }
+    header h1 {
+      font-size: 2rem;
+      color: #c9a84c;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    header p {
+      color: #9a8c7a;
+      margin-top: 6px;
+      font-size: 0.95rem;
+      font-style: italic;
+    }
+
+    #loading {
+      text-align: center;
+      padding: 60px 20px;
+    }
+    #loading p { color: #9a8c7a; margin-bottom: 16px; }
+    #progress-bar-wrap {
+      width: 260px;
+      height: 6px;
+      background: #2a2a4a;
+      border-radius: 3px;
+      margin: 0 auto;
+      overflow: hidden;
+    }
+    #progress-bar {
+      height: 100%;
+      background: #c9a84c;
+      border-radius: 3px;
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    #quiz {
+      display: none;
+      width: 100%;
+      max-width: 720px;
+    }
+
+    /* Score bar */
+    #scorebar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #16213e;
+      border-radius: 10px;
+      padding: 12px 20px;
+      margin-bottom: 24px;
+      font-size: 0.9rem;
+      color: #9a8c7a;
+    }
+    #scorebar span { color: #c9a84c; font-weight: bold; font-size: 1rem; }
+    #streak-display { font-size: 0.85rem; }
+
+    /* Verse card */
+    #verse-card {
+      background: #16213e;
+      border: 1px solid #2a2a4a;
+      border-radius: 14px;
+      padding: 36px 40px;
+      margin-bottom: 28px;
+      position: relative;
+    }
+    #verse-text {
+      font-size: 1.25rem;
+      line-height: 1.85;
+      color: #e8e0d0;
+      text-align: center;
+    }
+    #verse-text::before { content: '\201C'; }
+    #verse-text::after  { content: '\201D'; }
+
+    #verse-ref {
+      margin-top: 18px;
+      text-align: center;
+      font-size: 0.85rem;
+      color: #5a5a7a;
+      font-style: italic;
+      letter-spacing: 1px;
+      min-height: 1.2em;
+    }
+
+    /* Question */
+    #question {
+      text-align: center;
+      color: #c9a84c;
+      font-size: 1.1rem;
+      margin-bottom: 20px;
+      letter-spacing: 0.5px;
+    }
+
+    /* Chapter buttons */
+    #chapter-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+    .ch-btn {
+      background: #0f3460;
+      border: 1px solid #1e4d8c;
+      color: #b0c4e0;
+      padding: 14px 8px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-family: Georgia, serif;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .ch-btn:hover:not(:disabled) {
+      background: #1a5490;
+      border-color: #c9a84c;
+      color: #fff;
+      transform: translateY(-1px);
+    }
+    .ch-btn:disabled { cursor: default; opacity: 0.7; }
+    .ch-btn.correct {
+      background: #1a4a2e;
+      border-color: #4caf7a;
+      color: #7ddf9c;
+    }
+    .ch-btn.wrong {
+      background: #4a1a1a;
+      border-color: #c04040;
+      color: #e07070;
+    }
+
+    /* Feedback */
+    #feedback {
+      display: none;
+      background: #16213e;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 20px;
+      border-left: 4px solid #c9a84c;
+    }
+    #feedback.correct-fb { border-left-color: #4caf7a; }
+    #feedback.wrong-fb   { border-left-color: #c04040; }
+
+    #feedback-result {
+      font-size: 1.05rem;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+    .correct-fb #feedback-result { color: #7ddf9c; }
+    .wrong-fb   #feedback-result { color: #e07070; }
+
+    #feedback-theme {
+      color: #b0a090;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+    #feedback-theme strong { color: #c9a84c; }
+
+    /* Next button */
+    #next-btn {
+      display: none;
+      width: 100%;
+      padding: 16px;
+      background: #c9a84c;
+      color: #1a1a2e;
+      border: none;
+      border-radius: 10px;
+      font-size: 1.05rem;
+      font-family: Georgia, serif;
+      font-weight: bold;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: background 0.15s;
+    }
+    #next-btn:hover { background: #e0bf60; }
+
+    /* Footer */
+    footer {
+      margin-top: 40px;
+      color: #4a4a6a;
+      font-size: 0.78rem;
+      text-align: center;
+      padding-bottom: 20px;
+    }
+    footer a { color: #5a5a8a; text-decoration: none; }
+
+    @media (max-width: 500px) {
+      #verse-card { padding: 24px 20px; }
+      #verse-text { font-size: 1.05rem; }
+      #chapter-grid { grid-template-columns: repeat(4, 1fr); gap: 7px; }
+      .ch-btn { padding: 12px 4px; font-size: 0.9rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Romans</h1>
+  <p>Which chapter is this verse from?</p>
+</header>
+
+<div id="loading">
+  <p id="loading-msg">Loading the book of Romans…</p>
+  <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+</div>
+
+<div id="quiz">
+  <div id="scorebar">
+    <div>Score: <span id="score-display">0 / 0</span></div>
+    <div id="streak-display"></div>
+  </div>
+
+  <div id="verse-card">
+    <div id="verse-text"></div>
+    <div id="verse-ref"></div>
+  </div>
+
+  <div id="question">Which chapter is this verse from?</div>
+
+  <div id="chapter-grid"></div>
+
+  <div id="feedback">
+    <div id="feedback-result"></div>
+    <div id="feedback-theme"></div>
+  </div>
+
+  <button id="next-btn" onclick="nextVerse()">Next Verse &rarr;</button>
+</div>
+
+<footer>
+  World English Bible (WEB) &mdash; Public Domain &bull;
+  Text via <a href="https://bible-api.com" target="_blank">bible-api.com</a>
+</footer>
+
+<script>
+const CHAPTER_THEMES = {
+   1: "Paul's intro and credentials; God's wrath on human wickedness and idolatry",
+   2: "God judges impartially — both Jews and Gentiles are accountable",
+   3: "All have sinned and fall short; righteousness comes through faith in Christ",
+   4: "Abraham was justified by faith, not works — before circumcision",
+   5: "Peace with God through faith; Adam brought death, Christ brings life to all",
+   6: "Baptized into Christ's death; dead to sin, alive to God — don't let sin reign",
+   7: "The law is good but powerless to save; Paul's inner war with sin",
+   8: "No condemnation in Christ; life in the Spirit; nothing can separate us from God's love",
+   9: "God's sovereign election; Israel has stumbled but God's word has not failed",
+  10: "Righteousness by faith, not law; anyone who calls on the Lord will be saved",
+  11: "A faithful remnant remains; Gentiles grafted in; all Israel will be saved",
+  12: "Living sacrifice; diverse gifts in one body; overcome evil with good",
+  13: "Submit to governing authorities; love your neighbor — love fulfills the law",
+  14: "Accept the weak in faith; don't judge over disputable matters",
+  15: "Bear with the weak; Paul's ambition to preach where Christ is unknown",
+  16: "Greetings to coworkers; final warnings against divisiveness; doxology",
+};
+
+let allVerses = [];
+let currentVerse = null;
+let correct = 0;
+let total = 0;
+let streak = 0;
+
+async function loadRomans() {
+  const CACHE_KEY = 'romans_web_v1';
+  const cached = localStorage.getItem(CACHE_KEY);
+  if (cached) {
+    allVerses = JSON.parse(cached);
+    startQuiz();
+    return;
+  }
+
+  const verses = [];
+  for (let ch = 1; ch <= 16; ch++) {
+    document.getElementById('loading-msg').textContent =
+      `Loading Romans ${ch} of 16…`;
+    document.getElementById('progress-bar').style.width =
+      ((ch - 1) / 16 * 100) + '%';
+
+    let res, data;
+    try {
+      res = await fetch(`https://bible-api.com/romans+${ch}?translation=web`);
+      data = await res.json();
+    } catch (e) {
+      document.getElementById('loading-msg').textContent =
+        'Network error. Please refresh and try again.';
+      return;
+    }
+
+    for (const v of data.verses) {
+      const text = v.text.trim().replace(/\n/g, ' ');
+      if (text.length >= 40) {   // skip very short verses
+        verses.push({ chapter: v.chapter, verse: v.verse, text });
+      }
+    }
+  }
+
+  document.getElementById('progress-bar').style.width = '100%';
+  localStorage.setItem(CACHE_KEY, JSON.stringify(verses));
+  allVerses = verses;
+  setTimeout(startQuiz, 300);
+}
+
+function startQuiz() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('quiz').style.display = 'block';
+  buildGrid();
+  nextVerse();
+}
+
+function buildGrid() {
+  const grid = document.getElementById('chapter-grid');
+  grid.innerHTML = '';
+  for (let ch = 1; ch <= 16; ch++) {
+    const btn = document.createElement('button');
+    btn.className = 'ch-btn';
+    btn.textContent = ch;
+    btn.dataset.ch = ch;
+    btn.addEventListener('click', () => guess(ch, btn));
+    grid.appendChild(btn);
+  }
+}
+
+function nextVerse() {
+  // Pick a verse not the same as the last one
+  let pick;
+  do {
+    pick = allVerses[Math.floor(Math.random() * allVerses.length)];
+  } while (allVerses.length > 1 && pick === currentVerse);
+  currentVerse = pick;
+
+  document.getElementById('verse-text').textContent = pick.text;
+  document.getElementById('verse-ref').textContent = '';
+  document.getElementById('feedback').style.display = 'none';
+  document.getElementById('next-btn').style.display = 'none';
+
+  // Re-enable all buttons, clear colors
+  document.querySelectorAll('.ch-btn').forEach(b => {
+    b.disabled = false;
+    b.className = 'ch-btn';
+  });
+}
+
+function guess(ch, btn) {
+  const answer = currentVerse.chapter;
+  total++;
+
+  // Disable all buttons
+  document.querySelectorAll('.ch-btn').forEach(b => { b.disabled = true; });
+
+  // Reveal reference
+  document.getElementById('verse-ref').textContent =
+    `Romans ${answer}:${currentVerse.verse}`;
+
+  if (ch === answer) {
+    correct++;
+    streak++;
+    btn.className = 'ch-btn correct';
+    showFeedback(true, answer);
+  } else {
+    streak = 0;
+    btn.className = 'ch-btn wrong';
+    // Highlight correct answer
+    document.querySelector(`.ch-btn[data-ch="${answer}"]`).className = 'ch-btn correct';
+    showFeedback(false, answer);
+  }
+
+  updateScore();
+  document.getElementById('next-btn').style.display = 'block';
+}
+
+function showFeedback(isCorrect, chapter) {
+  const fb = document.getElementById('feedback');
+  fb.style.display = 'block';
+  fb.className = isCorrect ? 'correct-fb' : 'wrong-fb';
+  document.getElementById('feedback-result').textContent =
+    isCorrect ? '✓ Correct!' : `✗ That was Romans ${chapter}`;
+  document.getElementById('feedback-theme').innerHTML =
+    `<strong>Chapter ${chapter} theme:</strong> ${CHAPTER_THEMES[chapter]}`;
+}
+
+function updateScore() {
+  document.getElementById('score-display').textContent = `${correct} / ${total}`;
+  const pct = total ? Math.round(correct / total * 100) : 0;
+  let streakText = '';
+  if (streak >= 3) streakText = `🔥 ${streak} in a row!`;
+  else if (streak === 2) streakText = '2 in a row';
+  document.getElementById('streak-display').textContent =
+    total ? `${pct}%${streakText ? ' · ' + streakText : ''}` : '';
+}
+
+// Kick off
+loadRomans();
+</script>
+</body>
+</html>

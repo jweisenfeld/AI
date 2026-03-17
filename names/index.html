@@ -113,6 +113,15 @@
     }
     #name-text.visible { opacity: 1; }
 
+    #church-text {
+      font-size: clamp(0.8rem, 3vw, 1rem);
+      color: #7a9bb5;
+      font-style: italic;
+      opacity: 0;
+      transition: opacity 0.25s ease 0.1s;
+    }
+    #church-text.visible { opacity: 1; }
+
     #tap-hint {
       font-size: 0.8rem;
       color: #556;
@@ -249,6 +258,7 @@
     </div>
     <div id="name-reveal">
       <div id="name-text"></div>
+      <div id="church-text"></div>
       <div id="tap-hint">Tap to reveal name</div>
     </div>
   </div>
@@ -292,9 +302,10 @@
       if (!row) continue;
       // Handle quoted fields
       const cols = row.match(/(".*?"|[^,]+)/g) || [];
-      const filename = (cols[0] || '').replace(/^"|"$/g, '').trim();
-      const fullname = (cols[1] || '').replace(/^"|"$/g, '').trim();
-      if (filename && fullname) cards.push({ filename, fullname });
+      const filename   = (cols[0] || '').replace(/^"|"$/g, '').trim();
+      const fullname   = (cols[1] || '').replace(/^"|"$/g, '').trim();
+      const churchname = (cols[2] || '').replace(/^"|"$/g, '').trim();
+      if (filename && fullname) cards.push({ filename, fullname, churchname });
     }
     if (cards.length === 0) throw new Error('No valid rows found in CSV');
     initDeck();
@@ -349,6 +360,9 @@
     const nameEl = document.getElementById('name-text');
     nameEl.textContent = card.fullname;
     nameEl.classList.remove('visible');
+    const churchEl = document.getElementById('church-text');
+    churchEl.textContent = '';
+    churchEl.classList.remove('visible');
 
     // Hint / quiz
     updateModeUI();
@@ -380,7 +394,11 @@
 
   function revealName() {
     revealed = true;
+    const card = cards[order[pos]];
     document.getElementById('name-text').classList.add('visible');
+    const churchEl = document.getElementById('church-text');
+    churchEl.textContent = card.churchname || '';
+    if (card.churchname) churchEl.classList.add('visible');
     document.getElementById('tap-hint').textContent = '';
   }
 

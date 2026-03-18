@@ -250,8 +250,7 @@
 </div>
 
 <footer>
-  World English Bible (WEB) &mdash; Public Domain &bull;
-  Text via <a href="https://bible-api.com" target="_blank">bible-api.com</a>
+  World English Bible (WEB) &mdash; Public Domain
 </footer>
 
 <script>
@@ -281,43 +280,23 @@ let total = 0;
 let streak = 0;
 
 async function loadRomans() {
-  const CACHE_KEY = 'romans_web_v1';
-  const cached = localStorage.getItem(CACHE_KEY);
-  if (cached) {
-    allVerses = JSON.parse(cached);
-    startQuiz();
+  let raw;
+  try {
+    const res = await fetch('data.json');
+    if (!res.ok) throw new Error(res.status);
+    raw = await res.json();
+  } catch (e) {
+    document.getElementById('loading-msg').textContent =
+      'Could not load data.json. Please refresh or check your connection.';
     return;
   }
 
-  const verses = [];
-  for (let ch = 1; ch <= 16; ch++) {
-    document.getElementById('loading-msg').textContent =
-      `Loading Romans ${ch} of 16…`;
-    document.getElementById('progress-bar').style.width =
-      ((ch - 1) / 16 * 100) + '%';
-
-    let res, data;
-    try {
-      res = await fetch(`https://bible-api.com/romans+${ch}?translation=web`);
-      data = await res.json();
-    } catch (e) {
-      document.getElementById('loading-msg').textContent =
-        'Network error. Please refresh and try again.';
-      return;
-    }
-
-    for (const v of data.verses) {
-      const text = v.text.trim().replace(/\n/g, ' ');
-      if (text.length >= 40) {   // skip very short verses
-        verses.push({ chapter: v.chapter, verse: v.verse, text });
-      }
-    }
-  }
+  allVerses = raw.filter(v => v.t.length >= 40).map(v => ({
+    chapter: v.c, verse: v.v, text: v.t
+  }));
 
   document.getElementById('progress-bar').style.width = '100%';
-  localStorage.setItem(CACHE_KEY, JSON.stringify(verses));
-  allVerses = verses;
-  setTimeout(startQuiz, 300);
+  setTimeout(startQuiz, 150);
 }
 
 function startQuiz() {

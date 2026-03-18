@@ -114,13 +114,55 @@
       letter-spacing: 0.5px;
     }
 
-    /* Chapter buttons */
+    /* Chapter grid — 5 columns: checkbox + 4 chapter buttons */
     #chapter-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: 32px repeat(4, 1fr);
       gap: 10px;
       margin-bottom: 24px;
+      align-items: center;
     }
+
+    /* Group checkbox */
+    .group-cb-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .group-cb-cell input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #4a5a8a;
+      border-radius: 5px;
+      background: #16213e;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.15s, background 0.15s;
+      flex-shrink: 0;
+    }
+    .group-cb-cell input[type="checkbox"]:checked {
+      background: #c9a84c;
+      border-color: #c9a84c;
+    }
+    .group-cb-cell input[type="checkbox"]:checked::after {
+      content: '';
+      position: absolute;
+      left: 4px;
+      top: 1px;
+      width: 8px;
+      height: 12px;
+      border: 2px solid #1a1a2e;
+      border-top: none;
+      border-left: none;
+      transform: rotate(45deg);
+    }
+    .group-cb-cell input[type="checkbox"]:hover {
+      border-color: #c9a84c;
+    }
+
+    /* Chapter buttons */
     .ch-btn {
       background: #0f3460;
       border: 1px solid #1e4d8c;
@@ -149,6 +191,10 @@
       background: #4a1a1a;
       border-color: #c04040;
       color: #e07070;
+    }
+    /* Dimmed: chapter button belongs to an inactive group */
+    .ch-btn.inactive-group {
+      opacity: 0.35;
     }
 
     /* Feedback */
@@ -209,7 +255,7 @@
     @media (max-width: 500px) {
       #verse-card { padding: 24px 20px; }
       #verse-text { font-size: 1.05rem; }
-      #chapter-grid { grid-template-columns: repeat(4, 1fr); gap: 7px; }
+      #chapter-grid { grid-template-columns: 28px repeat(4, 1fr); gap: 7px; }
       .ch-btn { padding: 12px 4px; font-size: 0.9rem; }
     }
   </style>
@@ -273,6 +319,32 @@ const CHAPTER_THEMES = {
   16: "Greetings to coworkers; final warnings against divisiveness; doxology",
 };
 
+// Groups: 1 = ch 1-4, 2 = ch 5-8, 3 = ch 9-12, 4 = ch 13-16
+function groupForChapter(ch) { return Math.ceil(ch / 4); }
+function chaptersInGroup(g) { return [g*4-3, g*4-2, g*4-1, g*4]; }
+
+function getActiveGroups() {
+  const stored = localStorage.getItem('romans_groups');
+  return stored ? JSON.parse(stored) : [1];
+}
+
+function toggleGroup(g) {
+  const groups = getActiveGroups();
+  const idx = groups.indexOf(g);
+  if (idx >= 0) {
+    if (groups.length === 1) {
+      // Don't allow deselecting the last group — restore the checkbox
+      document.getElementById('group-cb-' + g).checked = true;
+      return;
+    }
+    groups.splice(idx, 1);
+  } else {
+    groups.push(g);
+  }
+  localStorage.setItem('romans_groups', JSON.stringify(groups));
+  location.reload();
+}
+
 let allVerses = [];
 let currentVerse = null;
 let correct = 0;
@@ -291,9 +363,12 @@ async function loadRomans() {
     return;
   }
 
-  allVerses = raw.filter(v => v.t.length >= 40).map(v => ({
-    chapter: v.c, verse: v.v, text: v.t
-  }));
+  const activeGroups = getActiveGroups();
+  const activeChapters = new Set(activeGroups.flatMap(g => chaptersInGroup(g)));
+
+  allVerses = raw
+    .filter(v => v.t.length >= 40 && activeChapters.has(v.c))
+    .map(v => ({ chapter: v.c, verse: v.v, text: v.t }));
 
   document.getElementById('progress-bar').style.width = '100%';
   setTimeout(startQuiz, 150);
@@ -309,18 +384,33 @@ function startQuiz() {
 function buildGrid() {
   const grid = document.getElementById('chapter-grid');
   grid.innerHTML = '';
-  for (let ch = 1; ch <= 16; ch++) {
-    const btn = document.createElement('button');
-    btn.className = 'ch-btn';
-    btn.textContent = ch;
-    btn.dataset.ch = ch;
-    btn.addEventListener('click', () => guess(ch, btn));
-    grid.appendChild(btn);
+  const activeGroups = getActiveGroups();
+
+  for (let g = 1; g <= 4; g++) {
+    // Checkbox cell
+    const cell = document.createElement('div');
+    cell.className = 'group-cb-cell';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.id = 'group-cb-' + g;
+    cb.checked = activeGroups.includes(g);
+    cb.addEventListener('change', () => toggleGroup(g));
+    cell.appendChild(cb);
+    grid.appendChild(cell);
+
+    // Four chapter buttons
+    for (let ch = g*4-3; ch <= g*4; ch++) {
+      const btn = document.createElement('button');
+      btn.className = 'ch-btn' + (activeGroups.includes(g) ? '' : ' inactive-group');
+      btn.textContent = ch;
+      btn.dataset.ch = ch;
+      btn.addEventListener('click', () => guess(ch, btn));
+      grid.appendChild(btn);
+    }
   }
 }
 
 function nextVerse() {
-  // Pick a verse not the same as the last one
   let pick;
   do {
     pick = allVerses[Math.floor(Math.random() * allVerses.length)];
@@ -332,10 +422,12 @@ function nextVerse() {
   document.getElementById('feedback').style.display = 'none';
   document.getElementById('next-btn').style.display = 'none';
 
-  // Re-enable all buttons, clear colors
+  // Re-enable all buttons, restore colors (preserve inactive-group dim)
+  const activeGroups = getActiveGroups();
   document.querySelectorAll('.ch-btn').forEach(b => {
     b.disabled = false;
-    b.className = 'ch-btn';
+    const g = groupForChapter(Number(b.dataset.ch));
+    b.className = 'ch-btn' + (activeGroups.includes(g) ? '' : ' inactive-group');
   });
 }
 
@@ -343,10 +435,8 @@ function guess(ch, btn) {
   const answer = currentVerse.chapter;
   total++;
 
-  // Disable all buttons
   document.querySelectorAll('.ch-btn').forEach(b => { b.disabled = true; });
 
-  // Reveal reference
   document.getElementById('verse-ref').textContent =
     `Romans ${answer}:${currentVerse.verse}`;
 
@@ -358,7 +448,6 @@ function guess(ch, btn) {
   } else {
     streak = 0;
     btn.className = 'ch-btn wrong';
-    // Highlight correct answer
     document.querySelector(`.ch-btn[data-ch="${answer}"]`).className = 'ch-btn correct';
     showFeedback(false, answer);
   }

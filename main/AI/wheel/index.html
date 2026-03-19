@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tri-Lingual Emotion Wheel</title>
+  <style>
+    :root {
+      --bg: #f6fbff;
+      --ink: #1d2a3a;
+      --card: rgba(255,255,255,0.82);
+      --line: rgba(29,42,58,0.12);
+      --accent: #6d5efc;
+      --shadow: 0 20px 50px rgba(40, 61, 88, 0.16);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, #ffe5f3 0, transparent 28%),
+        radial-gradient(circle at top right, #dff7ff 0, transparent 30%),
+        radial-gradient(circle at bottom left, #fff2c9 0, transparent 28%),
+        linear-gradient(180deg, #f9fcff 0%, #eef5ff 100%);
+      min-height: 100vh;
+    }
+
+    .page {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 24px;
+      align-items: stretch;
+      margin-bottom: 24px;
+    }
+
+    .glass {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.7);
+      backdrop-filter: blur(12px);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+    }
+
+    .intro {
+      padding: 28px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(109, 94, 252, 0.1);
+      color: var(--accent);
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      font-size: 0.8rem;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { font-size: clamp(2rem, 4vw, 3.2rem); line-height: 1.05; margin: 16px 0; }
+    .lead { font-size: 1.05rem; line-height: 1.6; max-width: 62ch; }
+
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 22px;
+    }
+
+    .legend-card {
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.75);
+      border: 1px solid var(--line);
+    }
+    .legend-card strong { display: block; margin-bottom: 4px; }
+
+    .quick-guide {
+      padding: 24px;
+      display: grid;
+      gap: 14px;
+      align-content: center;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      gap: 14px;
+      align-items: start;
+      padding: 12px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.68);
+      border: 1px solid var(--line);
+    }
+
+    .step-number {
+      width: 44px; height: 44px; border-radius: 50%;
+      display: grid; place-items: center;
+      color: white; font-weight: 800;
+      background: linear-gradient(135deg, #6d5efc, #20b3ff);
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(360px, 760px) minmax(300px, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .wheel-card { padding: 18px; }
+    .wheel-toolbar {
+      display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center;
+      padding: 10px 10px 18px;
+    }
+    .pill-group { display: flex; flex-wrap: wrap; gap: 8px; }
+    button, .chip {
+      border: 0; cursor: pointer; font: inherit;
+      border-radius: 999px; padding: 10px 14px;
+      transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+    }
+    button:hover, .chip:hover { transform: translateY(-1px); }
+    .lang-btn {
+      background: rgba(109,94,252,0.08);
+      color: #4635d4;
+      border: 1px solid rgba(109,94,252,0.18);
+      font-weight: 700;
+    }
+    .lang-btn.active {
+      background: linear-gradient(135deg, #6d5efc, #20b3ff);
+      color: white;
+      box-shadow: 0 8px 20px rgba(77, 89, 241, 0.24);
+    }
+
+    .wheel-wrap {
+      position: relative;
+      display: grid;
+      place-items: center;
+      overflow: auto;
+      padding: 10px;
+    }
+
+    svg { width: min(90vw, 740px); height: auto; overflow: visible; }
+    .segment {
+      stroke: rgba(255,255,255,0.95);
+      stroke-width: 2;
+      cursor: pointer;
+      transition: opacity 160ms ease, transform 160ms ease, filter 160ms ease;
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+    .segment:hover { filter: brightness(1.08); }
+    .segment.dim { opacity: 0.28; }
+    .segment.selected {
+      filter: drop-shadow(0 10px 18px rgba(24, 32, 56, 0.22));
+      stroke: rgba(255,255,255,1);
+      stroke-width: 3;
+    }
+
+    .label-text {
+      pointer-events: none;
+      text-anchor: middle;
+      fill: #183045;
+      font-weight: 700;
+    }
+    .label-core { font-size: 18px; }
+    .label-mid, .label-outer { font-size: 10px; }
+
+    .tooltip {
+      position: absolute;
+      min-width: 220px;
+      max-width: 320px;
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(23, 33, 48, 0.92);
+      color: white;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.24);
+      pointer-events: none;
+      opacity: 0;
+      transform: translate(-50%, -110%);
+      transition: opacity 120ms ease;
+      z-index: 10;
+    }
+    .tooltip.visible { opacity: 1; }
+    .tooltip small { color: rgba(255,255,255,0.74); display:block; margin-top: 6px; }
+
+    .side-panel {
+      padding: 24px;
+      display: grid;
+      gap: 18px;
+      position: sticky;
+      top: 20px;
+    }
+
+    .status-card, .detail-card, .advice-card { padding: 18px; border-radius: 22px; background: rgba(255,255,255,0.8); border: 1px solid var(--line); }
+    .trio {
+      display: grid;
+      gap: 4px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(109,94,252,0.08);
+      border: 1px solid rgba(109,94,252,0.12);
+    }
+    .trio strong { font-size: 1.1rem; }
+    .trio span { color: #4d6070; }
+
+    .word-grid, .strategy-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .word-chip, .strategy-chip {
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.92);
+      border: 1px solid var(--line);
+      text-align: left;
+    }
+    .word-chip.active, .strategy-chip.active {
+      background: linear-gradient(135deg, rgba(109,94,252,0.16), rgba(32,179,255,0.12));
+      border-color: rgba(109,94,252,0.4);
+    }
+    .word-chip small, .strategy-chip small { display: block; color: #577086; margin-top: 4px; }
+
+    textarea {
+      width: 100%; min-height: 140px; resize: vertical;
+      border-radius: 18px; border: 1px solid var(--line);
+      padding: 14px; font: inherit;
+      background: rgba(255,255,255,0.88);
+      color: var(--ink);
+    }
+
+    .advice-box {
+      padding: 16px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(109,94,252,0.12), rgba(255,203,90,0.16));
+      border: 1px solid rgba(109,94,252,0.15);
+      line-height: 1.6;
+    }
+
+    .muted { color: #5d7387; }
+    .tiny { font-size: 0.9rem; }
+
+    @media (max-width: 1100px) {
+      .hero, .workspace { grid-template-columns: 1fr; }
+      .side-panel { position: static; }
+    }
+
+    @media (max-width: 720px) {
+      .page { padding: 16px; }
+      .legend { grid-template-columns: 1fr; }
+      .wheel-toolbar { flex-direction: column; align-items: stretch; }
+      .label-core { font-size: 14px; }
+      .label-mid, .label-outer { font-size: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="intro glass">
+        <div class="eyebrow">Emotion Wheel • English + Español + Русский</div>
+        <h1>Find your big feeling, then choose a next step.</h1>
+        <p class="lead">
+          Start in the center with a <strong>big emotion</strong>, or begin with a more specific outer word and let the wheel guide you back.
+          Hover or tap any section to see synonyms and meanings across three languages.
+        </p>
+        <div class="legend">
+          <div class="legend-card">
+            <strong>1. Pick a core feeling</strong>
+            Or click a detailed word and trace it inward.
+          </div>
+          <div class="legend-card">
+            <strong>2. Confirm with nearby words</strong>
+            Use the middle and outer rings to check whether the feeling fits.
+          </div>
+          <div class="legend-card">
+            <strong>3. Make a plan</strong>
+            Choose a strategy or type what is on your mind for supportive advice.
+          </div>
+        </div>
+      </div>
+      <aside class="quick-guide glass">
+        <div class="step"><div class="step-number">1</div><div><strong>Hover for clues</strong><div class="muted">Tooltips include synonyms in English, Spanish, and Russian.</div></div></div>
+        <div class="step"><div class="step-number">2</div><div><strong>Click any ring</strong><div class="muted">The page highlights matching emotion families so students can move inward or outward.</div></div></div>
+        <div class="step"><div class="step-number">3</div><div><strong>Reflect and reset</strong><div class="muted">Students can pick a coping strategy, journal briefly, and get suggested next steps.</div></div></div>
+      </aside>
+    </section>
+
+    <section class="workspace">
+      <section class="wheel-card glass">
+        <div class="wheel-toolbar">
+          <div>
+            <h2 style="margin-bottom:6px;">Interactive Emotion Wheel</h2>
+            <div class="muted tiny">Tip: students can begin with the inner circle or the detailed words around the outside.</div>
+          </div>
+          <div class="pill-group" id="languageButtons"></div>
+        </div>
+        <div class="wheel-wrap" id="wheelWrap">
+          <div class="tooltip" id="tooltip"></div>
+          <svg id="wheelSvg" viewBox="0 0 720 720" aria-label="Tri-lingual emotion wheel"></svg>
+        </div>
+      </section>
+
+      <aside class="side-panel glass">
+        <section class="status-card">
+          <h2>Your emotion check-in</h2>
+          <div id="selectionSummary" class="trio">
+            <strong>Choose a word on the wheel.</strong>
+            <span>Selecciona una palabra en la rueda.</span>
+            <span>Выберите слово на колесе.</span>
+          </div>
+        </section>
+
+        <section class="detail-card">
+          <h3>Confirm with nearby words</h3>
+          <p class="muted tiny">These help students test whether the big emotion fits.</p>
+          <div id="familyWords" class="word-grid"></div>
+        </section>
+
+        <section class="advice-card">
+          <h3>Pick a strategy</h3>
+          <div id="strategyGrid" class="strategy-grid"></div>
+          <label for="thoughts" style="display:block; margin-top:14px;"><strong>Or type your thoughts</strong></label>
+          <textarea id="thoughts" placeholder="What happened? What are you feeling in your body? What do you need right now?"></textarea>
+          <div class="pill-group" style="margin-top:12px;">
+            <button id="adviceButton" class="lang-btn active" type="button">Get next steps</button>
+            <button id="resetButton" class="lang-btn" type="button">Reset</button>
+          </div>
+          <div id="adviceOutput" class="advice-box" style="margin-top:14px;">
+            Pick an emotion first, then choose a strategy or write a few thoughts.
+          </div>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const languages = [
+      { code: 'en', label: 'English' },
+      { code: 'es', label: 'Español' },
+      { code: 'ru', label: 'Русский' }
+    ];
+
+    const emotionFamilies = [
+      {
+        id: 'joyful',
+        color: '#ffd166',
+        core: { en: 'Joyful', es: 'Alegre', ru: 'Радостный' },
+        description: {
+          en: 'Bright, energized, or celebrating something good.',
+          es: 'Te sientes con energía, emocionado o celebrando algo bueno.',
+          ru: 'Вы чувствуете радость, энергию или хотите что-то отпраздновать.'
+        },
+        synonyms: {
+          en: ['happy', 'excited', 'cheerful'],
+          es: ['feliz', 'emocionado', 'contento'],
+          ru: ['счастливый', 'воодушевлённый', 'весёлый']
+        },
+        words: [
+          { id: 'excited', mid: { en: 'Excited', es: 'Emocionado', ru: 'Взволнованный' }, outer: { en: 'Enthralled', es: 'Fascinado', ru: 'Захваченный' }, synonyms: { en: ['thrilled', 'eager'], es: ['encantado', 'ansioso'], ru: ['восторженный', 'увлечённый'] } },
+          { id: 'creative', mid: { en: 'Creative', es: 'Creativo', ru: 'Творческий' }, outer: { en: 'Playful', es: 'Juguetón', ru: 'Игривый' }, synonyms: { en: ['inventive', 'imaginative'], es: ['ingenioso', 'imaginativo'], ru: ['изобретательный', 'воображающий'] } },
+          { id: 'proud', mid: { en: 'Proud', es: 'Orgulloso', ru: 'Гордый' }, outer: { en: 'Delighted', es: 'Encantado', ru: 'В восторге' }, synonyms: { en: ['accomplished', 'confident'], es: ['satisfecho', 'seguro'], ru: ['довольный', 'уверенный'] } },
+          { id: 'aware', mid: { en: 'Aware', es: 'Consciente', ru: 'Осознающий' }, outer: { en: 'Amused', es: 'Divertido', ru: 'Развеселённый' }, synonyms: { en: ['alert', 'tuned in'], es: ['atento', 'despierto'], ru: ['внимательный', 'осознанный'] } }
+        ],
+        strategies: [
+          { title: 'Celebrate wins', en: 'Name one success from today and share it with someone.', es: 'Nombra un logro de hoy y compártelo con alguien.', ru: 'Назовите один успех за сегодня и поделитесь им с кем-нибудь.' },
+          { title: 'Spread the joy', en: 'Give three compliments or kind messages.', es: 'Da tres cumplidos o mensajes amables.', ru: 'Сделайте три комплимента или добрых сообщения.' },
+          { title: 'Create something', en: 'Draw, write, build, or make a playlist.', es: 'Dibuja, escribe, construye o crea una lista de música.', ru: 'Нарисуйте, напишите, создайте что-нибудь или соберите плейлист.' }
+        ]
+      },
+      {
+        id: 'powerful',
+        color: '#8bd3dd',
+        core: { en: 'Powerful', es: 'Poderoso', ru: 'Сильный' },
+        description: {
+          en: 'Capable, steady, and ready to act.',
+          es: 'Capaz, firme y listo para actuar.',
+          ru: 'Вы чувствуете силу, устойчивость и готовность действовать.'
+        },
+        synonyms: {
+          en: ['strong', 'capable', 'confident'],
+          es: ['fuerte', 'capaz', 'seguro'],
+          ru: ['сильный', 'способный', 'уверенный']
+        },
+        words: [
+          { id: 'important', mid: { en: 'Important', es: 'Importante', ru: 'Важный' }, outer: { en: 'Faithful', es: 'Fiel', ru: 'Верный' }, synonyms: { en: ['valuable', 'needed'], es: ['valioso', 'necesario'], ru: ['ценный', 'нужный'] } },
+          { id: 'appreciated', mid: { en: 'Appreciated', es: 'Apreciado', ru: 'Ценимый' }, outer: { en: 'Valued', es: 'Valorado', ru: 'Ценный' }, synonyms: { en: ['noticed', 'respected'], es: ['reconocido', 'respetado'], ru: ['замеченный', 'уважаемый'] } },
+          { id: 'respected', mid: { en: 'Respected', es: 'Respetado', ru: 'Уважаемый' }, outer: { en: 'Satisfied', es: 'Satisfecho', ru: 'Удовлетворённый' }, synonyms: { en: ['honored', 'trusted'], es: ['honrado', 'confiado'], ru: ['почитаемый', 'надёжный'] } },
+          { id: 'hopeful', mid: { en: 'Hopeful', es: 'Esperanzado', ru: 'Полный надежды' }, outer: { en: 'Worthwhile', es: 'Valioso', ru: 'Достойный' }, synonyms: { en: ['optimistic', 'ready'], es: ['optimista', 'listo'], ru: ['оптимистичный', 'готовый'] } }
+        ],
+        strategies: [
+          { title: 'Use your energy', en: 'Do a sport, stretch, or take a brisk walk.', es: 'Haz deporte, estírate o camina con energía.', ru: 'Займитесь спортом, потянитесь или быстро пройдитесь.' },
+          { title: 'Feed the mind', en: 'Learn more about something you care about.', es: 'Aprende más sobre algo que te importa.', ru: 'Узнайте больше о том, что вам интересно.' },
+          { title: 'Lead with purpose', en: 'Choose one helpful action you can finish today.', es: 'Elige una acción útil que puedas terminar hoy.', ru: 'Выберите одно полезное дело, которое можно завершить сегодня.' }
+        ]
+      },
+      {
+        id: 'peaceful',
+        color: '#95e1d3',
+        core: { en: 'Peaceful', es: 'En paz', ru: 'Спокойный' },
+        description: {
+          en: 'Calm, safe, or connected.',
+          es: 'Tranquilo, seguro o conectado con otros.',
+          ru: 'Вы спокойны, чувствуете безопасность или связь с другими.'
+        },
+        synonyms: {
+          en: ['calm', 'restful', 'centered'],
+          es: ['calmado', 'tranquilo', 'centrado'],
+          ru: ['спокойный', 'умиротворённый', 'собранный']
+        },
+        words: [
+          { id: 'friendly', mid: { en: 'Friendly', es: 'Amistoso', ru: 'Дружелюбный' }, outer: { en: 'Responsive', es: 'Atento', ru: 'Отзывчивый' }, synonyms: { en: ['kind', 'warm'], es: ['amable', 'cercano'], ru: ['добрый', 'тёплый'] } },
+          { id: 'loving', mid: { en: 'Loving', es: 'Cariñoso', ru: 'Любящий' }, outer: { en: 'Serene', es: 'Sereno', ru: 'Безмятежный' }, synonyms: { en: ['affectionate', 'caring'], es: ['afectuoso', 'cariñoso'], ru: ['ласковый', 'заботливый'] } },
+          { id: 'trusting', mid: { en: 'Trusting', es: 'Confiado', ru: 'Доверяющий' }, outer: { en: 'Sentimental', es: 'Sentimental', ru: 'Сентиментальный' }, synonyms: { en: ['secure', 'open'], es: ['seguro', 'abierto'], ru: ['доверчивый', 'открытый'] } },
+          { id: 'thoughtful', mid: { en: 'Thoughtful', es: 'Reflexivo', ru: 'Задумчивый' }, outer: { en: 'Pensive', es: 'Pensativo', ru: 'Задумчивый' }, synonyms: { en: ['reflective', 'calm'], es: ['pensativo', 'sereno'], ru: ['размышляющий', 'спокойный'] } }
+        ],
+        strategies: [
+          { title: 'Square breathing', en: 'Breathe in for 4, hold for 4, out for 4, hold for 4.', es: 'Inhala 4, sostén 4, exhala 4, sostén 4.', ru: 'Вдох на 4, пауза на 4, выдох на 4, пауза на 4.' },
+          { title: 'Show positivity', en: 'Write down three strengths you notice in yourself.', es: 'Escribe tres fortalezas que notas en ti.', ru: 'Запишите три своих сильных качества.' },
+          { title: 'Protect the calm', en: 'Choose one peaceful habit to repeat later today.', es: 'Elige un hábito tranquilo para repetir hoy.', ru: 'Выберите одно спокойное действие и повторите его сегодня.' }
+        ]
+      },
+      {
+        id: 'sad',
+        color: '#a29bfe',
+        core: { en: 'Sad', es: 'Triste', ru: 'Грустный' },
+        description: {
+          en: 'Low, hurt, disappointed, or heavy.',
+          es: 'Desanimado, herido, decepcionado o con peso emocional.',
+          ru: 'Вы чувствуете грусть, боль, разочарование или тяжесть.'
+        },
+        synonyms: {
+          en: ['down', 'hurt', 'blue'],
+          es: ['decaído', 'herido', 'apagado'],
+          ru: ['печальный', 'раненый', 'унылый']
+        },
+        words: [
+          { id: 'lonely', mid: { en: 'Lonely', es: 'Solitario', ru: 'Одинокий' }, outer: { en: 'Miserable', es: 'Miserable', ru: 'Несчастный' }, synonyms: { en: ['alone', 'isolated'], es: ['solo', 'aislado'], ru: ['одинокий', 'изолированный'] } },
+          { id: 'bored', mid: { en: 'Bored', es: 'Aburrido', ru: 'Скучающий' }, outer: { en: 'Apathetic', es: 'Apático', ru: 'Апатичный' }, synonyms: { en: ['uninterested', 'tired'], es: ['sin interés', 'cansado'], ru: ['безразличный', 'уставший'] } },
+          { id: 'depressed', mid: { en: 'Depressed', es: 'Deprimido', ru: 'Подавленный' }, outer: { en: 'Inadequate', es: 'Inadecuado', ru: 'Недостаточный' }, synonyms: { en: ['empty', 'very low'], es: ['vacío', 'muy triste'], ru: ['опустошённый', 'очень подавленный'] } },
+          { id: 'ashamed', mid: { en: 'Ashamed', es: 'Avergonzado', ru: 'Пристыженный' }, outer: { en: 'Bashful', es: 'Tímido', ru: 'Застенчивый' }, synonyms: { en: ['embarrassed', 'guilty'], es: ['apenado', 'culpable'], ru: ['смущённый', 'виноватый'] } }
+        ],
+        strategies: [
+          { title: 'Write three things', en: 'List three good or beautiful things from this week.', es: 'Escribe tres cosas buenas o bonitas de esta semana.', ru: 'Запишите три хороших или красивых события этой недели.' },
+          { title: 'Show gratitude', en: 'Think of one person or pet you appreciate and why.', es: 'Piensa en una persona o mascota que aprecias y por qué.', ru: 'Подумайте об одном человеке или питомце, которого вы цените, и почему.' },
+          { title: 'Journal it out', en: 'Write freely for five minutes without judging yourself.', es: 'Escribe libremente por cinco minutos sin juzgarte.', ru: 'Пишите свободно пять минут, не осуждая себя.' }
+        ]
+      },
+      {
+        id: 'mad',
+        color: '#ff8b94',
+        core: { en: 'Mad', es: 'Enojado', ru: 'Сердитый' },
+        description: {
+          en: 'Irritated, frustrated, or intensely upset.',
+          es: 'Irritado, frustrado o muy molesto.',
+          ru: 'Вы раздражены, расстроены или сильно злитесь.'
+        },
+        synonyms: {
+          en: ['angry', 'frustrated', 'heated'],
+          es: ['molesto', 'furioso', 'frustrado'],
+          ru: ['злой', 'раздражённый', 'возмущённый']
+        },
+        words: [
+          { id: 'hostile', mid: { en: 'Hostile', es: 'Hostil', ru: 'Враждебный' }, outer: { en: 'Selfish', es: 'Egoísta', ru: 'Эгоистичный' }, synonyms: { en: ['unfriendly', 'sharp'], es: ['brusco', 'agresivo'], ru: ['резкий', 'недружелюбный'] } },
+          { id: 'angry', mid: { en: 'Angry', es: 'Furioso', ru: 'Злой' }, outer: { en: 'Frustrated', es: 'Frustrado', ru: 'Фрустрированный' }, synonyms: { en: ['mad', 'upset'], es: ['enojado', 'molesto'], ru: ['сердитый', 'расстроенный'] } },
+          { id: 'enraged', mid: { en: 'Enraged', es: 'Enfurecido', ru: 'В ярости' }, outer: { en: 'Furious', es: 'Furioso', ru: 'Разъярённый' }, synonyms: { en: ['furious', 'boiling'], es: ['rabioso', 'ardiendo'], ru: ['взбешённый', 'кипящий'] } },
+          { id: 'critical', mid: { en: 'Critical', es: 'Crítico', ru: 'Критичный' }, outer: { en: 'Skeptical', es: 'Escéptico', ru: 'Скептичный' }, synonyms: { en: ['judging', 'doubtful'], es: ['juzgador', 'dudoso'], ru: ['осуждающий', 'сомневающийся'] } }
+        ],
+        strategies: [
+          { title: 'Breathe and body', en: 'Slow your breathing and relax one body part at a time.', es: 'Respira lento y relaja una parte del cuerpo a la vez.', ru: 'Дышите медленно и расслабляйте тело по одной части.' },
+          { title: 'Retell the story', en: 'Imagine the situation from the other person’s point of view.', es: 'Imagina la situación desde la perspectiva de la otra persona.', ru: 'Посмотрите на ситуацию глазами другого человека.' },
+          { title: 'Move your body', en: 'Walk, stretch, or exercise to release the heat.', es: 'Camina, estírate o haz ejercicio para soltar la energía.', ru: 'Пройдитесь, потянитесь или потренируйтесь, чтобы выпустить напряжение.' }
+        ]
+      },
+      {
+        id: 'scared',
+        color: '#c3bef0',
+        core: { en: 'Scared', es: 'Asustado', ru: 'Испуганный' },
+        description: {
+          en: 'Nervous, unsure, embarrassed, or worried.',
+          es: 'Nervioso, inseguro, avergonzado o preocupado.',
+          ru: 'Вы нервничаете, не уверены в себе, смущены или беспокоитесь.'
+        },
+        synonyms: {
+          en: ['afraid', 'nervous', 'worried'],
+          es: ['temeroso', 'nervioso', 'preocupado'],
+          ru: ['испуганный', 'нервный', 'обеспокоенный']
+        },
+        words: [
+          { id: 'rejected', mid: { en: 'Rejected', es: 'Rechazado', ru: 'Отвергнутый' }, outer: { en: 'Bewildered', es: 'Desconcertado', ru: 'Озадаченный' }, synonyms: { en: ['left out', 'pushed away'], es: ['excluido', 'apartado'], ru: ['отстранённый', 'покинутый'] } },
+          { id: 'confused', mid: { en: 'Confused', es: 'Confundido', ru: 'Сбитый с толку' }, outer: { en: 'Discouraged', es: 'Desanimado', ru: 'Обескураженный' }, synonyms: { en: ['mixed up', 'uncertain'], es: ['perdido', 'incierto'], ru: ['запутавшийся', 'неуверенный'] } },
+          { id: 'helpless', mid: { en: 'Helpless', es: 'Indefenso', ru: 'Беспомощный' }, outer: { en: 'Weak', es: 'Débil', ru: 'Слабый' }, synonyms: { en: ['stuck', 'powerless'], es: ['atorado', 'sin poder'], ru: ['застрявший', 'бессильный'] } },
+          { id: 'insecure', mid: { en: 'Insecure', es: 'Inseguro', ru: 'Неуверенный' }, outer: { en: 'Embarrassed', es: 'Avergonzado', ru: 'Смущённый' }, synonyms: { en: ['shaky', 'not sure'], es: ['dudoso', 'sin confianza'], ru: ['сомневающийся', 'неуверенный'] } }
+        ],
+        strategies: [
+          { title: 'Talk to someone safe', en: 'Make a list of trusted people and choose one to contact.', es: 'Haz una lista de personas de confianza y elige una para hablar.', ru: 'Составьте список надёжных людей и выберите одного для разговора.' },
+          { title: 'Cheer yourself on', en: 'Tell yourself what you would tell a friend in the same situation.', es: 'Dite lo que le dirías a un amigo en la misma situación.', ru: 'Скажите себе то, что сказали бы другу в такой же ситуации.' },
+          { title: 'Shrink the fear', en: 'Name one tiny next step that feels safe enough.', es: 'Nombra un paso pequeño que sí se sienta posible.', ru: 'Назовите один маленький следующий шаг, который кажется безопасным.' }
+        ]
+      }
+    ];
+
+    const wheelSvg = document.getElementById('wheelSvg');
+    const languageButtons = document.getElementById('languageButtons');
+    const selectionSummary = document.getElementById('selectionSummary');
+    const familyWords = document.getElementById('familyWords');
+    const strategyGrid = document.getElementById('strategyGrid');
+    const thoughts = document.getElementById('thoughts');
+    const adviceButton = document.getElementById('adviceButton');
+    const resetButton = document.getElementById('resetButton');
+    const adviceOutput = document.getElementById('adviceOutput');
+    const tooltip = document.getElementById('tooltip');
+    const wheelWrap = document.getElementById('wheelWrap');
+
+    let currentLanguage = 'en';
+    let selectedFamilyId = null;
+    let selectedWordId = null;
+    let selectedStrategy = null;
+
+    const polarToCartesian = (cx, cy, radius, angle) => ({
+      x: cx + radius * Math.cos((angle - 90) * Math.PI / 180),
+      y: cy + radius * Math.sin((angle - 90) * Math.PI / 180)
+    });
+
+    function ringSegmentPath(cx, cy, innerRadius, outerRadius, startAngle, endAngle) {
+      const largeArc = endAngle - startAngle <= 180 ? 0 : 1;
+      const p1 = polarToCartesian(cx, cy, outerRadius, endAngle);
+      const p2 = polarToCartesian(cx, cy, outerRadius, startAngle);
+      const p3 = polarToCartesian(cx, cy, innerRadius, startAngle);
+      const p4 = polarToCartesian(cx, cy, innerRadius, endAngle);
+      return [
+        `M ${p1.x} ${p1.y}`,
+        `A ${outerRadius} ${outerRadius} 0 ${largeArc} 0 ${p2.x} ${p2.y}`,
+        `L ${p3.x} ${p3.y}`,
+        `A ${innerRadius} ${innerRadius} 0 ${largeArc} 1 ${p4.x} ${p4.y}`,
+        'Z'
+      ].join(' ');
+    }
+
+    function pointOnRing(cx, cy, innerRadius, outerRadius, angle) {
+      const radius = (innerRadius + outerRadius) / 2;
+      return polarToCartesian(cx, cy, radius, angle);
+    }
+
+    function getLabel(item) {
+      return item[currentLanguage] || item.en;
+    }
+
+    function createLanguageButtons() {
+      languageButtons.innerHTML = '';
+      languages.forEach((lang) => {
+        const btn = document.createElement('button');
+        btn.className = `lang-btn ${lang.code === currentLanguage ? 'active' : ''}`;
+        btn.textContent = lang.label;
+        btn.type = 'button';
+        btn.addEventListener('click', () => {
+          currentLanguage = lang.code;
+          createLanguageButtons();
+          drawWheel();
+          renderSelection();
+        });
+        languageButtons.appendChild(btn);
+      });
+    }
+
+    function showTooltip(event, lines) {
+      tooltip.innerHTML = lines.map(line => `<div>${line}</div>`).join('');
+      tooltip.classList.add('visible');
+      const bounds = wheelWrap.getBoundingClientRect();
+      tooltip.style.left = `${event.clientX - bounds.left}px`;
+      tooltip.style.top = `${event.clientY - bounds.top}px`;
+    }
+
+    function hideTooltip() { tooltip.classList.remove('visible'); }
+
+    function drawWheel() {
+      wheelSvg.innerHTML = '';
+      const cx = 360;
+      const cy = 360;
+      const rings = [
+        { inner: 0, outer: 112, type: 'core' },
+        { inner: 112, outer: 212, type: 'mid' },
+        { inner: 212, outer: 316, type: 'outer' }
+      ];
+      const familyAngle = 360 / emotionFamilies.length;
+
+      emotionFamilies.forEach((family, familyIndex) => {
+        const familyStart = familyIndex * familyAngle;
+        const familyEnd = familyStart + familyAngle;
+
+        const corePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        corePath.setAttribute('d', ringSegmentPath(cx, cy, rings[0].inner, rings[0].outer, familyStart, familyEnd));
+        corePath.setAttribute('fill', family.color);
+        corePath.setAttribute('class', buildSegmentClass(family.id));
+        attachSegmentEvents(corePath, family, null, 'core');
+        wheelSvg.appendChild(corePath);
+
+        const coreLabelPos = pointOnRing(cx, cy, 10, rings[0].outer, familyStart + familyAngle / 2);
+        const coreText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        coreText.setAttribute('x', coreLabelPos.x);
+        coreText.setAttribute('y', coreLabelPos.y + 6);
+        coreText.setAttribute('class', 'label-text label-core');
+        coreText.textContent = getLabel(family.core);
+        wheelSvg.appendChild(coreText);
+
+        const subAngle = familyAngle / family.words.length;
+        family.words.forEach((word, wordIndex) => {
+          const wordStart = familyStart + wordIndex * subAngle;
+          const wordEnd = wordStart + subAngle;
+
+          const midPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          midPath.setAttribute('d', ringSegmentPath(cx, cy, rings[1].inner, rings[1].outer, wordStart, wordEnd));
+          midPath.setAttribute('fill', shadeColor(family.color, 0.1));
+          midPath.setAttribute('class', buildSegmentClass(family.id, word.id));
+          attachSegmentEvents(midPath, family, word, 'mid');
+          wheelSvg.appendChild(midPath);
+
+          const outerPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          outerPath.setAttribute('d', ringSegmentPath(cx, cy, rings[2].inner, rings[2].outer, wordStart, wordEnd));
+          outerPath.setAttribute('fill', shadeColor(family.color, 0.2));
+          outerPath.setAttribute('class', buildSegmentClass(family.id, word.id));
+          attachSegmentEvents(outerPath, family, word, 'outer');
+          wheelSvg.appendChild(outerPath);
+
+          addArcLabel(getLabel(word.mid), cx, cy, rings[1].inner, rings[1].outer, wordStart, wordEnd, 'label-mid');
+          addArcLabel(getLabel(word.outer), cx, cy, rings[2].inner, rings[2].outer, wordStart, wordEnd, 'label-outer');
+        });
+      });
+    }
+
+    function addArcLabel(text, cx, cy, inner, outer, startAngle, endAngle, className) {
+      const angle = startAngle + (endAngle - startAngle) / 2;
+      const point = pointOnRing(cx, cy, inner, outer, angle);
+      const rotation = angle > 180 ? angle + 90 : angle - 90;
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', point.x);
+      label.setAttribute('y', point.y + 3);
+      label.setAttribute('class', `label-text ${className}`);
+      label.setAttribute('transform', `rotate(${rotation} ${point.x} ${point.y})`);
+      label.textContent = text;
+      wheelSvg.appendChild(label);
+    }
+
+    function buildSegmentClass(familyId, wordId = null) {
+      const isFamilySelected = selectedFamilyId === familyId;
+      const isWordSelected = wordId && selectedWordId === wordId;
+      const hasSelection = selectedFamilyId !== null;
+      const dim = hasSelection && !isFamilySelected ? 'dim' : '';
+      const selected = isWordSelected || (!wordId && isFamilySelected && !selectedWordId) ? 'selected' : '';
+      return `segment ${dim} ${selected}`.trim();
+    }
+
+    function attachSegmentEvents(element, family, word, level) {
+      element.addEventListener('mouseenter', (event) => {
+        const title = word ? `${getLabel(word[level === 'outer' ? 'outer' : 'mid'])} → ${getLabel(family.core)}` : getLabel(family.core);
+        const lines = [
+          `<strong>${title}</strong>`,
+          `${family.core.en} / ${family.core.es} / ${family.core.ru}`,
+          `Synonyms: ${family.synonyms.en.join(', ')} • ${family.synonyms.es.join(', ')} • ${family.synonyms.ru.join(', ')}`,
+          word ? `<small>${word.mid.en}/${word.mid.es}/${word.mid.ru} • ${word.outer.en}/${word.outer.es}/${word.outer.ru}</small>` : `<small>${family.description.en}</small>`
+        ];
+        showTooltip(event, lines);
+      });
+      element.addEventListener('mousemove', (event) => {
+        if (tooltip.classList.contains('visible')) {
+          const bounds = wheelWrap.getBoundingClientRect();
+          tooltip.style.left = `${event.clientX - bounds.left}px`;
+          tooltip.style.top = `${event.clientY - bounds.top}px`;
+        }
+      });
+      element.addEventListener('mouseleave', hideTooltip);
+      element.addEventListener('click', () => {
+        selectedFamilyId = family.id;
+        selectedWordId = word ? word.id : null;
+        selectedStrategy = null;
+        renderSelection();
+        drawWheel();
+      });
+    }
+
+    function renderSelection() {
+      const family = emotionFamilies.find(item => item.id === selectedFamilyId);
+      if (!family) {
+        selectionSummary.innerHTML = `
+          <strong>Choose a word on the wheel.</strong>
+          <span>Selecciona una palabra en la rueda.</span>
+          <span>Выберите слово на колесе.</span>`;
+        familyWords.innerHTML = '';
+        strategyGrid.innerHTML = '';
+        adviceOutput.textContent = 'Pick an emotion first, then choose a strategy or write a few thoughts.';
+        return;
+      }
+
+      const word = family.words.find(item => item.id === selectedWordId) || null;
+      selectionSummary.innerHTML = `
+        <strong>${getLabel(family.core)}${word ? ` • ${getLabel(word.mid)}` : ''}</strong>
+        <span>${family.core.en}${word ? ` • ${word.mid.en}` : ''} — ${family.description.en}</span>
+        <span>${family.core.es}${word ? ` • ${word.mid.es}` : ''} — ${family.description.es}</span>
+        <span>${family.core.ru}${word ? ` • ${word.mid.ru}` : ''} — ${family.description.ru}</span>`;
+
+      familyWords.innerHTML = '';
+      family.words.forEach((item) => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = `word-chip ${selectedWordId === item.id ? 'active' : ''}`;
+        chip.innerHTML = `<strong>${getLabel(item.mid)}</strong><small>${item.outer.en} / ${item.outer.es} / ${item.outer.ru}</small>`;
+        chip.title = `${item.synonyms.en.join(', ')} | ${item.synonyms.es.join(', ')} | ${item.synonyms.ru.join(', ')}`;
+        chip.addEventListener('click', () => {
+          selectedWordId = item.id;
+          renderSelection();
+          drawWheel();
+        });
+        familyWords.appendChild(chip);
+      });
+
+      strategyGrid.innerHTML = '';
+      family.strategies.forEach((strategy, index) => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = `strategy-chip ${selectedStrategy === index ? 'active' : ''}`;
+        chip.innerHTML = `<strong>${strategy.title}</strong><small>${strategy[currentLanguage]}</small>`;
+        chip.addEventListener('click', () => {
+          selectedStrategy = index;
+          renderSelection();
+        });
+        strategyGrid.appendChild(chip);
+      });
+
+      if (selectedStrategy !== null) {
+        const picked = family.strategies[selectedStrategy];
+        adviceOutput.innerHTML = `<strong>Suggested step:</strong><br>${picked[currentLanguage]}`;
+      } else {
+        adviceOutput.innerHTML = `Try one of the ${getLabel(family.core).toLowerCase()} strategies, or type what is happening for more support.`;
+      }
+    }
+
+    function generateAdvice() {
+      const family = emotionFamilies.find(item => item.id === selectedFamilyId);
+      if (!family) {
+        adviceOutput.textContent = 'Choose an emotion family first so I can suggest a good next step.';
+        return;
+      }
+
+      const text = thoughts.value.trim().toLowerCase();
+      const pickedStrategy = selectedStrategy !== null ? family.strategies[selectedStrategy] : null;
+
+      let reflection = family.description[currentLanguage];
+      let nextStep = pickedStrategy ? pickedStrategy[currentLanguage] : family.strategies[0][currentLanguage];
+      let support = {
+        en: 'Take one small action in the next 10 minutes, and notice whether your feeling shifts even a little.',
+        es: 'Da una acción pequeña en los próximos 10 minutos y fíjate si tu emoción cambia aunque sea un poco.',
+        ru: 'Сделайте один маленький шаг в ближайшие 10 минут и заметьте, меняется ли ваше чувство хотя бы немного.'
+      }[currentLanguage];
+
+      if (/(mad|angry|furious|frustrated|enoj|molest|rabia|зл|серд)/.test(text)) {
+        nextStep = family.id === 'mad' ? family.strategies[2][currentLanguage] : nextStep;
+        reflection = {
+          en: 'It sounds like your body may be carrying a lot of heat or tension.',
+          es: 'Parece que tu cuerpo puede estar cargando mucha tensión o calor emocional.',
+          ru: 'Похоже, ваше тело сейчас держит много напряжения и внутреннего жара.'
+        }[currentLanguage];
+      } else if (/(sad|down|cry|alone|triste|solo|llorar|груст|один)/.test(text)) {
+        nextStep = family.id === 'sad' ? family.strategies[2][currentLanguage] : nextStep;
+        reflection = {
+          en: 'It sounds like you may need comfort, connection, or gentle care.',
+          es: 'Parece que necesitas consuelo, conexión o cuidado suave.',
+          ru: 'Похоже, вам сейчас нужны поддержка, связь с кем-то и мягкая забота о себе.'
+        }[currentLanguage];
+      } else if (/(scared|nervous|worried|afraid|asust|nerv|preocup|страх|бою|трев)/.test(text)) {
+        nextStep = family.id === 'scared' ? family.strategies[0][currentLanguage] : nextStep;
+        reflection = {
+          en: 'This sounds like a moment to get grounded and borrow support from someone safe.',
+          es: 'Este parece un momento para volver a sentirte en tierra y buscar apoyo en alguien seguro.',
+          ru: 'Похоже, сейчас важно заземлиться и опереться на поддержку надёжного человека.'
+        }[currentLanguage];
+      } else if (/(happy|excited|proud|feliz|orgull|рад|счаст)/.test(text)) {
+        nextStep = family.id === 'joyful' ? family.strategies[0][currentLanguage] : nextStep;
+        reflection = {
+          en: 'You may be in a good place to celebrate and share that energy.',
+          es: 'Puede ser un buen momento para celebrar y compartir esa energía.',
+          ru: 'Похоже, сейчас подходящий момент, чтобы отпраздновать и поделиться этой энергией.'
+        }[currentLanguage];
+      }
+
+      adviceOutput.innerHTML = `
+        <strong>${getLabel(family.core)} — next steps</strong><br><br>
+        ${reflection}<br><br>
+        <strong>Try this:</strong> ${nextStep}<br><br>
+        <strong>Then:</strong> ${support}
+      `;
+    }
+
+    function resetAll() {
+      selectedFamilyId = null;
+      selectedWordId = null;
+      selectedStrategy = null;
+      thoughts.value = '';
+      hideTooltip();
+      createLanguageButtons();
+      renderSelection();
+      drawWheel();
+    }
+
+    function shadeColor(hex, amount) {
+      const clamp = (value) => Math.max(0, Math.min(255, value));
+      const num = parseInt(hex.slice(1), 16);
+      const r = clamp((num >> 16) + 255 * amount);
+      const g = clamp(((num >> 8) & 0x00ff) + 255 * amount);
+      const b = clamp((num & 0x0000ff) + 255 * amount);
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    adviceButton.addEventListener('click', generateAdvice);
+    resetButton.addEventListener('click', resetAll);
+
+    createLanguageButtons();
+    drawWheel();
+    renderSelection();
+  </script>
+</body>
+</html>

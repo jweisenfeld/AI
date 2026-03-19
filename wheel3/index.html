@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trilingual Emotion Wheel & Strategies</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #f8fafc;
+            color: #334155;
+            overflow-x: hidden;
+        }
+        .wheel-container {
+            position: relative;
+            width: 100%;
+            max-width: 700px;
+            margin: 0 auto;
+            aspect-ratio: 1 / 1;
+        }
+        svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 10px 15px rgba(0,0,0,0.1));
+        }
+        .wedge {
+            transition: opacity 0.2s, stroke-width 0.2s;
+            cursor: pointer;
+            stroke: #ffffff;
+            stroke-width: 2px;
+        }
+        .wedge:hover, .wedge.active {
+            opacity: 0.85;
+            stroke-width: 4px;
+            stroke: #1e293b;
+        }
+        .wedge-text {
+            pointer-events: none;
+            font-size: 14px;
+            font-weight: 700;
+            fill: #1e293b;
+            text-anchor: middle;
+            dominant-baseline: middle;
+        }
+        .wedge-text.small {
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .fade-in {
+            animation: fadeIn 0.4s ease-in forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col">
+
+    <!-- Navbar -->
+    <nav class="bg-white shadow-sm p-4 z-10 relative">
+        <div class="max-w-6xl mx-auto flex justify-between items-center flex-wrap gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold text-xl">S</div>
+                <h1 class="text-xl font-bold" id="app-title">Emotion Wheel & Strategies</h1>
+            </div>
+            <div class="flex gap-2 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                <button onclick="setLang('en')" id="btn-lang-en" class="px-3 py-1 rounded-md bg-white shadow-sm font-bold text-sm transition-all">EN</button>
+                <button onclick="setLang('es')" id="btn-lang-es" class="px-3 py-1 rounded-md text-slate-500 hover:text-slate-700 font-bold text-sm transition-all">ES</button>
+                <button onclick="setLang('ru')" id="btn-lang-ru" class="px-3 py-1 rounded-md text-slate-500 hover:text-slate-700 font-bold text-sm transition-all">RU</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow p-4 md:p-8 flex flex-col items-center max-w-6xl mx-auto w-full">
+        
+        <!-- STEP 1: THE WHEEL -->
+        <section id="step-1" class="w-full flex flex-col lg:flex-row gap-8 items-center lg:items-start justify-center fade-in">
+            <div class="w-full lg:w-2/3 flex flex-col items-center">
+                <h2 class="text-2xl md:text-3xl font-extrabold mb-2 text-center" id="instruction-title">How are you feeling?</h2>
+                <p class="text-slate-500 mb-6 text-center max-w-md" id="instruction-sub">Click on the wheel to identify your emotion. You can start from the middle or the outside.</p>
+                
+                <div class="wheel-container" id="wheel-container">
+                    <!-- SVG gets injected here -->
+                </div>
+            </div>
+
+            <div class="w-full lg:w-1/3 flex flex-col gap-4 sticky top-6">
+                <!-- Info Panel -->
+                <div class="bg-white rounded-2xl shadow-xl p-6 border-t-4 border-slate-200 transition-colors duration-300" id="info-panel">
+                    <div class="text-slate-400 text-sm font-bold uppercase tracking-wide mb-1" id="info-ring">Select an emotion</div>
+                    <h3 class="text-3xl font-extrabold mb-2" id="info-word">...</h3>
+                    
+                    <div class="flex flex-col gap-2 mb-4">
+                        <div class="flex items-center gap-2">
+                            <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded font-bold">EN</span>
+                            <span class="text-sm font-semibold text-slate-700" id="info-en">-</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded font-bold">ES</span>
+                            <span class="text-sm font-semibold text-slate-700" id="info-es">-</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded font-bold">RU</span>
+                            <span class="text-sm font-semibold text-slate-700" id="info-ru">-</span>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 text-sm mb-4 italic" id="info-def">Hover over or tap a word on the wheel to see its meaning and synonyms.</p>
+
+                    <button id="btn-continue" onclick="proceedToStep2()" class="w-full py-3 rounded-xl font-bold text-white bg-slate-300 cursor-not-allowed transition-all shadow-md mt-4" disabled>
+                        Choose this feeling
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- STEP 2: STRATEGIES & JOURNAL (Hidden initially) -->
+        <section id="step-2" class="w-full hidden fade-in max-w-4xl mx-auto mt-8">
+            <button onclick="backToStep1()" class="text-indigo-600 font-bold mb-6 flex items-center gap-2 hover:underline">
+                ← <span id="btn-back">Back to Wheel</span>
+            </button>
+
+            <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+                <div id="strategy-header" class="p-6 md:p-8 text-white">
+                    <h2 class="text-3xl font-extrabold mb-2" id="strategy-title">You are feeling [Emotion]</h2>
+                    <p class="opacity-90 font-medium" id="strategy-subtitle">Here are some strategies from the Emotion-Management worksheet to help you navigate this feeling.</p>
+                </div>
+                
+                <div class="p-6 md:p-8">
+                    <div id="strategies-list" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                        <!-- Strategies populated here -->
+                    </div>
+
+                    <div class="border-t border-slate-200 pt-8">
+                        <h3 class="text-xl font-bold mb-4" id="journal-title">Reflect & Get Advice</h3>
+                        <p class="text-slate-500 mb-4 text-sm" id="journal-sub">Try freewriting about everything you're feeling. Don't stop writing for a few minutes. Then, ask the Coach for advice!</p>
+                        
+                        <textarea id="journal-input" rows="4" class="w-full rounded-xl border-2 border-slate-200 p-4 focus:border-indigo-500 focus:outline-none transition-colors mb-4 resize-none" placeholder="Type your thoughts here..."></textarea>
+                        
+                        <button onclick="getAdvice()" id="btn-advice" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all w-full md:w-auto">
+                            Get Next Steps / Advice
+                        </button>
+
+                        <div id="ai-response" class="mt-6 p-5 bg-slate-50 rounded-xl border border-slate-200 hidden">
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold text-sm">🤖</div>
+                                <h4 class="font-bold text-slate-800" id="coach-title">Virtual Coach</h4>
+                            </div>
+                            <p class="text-slate-600 leading-relaxed" id="ai-text"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // --- DATA DICTIONARY ---
+        // Colors mapping
+        const colors = {
+            MAD: { core: '#ef4444', mid: '#f87171', outer: '#fca5a5' },     // Reds
+            SCARED: { core: '#f97316', mid: '#fb923c', outer: '#fdba74' },  // Oranges
+            JOYFUL: { core: '#eab308', mid: '#facc15', outer: '#fef08a' },  // Yellows
+            POWERFUL: { core: '#22c55e', mid: '#4ade80', outer: '#86efac' }, // Greens
+            PEACEFUL: { core: '#06b6d4', mid: '#22d3ee', outer: '#67e8f9' }, // Cyans
+            SAD: { core: '#6366f1', mid: '#818cf8', outer: '#a5b4fc' }      // Indigos
+        };
+
+        const uT = { // UI Translations
+            en: {
+                appTitle: "Emotion Wheel & Strategies",
+                instTitle: "How are you feeling?",
+                instSub: "Click on the wheel to identify your emotion. You can start from the middle or the outside.",
+                ringCore: "Core Emotion", ringMid: "Specific Emotion", ringOuter: "Nuanced Emotion",
+                hoverDef: "Hover over or tap a word on the wheel to see its meaning and synonyms.",
+                btnChoose: "Choose this feeling",
+                btnBack: "Back to Wheel",
+                stratSub: "Here are some strategies to help you navigate this feeling.",
+                journalTitle: "Reflect & Get Advice",
+                journalSub: "Try freewriting about everything you're feeling. Feel free to vent! Then, ask the Coach for advice.",
+                journalPlh: "Type your thoughts here...",
+                btnAdvice: "Get Next Steps / Advice",
+                coachTitle: "Virtual Coach"
+            },
+            es: {
+                appTitle: "Rueda de Emociones y Estrategias",
+                instTitle: "¿Cómo te sientes?",
+                instSub: "Haz clic en la rueda para identificar tu emoción. Puedes empezar desde el centro o desde afuera.",
+                ringCore: "Emoción Principal", ringMid: "Emoción Específica", ringOuter: "Emoción Matizada",
+                hoverDef: "Pasa el ratón o toca una palabra para ver su significado y sinónimos.",
+                btnChoose: "Elegir este sentimiento",
+                btnBack: "Volver a la Rueda",
+                stratSub: "Aquí hay algunas estrategias para ayudarte a manejar este sentimiento.",
+                journalTitle: "Reflexiona y Obtén Consejos",
+                journalSub: "Intenta escribir libremente sobre todo lo que sientes. ¡Desahógate! Luego, pide un consejo al Entrenador.",
+                journalPlh: "Escribe tus pensamientos aquí...",
+                btnAdvice: "Obtener Siguientes Pasos / Consejos",
+                coachTitle: "Entrenador Virtual"
+            },
+            ru: {
+                appTitle: "Колесо Эмоций и Стратегии",
+                instTitle: "Как ты себя чувствуешь?",
+                instSub: "Нажми на колесо, чтобы определить свою эмоцию. Ты можешь начать с центра или снаружи.",
+                ringCore: "Основная эмоция", ringMid: "Специфическая эмоция", ringOuter: "Детальная эмоция",
+                hoverDef: "Наведи курсор или нажми на слово, чтобы увидеть его значение и синонимы.",
+                btnChoose: "Выбрать это чувство",
+                btnBack: "Назад к колесу",
+                stratSub: "Вот несколько стратегий, которые помогут тебе справиться с этим чувством.",
+                journalTitle: "Поразмышляй и получи совет",
+                journalSub: "Попробуй свободно написать обо всем, что ты чувствуешь. Выговорись! Затем спроси совета у Тренера.",
+                journalPlh: "Напиши свои мысли здесь...",
+                btnAdvice: "Получить следующие шаги / Совет",
+                coachTitle: "Виртуальный Тренер"
+            }
+        };
+
+        const emotionData = [
+            {
+                id: "SAD", en: "Sad", es: "Triste", ru: "Грустный", def: "Feeling sorrow or unhappiness.", color: 'SAD',
+                mid: [
+                    { en: "Lonely", es: "Solitario", ru: "Одинокий", def: "Feeling isolated or lacking company.", outer: ["Apathetic", "Inferior"] },
+                    { en: "Depressed", es: "Deprimido", ru: "Подавленный", def: "Feeling very low, lacking energy.", outer: ["Inadequate", "Miserable"] },
+                    { en: "Ashamed", es: "Avergonzado", ru: "Пристыженный", def: "Feeling guilt or embarrassment.", outer: ["Unwise"] },
+                    { en: "Guilty", es: "Culpable", ru: "Виноватый", def: "Feeling responsible for a wrongdoing.", outer: ["Bashful"] }
+                ]
+            },
+            {
+                id: "MAD", en: "Mad", es: "Enojado", ru: "Злой", def: "Feeling anger or strong displeasure.", color: 'MAD',
+                mid: [
+                    { en: "Hurt", es: "Herido", ru: "Обиженный", def: "Feeling emotional pain.", outer: ["Jealous"] },
+                    { en: "Hostile", es: "Hostil", ru: "Враждебный", def: "Unfriendly, opposed, argumentative.", outer: ["Selfish"] },
+                    { en: "Angry", es: "Enfadado", ru: "Сердитый", def: "Feeling strong annoyance.", outer: ["Frustrated"] },
+                    { en: "Enraged", es: "Enfurecido", ru: "Разъяренный", def: "Furious, extremely angry.", outer: ["Furious"] },
+                    { en: "Hateful", es: "Odioso", ru: "Полный ненависти", def: "Feeling intense dislike.", outer: ["Irritated"] },
+                    { en: "Critical", es: "Crítico", ru: "Критичный", def: "Finding fault with things.", outer: ["Skeptical"] }
+                ]
+            },
+            {
+                id: "SCARED", en: "Scared", es: "Asustado", ru: "Напуганный", def: "Feeling fear or anxiety.", color: 'SCARED',
+                mid: [
+                    { en: "Rejected", es: "Rechazado", ru: "Отвергнутый", def: "Feeling unaccepted or unwanted.", outer: ["Bewildered"] },
+                    { en: "Confused", es: "Confundido", ru: "Запутавшийся", def: "Unable to think clearly.", outer: ["Discouraged"] },
+                    { en: "Helpless", es: "Impotente", ru: "Беспомощный", def: "Feeling unable to defend oneself.", outer: ["Insignificant"] },
+                    { en: "Compliant", es: "Sumiso", ru: "Уступчивый", def: "Agreeable, willing to do what's asked.", outer: ["Weak"] },
+                    { en: "Insecure", es: "Inseguro", ru: "Неуверенный", def: "Not confident in something.", outer: ["Foolish"] },
+                    { en: "Anxious", es: "Ansioso", ru: "Тревожный", def: "Experiencing worry or unease.", outer: ["Embarrassed"] }
+                ]
+            },
+            {
+                id: "JOYFUL", en: "Joyful", es: "Alegre", ru: "Радостный", def: "Feeling, expressing, or causing great pleasure.", color: 'JOYFUL',
+                mid: [
+                    { en: "Excited", es: "Emocionado", ru: "Взволнованный", def: "Very enthusiastic and eager.", outer: ["Daring"] },
+                    { en: "Enthralled", es: "Cautivado", ru: "Увлеченный", def: "Giving something your full attention.", outer: ["Fascinated"] },
+                    { en: "Energetic", es: "Enérgico", ru: "Энергичный", def: "Showing or involving great activity.", outer: ["Invigorated"] },
+                    { en: "Playful", es: "Juguetón", ru: "Игривый", def: "Fond of games and amusement.", outer: ["Amused"] },
+                    { en: "Creative", es: "Creativo", ru: "Творческий", def: "Having good imagination or original ideas.", outer: ["Extravagant"] },
+                    { en: "Aware", es: "Consciente", ru: "Осознанный", def: "Having knowledge or perception of a situation.", outer: ["Delighted"] }
+                ]
+            },
+            {
+                id: "POWERFUL", en: "Powerful", es: "Poderoso", ru: "Сильный", def: "Having great power, strength, or control.", color: 'POWERFUL',
+                mid: [
+                    { en: "Proud", es: "Orgulloso", ru: "Гордый", def: "Feeling deep pleasure from one's achievements.", outer: ["Cheerful"] },
+                    { en: "Respected", es: "Respetado", ru: "Уважаемый", def: "Admired by others.", outer: ["Satisfied"] },
+                    { en: "Appreciated", es: "Apreciado", ru: "Оцененный", def: "Valued and recognized.", outer: ["Valued"] },
+                    { en: "Hopeful", es: "Esperanzado", ru: "Надеющийся", def: "Feeling optimistic about the future.", outer: ["Worthwhile"] },
+                    { en: "Important", es: "Importante", ru: "Важный", def: "Of great significance or value.", outer: ["Intelligent"] },
+                    { en: "Faithful", es: "Fiel", ru: "Верный", def: "Sure in your beliefs, loyal.", outer: ["Confident"] }
+                ]
+            },
+            {
+                id: "PEACEFUL", en: "Peaceful", es: "Pacífico", ru: "Спокойный", def: "Free from disturbance; tranquil.", color: 'PEACEFUL',
+                mid: [
+                    { en: "Nurturing", es: "Nutritivo", ru: "Заботливый", def: "Caring, supporting.", outer: ["Thankful"] },
+                    { en: "Trusting", es: "Confiado", ru: "Доверчивый", def: "Believing in the reliability of someone.", outer: ["Sentimental"] },
+                    { en: "Loving", es: "Amoroso", ru: "Любящий", def: "Feeling or showing love.", outer: ["Serene"] },
+                    { en: "Friendly", es: "Amigable", ru: "Дружелюбный", def: "Kind and pleasant.", outer: ["Responsive"] },
+                    { en: "Thoughtful", es: "Pensativo", ru: "Внимательный", def: "Showing consideration for the needs of others.", outer: ["Relaxed"] },
+                    { en: "Content", es: "Satisfecho", ru: "Довольный", def: "In a state of peaceful happiness.", outer: ["Pensive"] }
+                ]
+            }
+        ];
+
+        // Flat dictionary for quick Outer lookup translations
+        const dict = {
+            "Apathetic": {es: "Apático", ru: "Апатичный", def: "Having no feeling, showing little interest."},
+            "Inferior": {es: "Inferior", ru: "Худший", def: "Lower in status or quality."},
+            "Inadequate": {es: "Inadecuado", ru: "Неполноценный", def: "Not enough, unsuitable."},
+            "Miserable": {es: "Miserable", ru: "Несчастный", def: "Wretchedly unhappy or uncomfortable."},
+            "Unwise": {es: "Imprudente", ru: "Неразумный", def: "Foolish, lacking good judgment."},
+            "Bashful": {es: "Tímido", ru: "Застенчивый", def: "Socially shy, not liking attention."},
+            "Jealous": {es: "Celoso", ru: "Ревнивый", def: "Feeling resentment against a rival."},
+            "Selfish": {es: "Egoísta", ru: "Эгоистичный", def: "Lacking consideration for others."},
+            "Frustrated": {es: "Frustrado", ru: "Разочарованный", def: "Feeling distress from inability to achieve a goal."},
+            "Furious": {es: "Furioso", ru: "Взбешенный", def: "Extremely angry."},
+            "Irritated": {es: "Irritado", ru: "Раздраженный", def: "Angry, annoyed."},
+            "Skeptical": {es: "Escéptico", ru: "Скептический", def: "Having doubts, feeling disbelief."},
+            "Bewildered": {es: "Desconcertado", ru: "Сбитый с толку", def: "Completely confused, puzzled."},
+            "Discouraged": {es: "Desanimado", ru: "Обескураженный", def: "Lacking hope, confidence, or enthusiasm."},
+            "Insignificant": {es: "Insignificante", ru: "Незначительный", def: "Too small or unimportant to be worth consideration."},
+            "Weak": {es: "Débil", ru: "Слабый", def: "Lacking power or strength."},
+            "Foolish": {es: "Tonto", ru: "Глупый", def: "Lacking good sense or judgment."},
+            "Embarrassed": {es: "Avergonzado", ru: "Смущенный", def: "Feeling ashamed or self-conscious."},
+            "Daring": {es: "Audaz", ru: "Смелый", def: "Adventurous or audaciously bold."},
+            "Fascinated": {es: "Fascinado", ru: "Очарованный", def: "Having a lot of interest in something."},
+            "Invigorated": {es: "Vigorizado", ru: "Воодушевленный", def: "Energized, excited."},
+            "Amused": {es: "Divertido", ru: "Удивленный/Радостный", def: "Finding something funny or entertaining."},
+            "Extravagant": {es: "Extravagante", ru: "Экстравагантный", def: "Fancy, excessive, glamorous."},
+            "Delighted": {es: "Encantado", ru: "Восхищенный", def: "Feeling or showing great pleasure."},
+            "Cheerful": {es: "Alegre", ru: "Веселый", def: "Noticeably happy and optimistic."},
+            "Satisfied": {es: "Satisfecho", ru: "Удовлетворенный", def: "Having what you need."},
+            "Valued": {es: "Valorado", ru: "Оцененный", def: "Appreciated."},
+            "Worthwhile": {es: "Valioso", ru: "Стоящий", def: "Feeling good enough, justifying the effort."},
+            "Intelligent": {es: "Inteligente", ru: "Умный", def: "Having or showing a high degree of mental ability."},
+            "Confident": {es: "Confiado", ru: "Уверенный", def: "Feeling certain about the truth of something or oneself."},
+            "Thankful": {es: "Agradecido", ru: "Благодарный", def: "Pleased and relieved."},
+            "Sentimental": {es: "Sentimental", ru: "Сентиментальный", def: "Nostalgic, thinking of the past that's meaningful."},
+            "Serene": {es: "Sereno", ru: "Безмятежный", def: "Calm, restful."},
+            "Responsive": {es: "Receptivo", ru: "Отзывчивый", def: "Reacting quickly and positively."},
+            "Relaxed": {es: "Relajado", ru: "Расслабленный", def: "Free from tension and anxiety."},
+            "Pensive": {es: "Pensativo", ru: "Задумчивый", def: "Being thoughtful, reflecting on something."}
+        };
+
+        const strategies = {
+            MAD: [
+                { icon: '🫁', title: { en: "Breath and Body", es: "Respiración y Cuerpo", ru: "Дыхание и тело" }, desc: { en: "Breathe in through your nose for 5 seconds, hold for 5, release for 5. Let go of tension from your feet to your head.", es: "Inhala por la nariz por 5s, mantén por 5s, exhala por 5s. Relaja la tensión desde los pies hasta la cabeza.", ru: "Вдохни через нос на 5 сек, задержи на 5, выдохни на 5. Отпусти напряжение с ног до головы." }},
+                { icon: '🔄', title: { en: "Retell", es: "Contar de Nuevo", ru: "Пересказ" }, desc: { en: "Think about what the other person may be going through. Retell the story from their perspective.", es: "Piensa en lo que la otra persona puede estar pasando. Cuenta la historia desde su perspectiva.", ru: "Подумай о том, что может переживать другой человек. Перескажи историю с его точки зрения." }},
+                { icon: '🏃', title: { en: "Move Your Body", es: "Mueve tu Cuerpo", ru: "Двигай телом" }, desc: { en: "Do a hard workout, run until you're tired, or walk around the block. Walk away from a triggering situation.", es: "Haz un entrenamiento duro, corre o camina. Aléjate de la situación que provoca ira.", ru: "Сделай интенсивную тренировку, побегай или погуляй. Отойди от ситуации, вызывающей гнев." }}
+            ],
+            SCARED: [
+                { icon: '🤝', title: { en: "Trust", es: "Confianza", ru: "Доверие" }, desc: { en: "List people you trust. Imagine how you can talk to them about what you're afraid of. What would they advise?", es: "Haz una lista de personas en las que confías. Imagina cómo hablarles de tus miedos. ¿Qué te aconsejarían?", ru: "Составь список людей, которым доверяешь. Представь, как ты говоришь с ними о своих страхах." }},
+                { icon: '📣', title: { en: "Cheer Yourself On", es: "Anímate", ru: "Подбодри себя" }, desc: { en: "Imagine a friend facing this fear. What positive advice would you give them? Now say those things to yourself.", es: "Imagina a un amigo enfrentando este miedo. ¿Qué le dirías? Ahora dite esas cosas a ti mismo.", ru: "Представь, что друг сталкивается с этим страхом. Что бы ты ему сказал? Теперь скажи это себе." }}
+            ],
+            JOYFUL: [
+                { icon: '📝', title: { en: "Write Your Success", es: "Escribe tu Éxito", ru: "Запиши свой успех" }, desc: { en: "Write a note to yourself acknowledging a success you've had.", es: "Escríbete una nota reconociendo un éxito que hayas tenido.", ru: "Напиши себе записку, признавая свой успех." }},
+                { icon: '🎉', title: { en: "Celebrate Wins", es: "Celebra las Victorias", ru: "Празднуй победы" }, desc: { en: "Think about something you can celebrate today and make a plan to do it!", es: "Piensa en algo que puedas celebrar hoy y ¡haz un plan para hacerlo!", ru: "Подумай о том, что ты можешь отпраздновать сегодня, и составь план!" }},
+                { icon: '✨', title: { en: "Spread the Joy", es: "Difunde la Alegría", ru: "Поделись радостью" }, desc: { en: "Think of three people you can compliment. This can help make someone else feel joyful too!", es: "Piensa en tres personas a las que puedas elogiar. ¡Esto ayudará a que otros se sientan alegres!", ru: "Подумай о трех людях, которым ты можешь сделать комплимент. Поделись радостью!" }}
+            ],
+            POWERFUL: [
+                { icon: '⚡', title: { en: "Use Your Energy", es: "Usa tu Energía", ru: "Используй свою энергию" }, desc: { en: "Do an energizing physical activity today, like playing a sport, stretching, or walking.", es: "Haz una actividad física energizante, como un deporte, estiramientos o caminar.", ru: "Займись сегодня энергичной физической активностью, например, спортом, растяжкой или прогулкой." }},
+                { icon: '🎨', title: { en: "Get Creative", es: "Ponte Creativo", ru: "Будь креативным" }, desc: { en: "Do something creative—draw a picture, play a song, or write a poem.", es: "Haz algo creativo: dibuja, toca una canción o escribe un poema.", ru: "Сделай что-нибудь творческое — нарисуй, сыграй песню или напиши стихотворение." }},
+                { icon: '🧠', title: { en: "Feed the Mind", es: "Alimenta la Mente", ru: "Питай ум" }, desc: { en: "Think of something that interests you and plan to learn more about it (article, book, podcast).", es: "Piensa en algo que te interese y planea aprender más sobre ello.", ru: "Подумай о том, что тебе интересно, и запланируй узнать об этом больше." }}
+            ],
+            PEACEFUL: [
+                { icon: '🔲', title: { en: "Use Square Breathing", es: "Respiración Cuadrada", ru: "Квадратное дыхание" }, desc: { en: "Breathe in 4s, hold 4s, exhale 4s, hold empty 4s. Repeat ten times.", es: "Inhala 4s, mantén 4s, exhala 4s, mantén sin aire 4s. Repite diez veces.", ru: "Вдох 4 сек, задержка 4 сек, выдох 4 сек, задержка без воздуха 4 сек. Повтори 10 раз." }},
+                { icon: '🌟', title: { en: "Show Positivity", es: "Muestra Positividad", ru: "Проявляй позитив" }, desc: { en: "Write a list of positive statements for yourself, like 'I am confident and capable'.", es: "Escribe una lista de afirmaciones positivas para ti, como 'Soy capaz'.", ru: "Напиши список позитивных утверждений для себя, например: «Я уверен в себе и способен»." }}
+            ],
+            SAD: [
+                { icon: '🌸', title: { en: "Write Three Things", es: "Escribe Tres Cosas", ru: "Напиши три вещи" }, desc: { en: "Write down three beautiful, funny, or good things that happened in the last week.", es: "Escribe tres cosas hermosas, divertidas o buenas que pasaron la semana pasada.", ru: "Напиши три прекрасные, смешные или хорошие вещи, которые произошли на прошлой неделе." }},
+                { icon: '🙏', title: { en: "Show Gratitude", es: "Muestra Gratitud", ru: "Прояви благодарность" }, desc: { en: "Thank someone you're grateful for—friend, family, or even a pet. Write a short note.", es: "Agradece a alguien: amigo, familia o mascota. Escribe una nota corta.", ru: "Поблагодари того, кому ты благодарен — друга, семью или питомца." }},
+                { icon: '💖', title: { en: "Show Kindness", es: "Muestra Amabilidad", ru: "Прояви доброту" }, desc: { en: "Think about something nice you can do today for someone else. Make a plan. Do it!", es: "Piensa en algo lindo que puedas hacer hoy por alguien. ¡Hazlo!", ru: "Подумай о чем-то хорошем, что ты можешь сделать сегодня для кого-то. Сделай это!" }},
+                { icon: '🎵', title: { en: "Listen to Music", es: "Escucha Música", ru: "Слушай музыку" }, desc: { en: "List a few songs that make you feel energized or upbeat and listen to them.", es: "Escucha canciones que te hagan sentir con energía o animado.", ru: "Послушай песни, которые заставляют тебя чувствовать себя энергичным или веселым." }},
+                { icon: '📔', title: { en: "Journal", es: "Escribir un Diario", ru: "Ведение дневника" }, desc: { en: "Try freewriting about everything you're feeling for 5 minutes. Feel free to vent!", es: "Escribe libremente sobre todo lo que sientes por 5 minutos. ¡Desahógate!", ru: "Попробуй писать все, что чувствуешь, в течение 5 минут. Выговорись!" }}
+            ]
+        };
+
+        // --- STATE & INITIALIZATION ---
+        let currentLang = 'en';
+        let selectedEmotion = null; 
+
+        function setLang(lang) {
+            currentLang = lang;
+            
+            // UI updates
+            ['en', 'es', 'ru'].forEach(l => {
+                const btn = document.getElementById(`btn-lang-${l}`);
+                if (l === lang) {
+                    btn.classList.replace('text-slate-500', 'text-slate-900');
+                    btn.classList.add('bg-white', 'shadow-sm');
+                    btn.classList.remove('hover:text-slate-700');
+                } else {
+                    btn.classList.replace('text-slate-900', 'text-slate-500');
+                    btn.classList.remove('bg-white', 'shadow-sm');
+                    btn.classList.add('hover:text-slate-700');
+                }
+            });
+
+            // Update Static Text
+            document.getElementById('app-title').innerText = uT[lang].appTitle;
+            document.getElementById('instruction-title').innerText = uT[lang].instTitle;
+            document.getElementById('instruction-sub').innerText = uT[lang].instSub;
+            document.getElementById('btn-continue').innerText = uT[lang].btnChoose;
+            document.getElementById('btn-back').innerText = uT[lang].btnBack;
+            document.getElementById('strategy-subtitle').innerText = uT[lang].stratSub;
+            document.getElementById('journal-title').innerText = uT[lang].journalTitle;
+            document.getElementById('journal-sub').innerText = uT[lang].journalSub;
+            document.getElementById('journal-input').placeholder = uT[lang].journalPlh;
+            document.getElementById('btn-advice').innerText = uT[lang].btnAdvice;
+            document.getElementById('coach-title').innerText = uT[lang].coachTitle;
+            
+            if (!selectedEmotion) {
+                document.getElementById('info-def').innerText = uT[lang].hoverDef;
+            } else {
+                updateInfoPanel(selectedEmotion);
+            }
+
+            // Redraw Wheel to update text
+            drawWheel();
+            
+            // If in step 2, redraw strategies
+            if(selectedEmotion && document.getElementById('step-2').classList.contains('hidden') === false){
+                renderStrategies(selectedEmotion.coreId);
+            }
+        }
+
+        // --- SVG WHEEL GENERATION ---
+        function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
+            const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
+            return {
+                x: centerX + (radius * Math.cos(angleInRadians)),
+                y: centerY + (radius * Math.sin(angleInRadians))
+            };
+        }
+
+        function describeArc(x, y, innerRadius, outerRadius, startAngle, endAngle) {
+            const startOuter = polarToCartesian(x, y, outerRadius, endAngle);
+            const endOuter = polarToCartesian(x, y, outerRadius, startAngle);
+            const startInner = polarToCartesian(x, y, innerRadius, endAngle);
+            const endInner = polarToCartesian(x, y, innerRadius, startAngle);
+
+            const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+
+            const d = [
+                "M", startOuter.x, startOuter.y,
+                "A", outerRadius, outerRadius, 0, largeArcFlag, 0, endOuter.x, endOuter.y,
+                "L", endInner.x, endInner.y,
+                "A", innerRadius, innerRadius, 0, largeArcFlag, 1, startInner.x, startInner.y,
+                "Z"
+            ].join(" ");
+            return d;
+        }
+
+        function drawWheel() {
+            const container = document.getElementById('wheel-container');
+            container.innerHTML = '';
+            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            svg.setAttribute("viewBox", "0 0 1000 1000");
+            
+            const cx = 500, cy = 500;
+            const rCore = 150, rMid = 300, rOuter = 480;
+
+            const totalDegrees = 360;
+            const coreSlices = emotionData.length;
+            const coreAngle = totalDegrees / coreSlices;
+
+            let currentAngle = 0;
+
+            // Generate elements
+            emotionData.forEach((coreData) => {
+                const startCoreAngle = currentAngle;
+                const endCoreAngle = currentAngle + coreAngle;
+
+                // 1. Draw Outer Ring Slices (Calculate based on mid children)
+                const midSlices = coreData.mid;
+                const midAngleSize = coreAngle / midSlices.length;
+                let midCurrentAngle = startCoreAngle;
+
+                midSlices.forEach((midData) => {
+                    const startMidAngle = midCurrentAngle;
+                    const endMidAngle = midCurrentAngle + midAngleSize;
+                    
+                    // Draw Mid Wedge
+                    const midPath = createWedge(cx, cy, rCore, rMid, startMidAngle, endMidAngle, colors[coreData.color].mid, midData, 'mid', coreData.id);
+                    svg.appendChild(midPath.path);
+                    svg.appendChild(midPath.text);
+
+                    // Outer Wedges for this Mid Wedge
+                    const outerSlices = midData.outer || [];
+                    if(outerSlices.length > 0) {
+                        const outerAngleSize = midAngleSize / outerSlices.length;
+                        let outerCurrentAngle = startMidAngle;
+                        outerSlices.forEach((outerWord) => {
+                            const startOutAngle = outerCurrentAngle;
+                            const endOutAngle = outerCurrentAngle + outerAngleSize;
+                            
+                            const oData = dict[outerWord] || {es: outerWord, ru: outerWord, def: ""};
+                            const outerFullData = { en: outerWord, es: oData.es, ru: oData.ru, def: oData.def };
+
+                            const outerPath = createWedge(cx, cy, rMid, rOuter, startOutAngle, endOutAngle, colors[coreData.color].outer, outerFullData, 'outer', coreData.id);
+                            svg.appendChild(outerPath.path);
+                            svg.appendChild(outerPath.text);
+
+                            outerCurrentAngle += outerAngleSize;
+                        });
+                    }
+
+                    midCurrentAngle += midAngleSize;
+                });
+
+                // 2. Draw Core Ring Slice (on top for cleaner lines)
+                const corePath = createWedge(cx, cy, 0, rCore, startCoreAngle, endCoreAngle, colors[coreData.color].core, coreData, 'core', coreData.id);
+                svg.appendChild(corePath.path);
+                svg.appendChild(corePath.text);
+
+                currentAngle += coreAngle;
+            });
+
+            // Center circle decoration
+            const centerCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            centerCircle.setAttribute("cx", cx);
+            centerCircle.setAttribute("cy", cy);
+            centerCircle.setAttribute("r", "40");
+            centerCircle.setAttribute("fill", "#ffffff");
+            centerCircle.setAttribute("filter", "drop-shadow(0 4px 6px rgba(0,0,0,0.2))");
+            svg.appendChild(centerCircle);
+
+            container.appendChild(svg);
+        }
+
+        function createWedge(cx, cy, innerR, outerR, startA, endA, color, dataObj, ringLevel, coreId) {
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("d", describeArc(cx, cy, innerR, outerR, startA, endA));
+            path.setAttribute("fill", color);
+            path.classList.add('wedge');
+            
+            // Store data for interactions
+            const fullDataStr = JSON.stringify({ ...dataObj, ringLevel, color, coreId });
+            path.dataset.info = fullDataStr;
+            
+            path.addEventListener('mouseenter', () => handleHover(fullDataStr, path));
+            path.addEventListener('click', () => handleClick(fullDataStr, path));
+
+            // Text calculations
+            const textAngle = startA + (endA - startA) / 2;
+            const textRadius = innerR + (outerR - innerR) / 2;
+            const pos = polarToCartesian(cx, cy, textRadius, textAngle);
+            
+            const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            text.textContent = dataObj[currentLang] || dataObj.en;
+            text.setAttribute("x", pos.x);
+            text.setAttribute("y", pos.y);
+            
+            // Rotate text to face outward properly
+            let rot = textAngle - 90;
+            if (textAngle > 90 && textAngle < 270) {
+                rot += 180; // Flip text on bottom half to be readable
+            }
+            text.setAttribute("transform", `rotate(${rot}, ${pos.x}, ${pos.y})`);
+            text.classList.add('wedge-text');
+            if (ringLevel === 'outer') text.classList.add('small');
+
+            return { path, text };
+        }
+
+        // --- INTERACTION LOGIC ---
+
+        function handleHover(dataStr, pathEl) {
+            if (selectedEmotion) return; // Lock panel if something is chosen
+            const data = JSON.parse(dataStr);
+            updateInfoPanel(data);
+        }
+
+        function updateInfoPanel(data) {
+            const ringLabels = {
+                core: uT[currentLang].ringCore,
+                mid: uT[currentLang].ringMid,
+                outer: uT[currentLang].ringOuter
+            };
+            
+            document.getElementById('info-ring').innerText = ringLabels[data.ringLevel];
+            document.getElementById('info-word').innerText = data[currentLang] || data.en;
+            
+            document.getElementById('info-en').innerText = data.en;
+            document.getElementById('info-es').innerText = data.es;
+            document.getElementById('info-ru').innerText = data.ru;
+            
+            document.getElementById('info-def').innerText = data.def || "";
+            
+            const panel = document.getElementById('info-panel');
+            panel.style.borderTopColor = data.color;
+        }
+
+        function handleClick(dataStr, pathEl) {
+            // Remove active classes
+            document.querySelectorAll('.wedge').forEach(w => w.classList.remove('active'));
+            pathEl.classList.add('active');
+
+            const data = JSON.parse(dataStr);
+            selectedEmotion = data;
+            
+            updateInfoPanel(data);
+
+            const btn = document.getElementById('btn-continue');
+            btn.disabled = false;
+            btn.classList.remove('bg-slate-300', 'cursor-not-allowed');
+            btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700', 'hover:shadow-lg', 'scale-105');
+            btn.style.backgroundColor = data.color; // Match the button to the emotion color
+        }
+
+        function proceedToStep2() {
+            if (!selectedEmotion) return;
+            document.getElementById('step-1').classList.add('hidden');
+            document.getElementById('step-2').classList.remove('hidden');
+            
+            // Set Titles
+            const t = uT[currentLang];
+            const word = selectedEmotion[currentLang];
+            document.getElementById('strategy-title').innerText = currentLang === 'en' ? `You are feeling ${word}` : currentLang === 'es' ? `Te sientes ${word}` : `Ты чувствуешь себя: ${word}`;
+            
+            const header = document.getElementById('strategy-header');
+            header.style.backgroundColor = selectedEmotion.color;
+
+            renderStrategies(selectedEmotion.coreId);
+
+            // Clear journal
+            document.getElementById('journal-input').value = '';
+            document.getElementById('ai-response').classList.add('hidden');
+        }
+
+        function renderStrategies(coreId) {
+            const container = document.getElementById('strategies-list');
+            container.innerHTML = '';
+            
+            const list = strategies[coreId] || [];
+            list.forEach(strat => {
+                const div = document.createElement('div');
+                div.className = "bg-slate-50 border border-slate-100 p-5 rounded-xl hover:shadow-md transition-shadow";
+                div.innerHTML = `
+                    <div class="text-3xl mb-3">${strat.icon}</div>
+                    <h4 class="font-bold text-lg text-slate-800 mb-2">${strat.title[currentLang]}</h4>
+                    <p class="text-sm text-slate-600 leading-relaxed">${strat.desc[currentLang]}</p>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function backToStep1() {
+            document.getElementById('step-2').classList.add('hidden');
+            document.getElementById('step-1').classList.remove('hidden');
+            document.getElementById('journal-input').value = '';
+            document.getElementById('ai-response').classList.add('hidden');
+        }
+
+        function getAdvice() {
+            const text = document.getElementById('journal-input').value.trim();
+            const responseBox = document.getElementById('ai-response');
+            const aiText = document.getElementById('ai-text');
+            
+            responseBox.classList.remove('hidden');
+            responseBox.classList.add('fade-in');
+
+            const coreId = selectedEmotion.coreId;
+            let advice = "";
+
+            if (text.length < 5) {
+                const shortMsgs = {
+                    en: "It looks like you didn't write much, and that's totally okay! Sometimes it's hard to put feelings into words. Try one of the strategies above, and remember I'm here when you're ready.",
+                    es: "Parece que no escribiste mucho, ¡y está bien! A veces es difícil expresar los sentimientos con palabras. Prueba una de las estrategias de arriba y recuerda que estoy aquí cuando estés listo.",
+                    ru: "Кажется, ты написал немного, и это нормально! Иногда трудно выразить чувства словами. Попробуй одну из стратегий выше, и помни, что я здесь, когда ты будешь готов."
+                };
+                advice = shortMsgs[currentLang];
+            } else {
+                // Algorithmic encouragement based on Core emotion
+                const advices = {
+                    MAD: {
+                        en: "I hear your frustration in what you wrote. Anger is a natural response when a boundary is crossed. Your feelings are valid! Take a deep breath, try the 'Retell' strategy above, and let that intense energy pass before reacting.",
+                        es: "Escucho tu frustración en lo que escribiste. La ira es una respuesta natural cuando se cruza un límite. ¡Tus sentimientos son válidos! Respira profundo, prueba la estrategia de 'Contar de Nuevo' y deja pasar esa energía intensa.",
+                        ru: "Я слышу твое разочарование в том, что ты написал. Гнев — естественная реакция. Твои чувства обоснованы! Сделай глубокий вдох, попробуй стратегию «Пересказ» и дай этой энергии пройти, прежде чем реагировать."
+                    },
+                    SCARED: {
+                        en: "Thank you for sharing that. It takes courage to admit you're scared or anxious. Remember that you are stronger than this feeling. Try reaching out to a trusted person from your list today—you don't have to face this alone.",
+                        es: "Gracias por compartirlo. Se necesita valor para admitir el miedo. Recuerda que eres más fuerte que este sentimiento. Intenta hablar con una persona de confianza de tu lista hoy, no tienes que enfrentar esto solo.",
+                        ru: "Спасибо, что поделился. Нужно мужество, чтобы признаться в страхе. Помни, что ты сильнее этого чувства. Попробуй сегодня обратиться к доверенному лицу — тебе не обязательно сталкиваться с этим в одиночку."
+                    },
+                    JOYFUL: {
+                        en: "It is so great to read this! Holding onto joyful moments builds incredible resilience. Take a second to really lock in this feeling. Who can you share this good energy with today?",
+                        es: "¡Qué bueno leer esto! Aferrarse a momentos alegres construye resiliencia. Tómate un segundo para grabar este sentimiento. ¿Con quién puedes compartir esta buena energía hoy?",
+                        ru: "Как здорово это читать! Сохранение радостных моментов развивает стойкость. Зафиксируй это чувство. С кем ты можешь поделиться этой хорошей энергией сегодня?"
+                    },
+                    POWERFUL: {
+                        en: "You are radiating strength right now! Harness this confidence and channel it into a project, a goal, or helping someone else up. Keep this momentum going!",
+                        es: "¡Estás irradiando fuerza! Aprovecha esta confianza y canalízala en un proyecto, una meta o ayudando a alguien. ¡Mantén este impulso!",
+                        ru: "Ты излучаешь силу прямо сейчас! Используй эту уверенность и направь ее в проект, цель или помощь кому-то еще. Продолжай в том же духе!"
+                    },
+                    PEACEFUL: {
+                        en: "It sounds like you are in a really good, centered space. Peaceful moments are precious. Protect this peace, and maybe write down exactly what led you to feel this way so you can replicate it later.",
+                        es: "Parece que estás en un espacio muy centrado. Los momentos de paz son preciosos. Protege esta paz, y tal vez escribe qué te llevó a sentirte así para replicarlo.",
+                        ru: "Звучит так, будто ты в очень хорошем, сосредоточенном состоянии. Мирные моменты драгоценны. Береги этот покой и запиши, что привело тебя к нему."
+                    },
+                    SAD: {
+                        en: "I'm sorry you're feeling down. Writing it out is a beautiful first step to processing sadness. Be very gentle with yourself today. Put on your favorite soothing music and do one small, kind thing for yourself.",
+                        es: "Siento que estés desanimado. Escribir es un gran primer paso para procesar la tristeza. Sé muy amable contigo mismo hoy. Pon tu música favorita y haz algo pequeño y lindo por ti.",
+                        ru: "Мне жаль, что тебе грустно. Написать об этом — отличный первый шаг к проживанию печали. Будь очень нежен с собой сегодня. Включи любимую музыку и сделай для себя что-нибудь приятное."
+                    }
+                };
+                advice = advices[coreId][currentLang];
+            }
+
+            aiText.innerText = advice;
+        }
+
+        // Init
+        drawWheel();
+        setLang('en');
+
+        // Handle window resize for SVG centering/scaling
+        window.addEventListener('resize', drawWheel);
+
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,4 @@
+# Deny direct access to log and rate limit files
+<FilesMatch "\.(log|json)$">
+    Require all denied
+</FilesMatch>

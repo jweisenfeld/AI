@@ -64,32 +64,6 @@
 </head>
 <body class="antialiased min-h-screen flex flex-col">
 
-    <!-- LOGIN OVERLAY -->
-    <div id="login-overlay" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-95">
-        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm mx-4">
-            <div class="flex items-center gap-3 mb-6">
-                <div class="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold text-2xl">S</div>
-                <div>
-                    <h2 class="text-xl font-extrabold text-slate-800">Emotion Wheel</h2>
-                    <p class="text-sm text-slate-500">Sign in to continue</p>
-                </div>
-            </div>
-            <div id="login-error" class="hidden bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg mb-4"></div>
-            <div class="flex flex-col gap-4">
-                <input type="text" id="login-student-id" placeholder="Student ID"
-                    class="w-full rounded-xl border-2 border-slate-200 px-4 py-3 focus:border-indigo-500 focus:outline-none transition-colors text-sm"
-                    onkeydown="if(event.key==='Enter') document.getElementById('login-password').focus()" />
-                <input type="password" id="login-password" placeholder="Password"
-                    class="w-full rounded-xl border-2 border-slate-200 px-4 py-3 focus:border-indigo-500 focus:outline-none transition-colors text-sm"
-                    onkeydown="if(event.key==='Enter') doLogin()" />
-                <button onclick="doLogin()" id="login-btn"
-                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-md transition-all">
-                    Sign In
-                </button>
-            </div>
-        </div>
-    </div>
-
     <!-- Navbar -->
     <nav class="bg-white shadow-sm p-4 z-10 relative">
         <div class="max-w-6xl mx-auto flex justify-between items-center flex-wrap gap-4">
@@ -97,7 +71,6 @@
                 <div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold text-xl">S</div>
                 <h1 class="text-xl font-bold" id="app-title">Emotion Wheel & Strategies</h1>
             </div>
-            <span id="student-name-display" class="hidden text-sm font-semibold text-slate-500"></span>
             <div class="flex gap-2 bg-slate-100 p-1 rounded-lg border border-slate-200">
                 <button onclick="setLang('en')" id="btn-lang-en" class="px-3 py-1 rounded-md bg-white shadow-sm font-bold text-sm transition-all">EN</button>
                 <button onclick="setLang('es')" id="btn-lang-es" class="px-3 py-1 rounded-md text-slate-500 hover:text-slate-700 font-bold text-sm transition-all">ES</button>
@@ -177,31 +150,12 @@
                             Get Next Steps / Advice
                         </button>
 
-                        <!-- Initial AI Response -->
                         <div id="ai-response" class="mt-6 p-5 bg-slate-50 rounded-xl border border-slate-200 hidden">
-                            <div class="flex items-center gap-3 mb-3">
+                            <div class="flex items-center gap-3 mb-2">
                                 <div class="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold text-sm">🤖</div>
                                 <h4 class="font-bold text-slate-800" id="coach-title">Virtual Coach</h4>
                             </div>
-                            <p class="text-slate-700 leading-relaxed" id="ai-text"></p>
-                        </div>
-
-                        <!-- Chat Continuation -->
-                        <div id="chat-continuation" class="mt-4 hidden">
-                            <div id="chat-thread" class="space-y-3 mb-4 max-h-80 overflow-y-auto pr-1">
-                                <!-- Follow-up messages appear here -->
-                            </div>
-                            <div class="flex gap-2 items-end">
-                                <textarea id="chat-reply-input" rows="2"
-                                    class="flex-1 rounded-xl border-2 border-slate-200 p-3 focus:border-indigo-500 focus:outline-none resize-none transition-colors text-sm"
-                                    placeholder="Reply to your coach..."></textarea>
-                                <button onclick="sendReply()" id="btn-reply"
-                                    class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-5 rounded-xl shadow-md transition-all self-end whitespace-nowrap">Send</button>
-                            </div>
-                            <button onclick="restartWheel()"
-                                class="mt-3 text-sm text-indigo-600 hover:underline font-semibold" id="btn-explore-more">
-                                → Explore another feeling on the wheel
-                            </button>
+                            <p class="text-slate-600 leading-relaxed" id="ai-text"></p>
                         </div>
                     </div>
                 </div>
@@ -211,207 +165,7 @@
     </main>
 
     <script>
-        // ============================================
-        // AUTH STATE
-        // ============================================
-        let studentId   = '';
-        let studentName = '';
-        let conversationHistory = []; // [{role, content}, ...]
-
-        async function doLogin() {
-            const sid = document.getElementById('login-student-id').value.trim();
-            const pwd = document.getElementById('login-password').value.trim();
-            const errorDiv = document.getElementById('login-error');
-            const btn = document.getElementById('login-btn');
-
-            if (!sid || !pwd) {
-                errorDiv.textContent = 'Please enter your Student ID and password.';
-                errorDiv.classList.remove('hidden');
-                return;
-            }
-
-            btn.disabled = true;
-            btn.textContent = 'Signing in...';
-            errorDiv.classList.add('hidden');
-
-            try {
-                const res = await fetch('api-proxy.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'verify_login', student_id: sid, password: pwd })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    studentId   = sid;
-                    studentName = data.student_name || sid;
-                    document.getElementById('login-overlay').classList.add('hidden');
-                    const nameEl = document.getElementById('student-name-display');
-                    nameEl.textContent = studentName;
-                    nameEl.classList.remove('hidden');
-                } else {
-                    errorDiv.textContent = data.error || 'Invalid credentials. Try again.';
-                    errorDiv.classList.remove('hidden');
-                }
-            } catch (e) {
-                errorDiv.textContent = 'Connection error. Please try again.';
-                errorDiv.classList.remove('hidden');
-            }
-
-            btn.disabled = false;
-            btn.textContent = 'Sign In';
-        }
-
-        // ============================================
-        // AI HELPERS
-        // ============================================
-        function formatResponse(text) {
-            const div = document.createElement('div');
-            div.appendChild(document.createTextNode(text));
-            return div.innerHTML.replace(/\n/g, '<br>');
-        }
-
-        async function getAdvice() {
-            const text = document.getElementById('journal-input').value.trim();
-            const responseBox = document.getElementById('ai-response');
-            const aiText = document.getElementById('ai-text');
-            const btn = document.getElementById('btn-advice');
-
-            // Build context-rich first message for Haiku
-            const stratList = strategies[selectedEmotion.coreId] || [];
-            const stratTitles = stratList.map(s => s.title.en).join(', ');
-            const langNames = { en: 'English', es: 'Spanish', ru: 'Russian' };
-            const ringLabels = { core: 'core', mid: 'specific', outer: 'nuanced' };
-
-            const contextMsg =
-                `I used an emotion wheel to identify my feeling.\n` +
-                `Emotion: ${selectedEmotion.en} (en) / ${selectedEmotion.es} (es) / ${selectedEmotion.ru} (ru)\n` +
-                `Emotion family: ${selectedEmotion.coreId} — ${ringLabels[selectedEmotion.ringLevel] || selectedEmotion.ringLevel} level\n` +
-                `Coping strategies shown to me: ${stratTitles}\n` +
-                `My preferred language: ${langNames[currentLang]}\n\n` +
-                `My reflection:\n${text || '(I did not write a reflection yet — please give me general advice for this emotion and these strategies.)'}`;
-
-            conversationHistory = [{ role: 'user', content: contextMsg }];
-
-            // Show loading state
-            responseBox.classList.remove('hidden');
-            responseBox.classList.add('fade-in');
-            aiText.innerHTML = '<span class="text-slate-400 italic">Thinking...</span>';
-            btn.disabled = true;
-            btn.textContent = 'Getting advice...';
-            document.getElementById('chat-continuation').classList.add('hidden');
-            document.getElementById('chat-thread').innerHTML = '';
-
-            try {
-                const res = await fetch('api-proxy.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        student_id:   studentId,
-                        student_name: studentName,
-                        language:     currentLang,
-                        messages:     conversationHistory
-                    })
-                });
-                const data = await res.json();
-
-                if (data.error) {
-                    const msg = typeof data.error === 'string' ? data.error : (data.error.message || 'An error occurred.');
-                    aiText.innerHTML = `<span class="text-red-600">${formatResponse(msg)}</span>`;
-                } else {
-                    const reply = data.content?.[0]?.text || '';
-                    aiText.innerHTML = formatResponse(reply);
-                    conversationHistory.push({ role: 'assistant', content: reply });
-                    document.getElementById('chat-continuation').classList.remove('hidden');
-                    // Update "Explore" button text for current lang
-                    document.getElementById('btn-explore-more').textContent = uT[currentLang].btnExploreMore;
-                    document.getElementById('chat-reply-input').placeholder = uT[currentLang].chatReplyPlh;
-                }
-            } catch (e) {
-                aiText.innerHTML = '<span class="text-red-600">Connection error. Please try again.</span>';
-            }
-
-            btn.disabled = false;
-            btn.textContent = uT[currentLang].btnAdvice;
-        }
-
-        async function sendReply() {
-            const input = document.getElementById('chat-reply-input');
-            const text = input.value.trim();
-            if (!text) return;
-
-            const thread = document.getElementById('chat-thread');
-            const btn = document.getElementById('btn-reply');
-
-            // Student bubble
-            const studentDiv = document.createElement('div');
-            studentDiv.className = 'flex justify-end';
-            studentDiv.innerHTML = `<div class="bg-indigo-100 text-indigo-900 rounded-2xl rounded-tr-sm px-4 py-2 max-w-xs text-sm leading-relaxed">${formatResponse(text)}</div>`;
-            thread.appendChild(studentDiv);
-
-            conversationHistory.push({ role: 'user', content: text });
-            input.value = '';
-            btn.disabled = true;
-
-            // Loading bubble
-            const loadingDiv = document.createElement('div');
-            loadingDiv.className = 'flex justify-start gap-2 items-start';
-            loadingDiv.innerHTML = `
-                <div class="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center text-white text-xs flex-shrink-0 mt-1">🤖</div>
-                <div class="bg-slate-100 text-slate-400 rounded-2xl rounded-tl-sm px-4 py-2 text-sm italic">...</div>`;
-            thread.appendChild(loadingDiv);
-            thread.scrollTop = thread.scrollHeight;
-
-            try {
-                const res = await fetch('api-proxy.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        student_id:   studentId,
-                        student_name: studentName,
-                        language:     currentLang,
-                        messages:     conversationHistory
-                    })
-                });
-                const data = await res.json();
-                loadingDiv.remove();
-
-                if (data.error) {
-                    const msg = typeof data.error === 'string' ? data.error : (data.error.message || 'An error occurred.');
-                    const errDiv = document.createElement('div');
-                    errDiv.className = 'flex justify-start';
-                    errDiv.innerHTML = `<div class="bg-red-50 text-red-700 rounded-2xl px-4 py-2 text-sm">${formatResponse(msg)}</div>`;
-                    thread.appendChild(errDiv);
-                } else {
-                    const reply = data.content?.[0]?.text || '';
-                    conversationHistory.push({ role: 'assistant', content: reply });
-
-                    const coachDiv = document.createElement('div');
-                    coachDiv.className = 'flex justify-start gap-2 items-start';
-                    coachDiv.innerHTML = `
-                        <div class="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center text-white text-xs flex-shrink-0 mt-1">🤖</div>
-                        <div class="bg-white border border-slate-200 text-slate-700 rounded-2xl rounded-tl-sm px-4 py-3 text-sm leading-relaxed max-w-sm">${formatResponse(reply)}</div>`;
-                    thread.appendChild(coachDiv);
-                    thread.scrollTop = thread.scrollHeight;
-                }
-            } catch (e) {
-                loadingDiv.remove();
-                const errDiv = document.createElement('div');
-                errDiv.className = 'flex justify-start';
-                errDiv.innerHTML = `<div class="bg-red-50 text-red-700 rounded-2xl px-4 py-2 text-sm">Connection error. Please try again.</div>`;
-                thread.appendChild(errDiv);
-            }
-
-            btn.disabled = false;
-        }
-
-        function restartWheel() {
-            conversationHistory = [];
-            backToStep1();
-        }
-
-        // ============================================
-        // DATA DICTIONARY
-        // ============================================
+        // --- DATA DICTIONARY ---
         // Colors mapping
         const colors = {
             MAD: { core: '#ef4444', mid: '#f87171', outer: '#fca5a5' },     // Reds
@@ -436,9 +190,7 @@
                 journalSub: "Try freewriting about everything you're feeling. Feel free to vent! Then, ask the Coach for advice.",
                 journalPlh: "Type your thoughts here...",
                 btnAdvice: "Get Next Steps / Advice",
-                coachTitle: "Virtual Coach",
-                chatReplyPlh: "Reply to your coach...",
-                btnExploreMore: "→ Explore another feeling on the wheel"
+                coachTitle: "Virtual Coach"
             },
             es: {
                 appTitle: "Rueda de Emociones y Estrategias",
@@ -453,9 +205,7 @@
                 journalSub: "Intenta escribir libremente sobre todo lo que sientes. ¡Desahógate! Luego, pide un consejo al Entrenador.",
                 journalPlh: "Escribe tus pensamientos aquí...",
                 btnAdvice: "Obtener Siguientes Pasos / Consejos",
-                coachTitle: "Entrenador Virtual",
-                chatReplyPlh: "Responde a tu entrenador...",
-                btnExploreMore: "→ Explora otra emoción en la rueda"
+                coachTitle: "Entrenador Virtual"
             },
             ru: {
                 appTitle: "Колесо Эмоций и Стратегии",
@@ -470,9 +220,7 @@
                 journalSub: "Попробуй свободно написать обо всем, что ты чувствуешь. Выговорись! Затем спроси совета у Тренера.",
                 journalPlh: "Напиши свои мысли здесь...",
                 btnAdvice: "Получить следующие шаги / Совет",
-                coachTitle: "Виртуальный Тренер",
-                chatReplyPlh: "Ответь своему тренеру...",
-                btnExploreMore: "→ Исследуй другое чувство на колесе"
+                coachTitle: "Виртуальный Тренер"
             }
         };
 
@@ -864,12 +612,9 @@
 
             renderStrategies(selectedEmotion.coreId);
 
-            // Clear journal and chat
+            // Clear journal
             document.getElementById('journal-input').value = '';
             document.getElementById('ai-response').classList.add('hidden');
-            document.getElementById('chat-continuation').classList.add('hidden');
-            document.getElementById('chat-thread').innerHTML = '';
-            conversationHistory = [];
         }
 
         function renderStrategies(coreId) {
@@ -894,22 +639,69 @@
             document.getElementById('step-1').classList.remove('hidden');
             document.getElementById('journal-input').value = '';
             document.getElementById('ai-response').classList.add('hidden');
-            document.getElementById('chat-continuation').classList.add('hidden');
-            document.getElementById('chat-thread').innerHTML = '';
-            conversationHistory = [];
+        }
+
+        function getAdvice() {
+            const text = document.getElementById('journal-input').value.trim();
+            const responseBox = document.getElementById('ai-response');
+            const aiText = document.getElementById('ai-text');
+            
+            responseBox.classList.remove('hidden');
+            responseBox.classList.add('fade-in');
+
+            const coreId = selectedEmotion.coreId;
+            let advice = "";
+
+            if (text.length < 5) {
+                const shortMsgs = {
+                    en: "It looks like you didn't write much, and that's totally okay! Sometimes it's hard to put feelings into words. Try one of the strategies above, and remember I'm here when you're ready.",
+                    es: "Parece que no escribiste mucho, ¡y está bien! A veces es difícil expresar los sentimientos con palabras. Prueba una de las estrategias de arriba y recuerda que estoy aquí cuando estés listo.",
+                    ru: "Кажется, ты написал немного, и это нормально! Иногда трудно выразить чувства словами. Попробуй одну из стратегий выше, и помни, что я здесь, когда ты будешь готов."
+                };
+                advice = shortMsgs[currentLang];
+            } else {
+                // Algorithmic encouragement based on Core emotion
+                const advices = {
+                    MAD: {
+                        en: "I hear your frustration in what you wrote. Anger is a natural response when a boundary is crossed. Your feelings are valid! Take a deep breath, try the 'Retell' strategy above, and let that intense energy pass before reacting.",
+                        es: "Escucho tu frustración en lo que escribiste. La ira es una respuesta natural cuando se cruza un límite. ¡Tus sentimientos son válidos! Respira profundo, prueba la estrategia de 'Contar de Nuevo' y deja pasar esa energía intensa.",
+                        ru: "Я слышу твое разочарование в том, что ты написал. Гнев — естественная реакция. Твои чувства обоснованы! Сделай глубокий вдох, попробуй стратегию «Пересказ» и дай этой энергии пройти, прежде чем реагировать."
+                    },
+                    SCARED: {
+                        en: "Thank you for sharing that. It takes courage to admit you're scared or anxious. Remember that you are stronger than this feeling. Try reaching out to a trusted person from your list today—you don't have to face this alone.",
+                        es: "Gracias por compartirlo. Se necesita valor para admitir el miedo. Recuerda que eres más fuerte que este sentimiento. Intenta hablar con una persona de confianza de tu lista hoy, no tienes que enfrentar esto solo.",
+                        ru: "Спасибо, что поделился. Нужно мужество, чтобы признаться в страхе. Помни, что ты сильнее этого чувства. Попробуй сегодня обратиться к доверенному лицу — тебе не обязательно сталкиваться с этим в одиночку."
+                    },
+                    JOYFUL: {
+                        en: "It is so great to read this! Holding onto joyful moments builds incredible resilience. Take a second to really lock in this feeling. Who can you share this good energy with today?",
+                        es: "¡Qué bueno leer esto! Aferrarse a momentos alegres construye resiliencia. Tómate un segundo para grabar este sentimiento. ¿Con quién puedes compartir esta buena energía hoy?",
+                        ru: "Как здорово это читать! Сохранение радостных моментов развивает стойкость. Зафиксируй это чувство. С кем ты можешь поделиться этой хорошей энергией сегодня?"
+                    },
+                    POWERFUL: {
+                        en: "You are radiating strength right now! Harness this confidence and channel it into a project, a goal, or helping someone else up. Keep this momentum going!",
+                        es: "¡Estás irradiando fuerza! Aprovecha esta confianza y canalízala en un proyecto, una meta o ayudando a alguien. ¡Mantén este impulso!",
+                        ru: "Ты излучаешь силу прямо сейчас! Используй эту уверенность и направь ее в проект, цель или помощь кому-то еще. Продолжай в том же духе!"
+                    },
+                    PEACEFUL: {
+                        en: "It sounds like you are in a really good, centered space. Peaceful moments are precious. Protect this peace, and maybe write down exactly what led you to feel this way so you can replicate it later.",
+                        es: "Parece que estás en un espacio muy centrado. Los momentos de paz son preciosos. Protege esta paz, y tal vez escribe qué te llevó a sentirte así para replicarlo.",
+                        ru: "Звучит так, будто ты в очень хорошем, сосредоточенном состоянии. Мирные моменты драгоценны. Береги этот покой и запиши, что привело тебя к нему."
+                    },
+                    SAD: {
+                        en: "I'm sorry you're feeling down. Writing it out is a beautiful first step to processing sadness. Be very gentle with yourself today. Put on your favorite soothing music and do one small, kind thing for yourself.",
+                        es: "Siento que estés desanimado. Escribir es un gran primer paso para procesar la tristeza. Sé muy amable contigo mismo hoy. Pon tu música favorita y haz algo pequeño y lindo por ti.",
+                        ru: "Мне жаль, что тебе грустно. Написать об этом — отличный первый шаг к проживанию печали. Будь очень нежен с собой сегодня. Включи любимую музыку и сделай для себя что-нибудь приятное."
+                    }
+                };
+                advice = advices[coreId][currentLang];
+            }
+
+            aiText.innerText = advice;
         }
 
         // Init
         drawWheel();
         setLang('en');
-
-        // Enter key sends chat reply (Shift+Enter for newline)
-        document.getElementById('chat-reply-input').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendReply();
-            }
-        });
 
         // Handle window resize for SVG centering/scaling
         window.addEventListener('resize', drawWheel);

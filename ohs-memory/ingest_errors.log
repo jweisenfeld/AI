@@ -1,0 +1,5 @@
+2026-03-20T04:46:39.623225  FAIL  C:\Users\johnw\Documents\Emails\orion-planning-team\20250320_123154_00000000CD8D.msg  —  'str' object has no attribute 'strftime'
+2026-03-20T04:46:39.929793  FAIL  C:\Users\johnw\Documents\Emails\orion-planning-team\20250321_084659_00000000CD8D.msg  —  'str' object has no attribute 'strftime'
+2026-03-20T04:46:40.227355  FAIL  C:\Users\johnw\Documents\Emails\orion-planning-team\20250321_132727_00000000CD8D.msg  —  'str' object has no attribute 'strftime'
+2026-03-20T04:46:40.533875  FAIL  C:\Users\johnw\Documents\Emails\orion-planning-team\20250321_141028_00000000CD8D.msg  —  'str' object has no attribute 'strftime'
+2026-03-20T04:46:40.891335  FAIL  C:\Users\johnw\Documents\Emails\orion-planning-team\20250321_204102_00000000CD8D.msg  —  'str' object has no attribute 'strftime'

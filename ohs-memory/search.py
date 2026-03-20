@@ -14,30 +14,35 @@ Usage:
 
 import argparse
 import os
+import sys
 import textwrap
 from typing import Optional
 
+# Force UTF-8 output on Windows (avoids cp1252 errors with box-drawing chars)
+if sys.stdout.encoding != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 import psycopg2
 from dotenv import load_dotenv
-from sentence_transformers import SentenceTransformer
+from openai import OpenAI
 
 load_dotenv()
 
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
-_model: SentenceTransformer | None = None
+EMBEDDING_MODEL = "text-embedding-3-small"
+_openai_client: OpenAI | None = None
 
 
-def get_model():
-    global _model
-    if _model is None:
-        _model = SentenceTransformer(EMBEDDING_MODEL)
-    return _model
+def get_openai():
+    global _openai_client
+    if _openai_client is None:
+        _openai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    return _openai_client
 
 
 def embed_query(query: str) -> str:
     """Embed query text and return as pgvector literal string."""
-    embedding = get_model().encode([query])[0].tolist()
-    return "[" + ",".join(f"{x:.6f}" for x in embedding) + "]"
+    embedding = get_openai().embeddings.create(input=[query], model=EMBEDDING_MODEL).data[0].embedding
+    return "[" + ",".join(f"{x:.8f}" for x in embedding) + "]"
 
 
 def search(

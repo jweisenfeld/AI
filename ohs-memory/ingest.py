@@ -78,7 +78,22 @@ def hash_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def extract_text_from_pdf(path: Path) -> str:
+def extract_text(path: Path) -> str:
+    """
+    Extract text from a file. Strategy depends on file type:
+    - .md / .txt — read directly as plain text (no API call needed)
+    - .pdf       — send to Claude API for extraction
+    """
+    suffix = path.suffix.lower()
+    if suffix in (".md", ".txt"):
+        print(f"  Reading plain text file directly...")
+        return path.read_text(encoding="utf-8", errors="replace")
+    if suffix == ".pdf":
+        return _extract_text_from_pdf(path)
+    raise ValueError(f"Unsupported file type: {suffix}. Supported: .pdf, .md, .txt")
+
+
+def _extract_text_from_pdf(path: Path) -> str:
     """
     Send the PDF to Claude API and get back clean extracted text.
     Handles: meeting notes, slide decks, policy docs, printed emails.
@@ -206,15 +221,15 @@ def ingest_pdf(path: Path, metadata: dict | None = None, db_url: str | None = No
         file_hash = hash_file(path)
         cur.execute("SELECT id FROM documents WHERE source_hash = %s", (file_hash,))
         if existing := cur.fetchone():
-            print(f"  ⏭  Already ingested: {path.name} (id: {existing[0]})")
+            print(f"  [skip] Already ingested: {path.name} (id: {existing[0]})")
             return None
 
         # 2. Prompt for metadata if not provided
         if metadata is None:
             metadata = prompt_metadata(path.name)
 
-        # 3. Extract text via Claude
-        raw_text = extract_text_from_pdf(path)
+        # 3. Extract text
+        raw_text = extract_text(path)
         token_count = len(get_tokenizer().encode(raw_text))
         print(f"  Extracted {token_count:,} tokens")
 
@@ -272,15 +287,15 @@ def ingest_pdf(path: Path, metadata: dict | None = None, db_url: str | None = No
                 """,
                 rows,
             )
-            print(f"  ✓ {len(chunks)} {label} chunks stored")
+            print(f"  [ok] {len(chunks)} {label} chunks stored")
 
         conn.commit()
-        print(f"\n  ✅ Done: {path.name}  (id: {doc_id})\n")
+        print(f"\n  [DONE] {path.name}  (id: {doc_id})\n")
         return str(doc_id)
 
     except Exception as e:
         conn.rollback()
-        print(f"\n  ❌ Failed: {path.name} — {e}\n")
+        print(f"\n  [FAIL] {path.name} -- {e}\n")
         raise
     finally:
         cur.close()
@@ -324,18 +339,20 @@ Examples:
 
     target = Path(args.path)
 
+    SUPPORTED = {".pdf", ".md", ".txt"}
+
     if target.is_dir():
-        pdfs = sorted(target.glob("**/*.pdf"))
-        if not pdfs:
-            print(f"No PDFs found in {target}")
+        files = sorted(f for f in target.glob("**/*") if f.suffix.lower() in SUPPORTED)
+        if not files:
+            print(f"No supported files (.pdf, .md, .txt) found in {target}")
             sys.exit(1)
-        print(f"Found {len(pdfs)} PDF(s) in {target}\n")
-        for pdf in tqdm(pdfs, desc="Ingesting", unit="file"):
-            ingest_pdf(pdf, metadata=cli_metadata)
-    elif target.is_file() and target.suffix.lower() == ".pdf":
+        print(f"Found {len(files)} file(s) in {target}\n")
+        for f in tqdm(files, desc="Ingesting", unit="file"):
+            ingest_pdf(f, metadata=cli_metadata)
+    elif target.is_file() and target.suffix.lower() in SUPPORTED:
         ingest_pdf(target, metadata=cli_metadata)
     else:
-        print(f"Error: {target} is not a PDF or directory")
+        print(f"Error: {target} is not a supported file (.pdf, .md, .txt) or directory")
         sys.exit(1)
 
 

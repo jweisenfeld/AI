@@ -1,11 +1,14 @@
 <?php
 /**
  * OHS Memory — Search Proxy
- * Receives a query from index.html, embeds it with OpenAI,
- * calls the Supabase search_ohs_memory() function, returns JSON.
+ * Receives a query, embeds it with OpenAI, searches Supabase,
+ * and optionally synthesizes an answer with Claude.
  *
- * Flow:
- *   Browser → POST here → OpenAI embeddings → Supabase RPC → JSON response → Browser
+ * Flow (synthesis mode):
+ *   Browser → POST here → OpenAI embeddings → Supabase RPC → Claude synthesis → JSON response → Browser
+ *
+ * Pass synthesize: true in the request body to enable the answer generation step.
+ * index.html sends synthesize: true.  index0.html does not (raw results only).
  */
 
 header('Content-Type: application/json');
@@ -24,7 +27,9 @@ $secrets = require $secretsFile;
 $OPENAI_API_KEY    = $secrets['OPENAI_API_KEY']    ?? null;
 $SUPABASE_URL      = $secrets['SUPABASE_URL']      ?? null;
 $SUPABASE_ANON_KEY = $secrets['SUPABASE_ANON_KEY'] ?? null;
+$ANTHROPIC_API_KEY = $secrets['ANTHROPIC_API_KEY'] ?? null;
 $EMBEDDING_MODEL   = 'text-embedding-3-small';
+$SYNTHESIS_MODEL   = 'claude-haiku-4-5';
 
 if (!$OPENAI_API_KEY || !$SUPABASE_URL || !$SUPABASE_ANON_KEY) {
     http_response_code(500);
@@ -47,6 +52,7 @@ $year       = trim($input['year']       ?? '') ?: null;
 $doc_type   = trim($input['doc_type']   ?? '') ?: null;
 $chunk_size = trim($input['chunk_size'] ?? '') ?: null;
 $limit      = min((int)($input['limit'] ?? 8), 20);
+$synthesize = !empty($input['synthesize']);
 
 if (empty($query)) {
     http_response_code(400);
@@ -126,6 +132,68 @@ function search_supabase(array $embedding, ?string $subject, ?string $year,
     return json_decode($response, true) ?? [];
 }
 
+// ── Step 3: Synthesize answer with Claude ─────────────────────────────────────
+
+function synthesize_answer(string $query, array $results, string $anthropicKey,
+                            string $model): string {
+    if (empty($results)) {
+        return "No relevant documents were found in the OHS knowledge base for this query. "
+             . "This may mean the topic hasn't been ingested yet, or try rephrasing.";
+    }
+
+    // Build context block from top results
+    $context = '';
+    foreach (array_slice($results, 0, 6) as $i => $r) {
+        $n      = $i + 1;
+        $source = $r['original_filename'] ?? $r['source'] ?? 'Unknown';
+        $year   = $r['school_year'] ?? '';
+        $type   = isset($r['doc_type']) ? str_replace('_', ' ', $r['doc_type']) : '';
+        $meta   = implode(', ', array_filter([$source, $year, $type]));
+        $context .= "[Source $n: $meta]\n" . ($r['content'] ?? '') . "\n\n";
+    }
+
+    $payload = json_encode([
+        'model'      => $model,
+        'max_tokens' => 600,
+        'system'     => 'You are a helpful assistant for Orion High School staff in Pasco, Washington. '
+                      . 'You answer questions about school operations, policies, staff, students, and '
+                      . 'institutional history based on archived documents. '
+                      . 'Be direct, warm, and useful. Write in plain prose — no bullet lists unless the '
+                      . 'question specifically calls for a list. '
+                      . 'When you draw on a specific source, cite it inline as [Source N]. '
+                      . 'If the documents only partially answer the question, say what you know and '
+                      . 'acknowledge the gap.',
+        'messages'   => [[
+            'role'    => 'user',
+            'content' => "Question: $query\n\nDocuments:\n$context\nAnswer based on the documents above.",
+        ]],
+    ]);
+
+    $ch = curl_init('https://api.anthropic.com/v1/messages');
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_HTTPHEADER     => [
+            'Content-Type: application/json',
+            'x-api-key: ' . $anthropicKey,
+            'anthropic-version: 2023-06-01',
+        ],
+        CURLOPT_POSTFIELDS => $payload,
+    ]);
+
+    $response  = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($http_code !== 200) {
+        throw new Exception("Claude synthesis failed (HTTP $http_code): $response");
+    }
+
+    $data = json_decode($response, true);
+    return $data['content'][0]['text'] ?? 'Unable to generate synthesis.';
+}
+
 // ── Execute ────────────────────────────────────────────────────────────────────
 
 try {
@@ -133,11 +201,23 @@ try {
     $results   = search_supabase($embedding, $subject, $year, $doc_type, $chunk_size, $limit,
                                  $SUPABASE_URL, $SUPABASE_ANON_KEY);
 
-    echo json_encode([
+    $response = [
         'query'   => $query,
         'count'   => count($results),
         'results' => $results,
-    ]);
+    ];
+
+    if ($synthesize) {
+        if (!$ANTHROPIC_API_KEY) {
+            $response['answer'] = null;
+            $response['answer_error'] = 'ANTHROPIC_API_KEY not configured in .secrets/ohskey.php';
+        } else {
+            $response['answer'] = synthesize_answer($query, $results, $ANTHROPIC_API_KEY,
+                                                     $SYNTHESIS_MODEL);
+        }
+    }
+
+    echo json_encode($response);
 
 } catch (Exception $e) {
     http_response_code(500);

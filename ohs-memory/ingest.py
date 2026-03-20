@@ -190,39 +190,78 @@ def extract_text(path: Path) -> tuple[str, dict]:
     raise ValueError(f"Unsupported file type: {suffix}")
 
 
-def _extract_text_from_pdf(path: Path) -> str:
-    """Send PDF to Claude API for full text extraction."""
-    with open(path, "rb") as f:
-        pdf_b64 = base64.standard_b64encode(f.read()).decode("utf-8")
+def _extract_text_from_pdf_local(path: Path) -> str:
+    """Fallback PDF extraction using pdfplumber (no API call, handles large files)."""
+    try:
+        import pdfplumber
+    except ImportError:
+        raise ImportError("pdfplumber required for large PDFs.  Run: pip install pdfplumber")
 
+    parts = []
+    with pdfplumber.open(str(path)) as pdf:
+        for i, page in enumerate(pdf.pages, 1):
+            text = page.extract_text()
+            if text and text.strip():
+                parts.append(f"--- Page {i} ---")
+                parts.append(text.strip())
+    return "\n".join(parts) if parts else "(no extractable text found)"
+
+
+def _extract_text_from_pdf(path: Path) -> str:
+    """
+    Extract text from a PDF.
+
+    Tries the Claude API first (best quality — handles scans, slide decks, rotated text).
+    Falls back to pdfplumber if the file is too large for the API (413 request_too_large).
+    """
+    with open(path, "rb") as f:
+        pdf_bytes = f.read()
+
+    # Pre-flight size check: Anthropic API limit is ~32MB per request;
+    # base64 encoding adds ~33%, so stay well under with a 20MB binary threshold.
+    PDF_API_MAX_BYTES = 20 * 1024 * 1024  # 20 MB
+    if len(pdf_bytes) > PDF_API_MAX_BYTES:
+        size_mb = len(pdf_bytes) / 1024 / 1024
+        print(f"  PDF is {size_mb:.1f} MB — skipping Claude API, using pdfplumber...")
+        return _extract_text_from_pdf_local(path)
+
+    pdf_b64 = base64.standard_b64encode(pdf_bytes).decode("utf-8")
     print(f"  Extracting PDF via Claude API ({EXTRACTION_MODEL})...")
 
-    with get_anthropic().messages.stream(
-        model=EXTRACTION_MODEL,
-        max_tokens=8192,
-        messages=[{
-            "role": "user",
-            "content": [
-                {
-                    "type": "document",
-                    "source": {"type": "base64", "media_type": "application/pdf", "data": pdf_b64},
-                },
-                {
-                    "type": "text",
-                    "text": (
-                        "Extract ALL text from this document. "
-                        "Preserve structure: headings, bullet points, numbered lists, tables. "
-                        "If this is a slide deck, include ALL slide content. "
-                        "Do NOT summarize — extract the complete text verbatim. "
-                        "Return ONLY the extracted text with no commentary."
-                    ),
-                },
-            ],
-        }],
-    ) as stream:
-        final = stream.get_final_message()
+    try:
+        with get_anthropic().messages.stream(
+            model=EXTRACTION_MODEL,
+            max_tokens=8192,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "document",
+                        "source": {"type": "base64", "media_type": "application/pdf", "data": pdf_b64},
+                    },
+                    {
+                        "type": "text",
+                        "text": (
+                            "Extract ALL text from this document. "
+                            "Preserve structure: headings, bullet points, numbered lists, tables. "
+                            "If this is a slide deck, include ALL slide content. "
+                            "Do NOT summarize — extract the complete text verbatim. "
+                            "Return ONLY the extracted text with no commentary."
+                        ),
+                    },
+                ],
+            }],
+        ) as stream:
+            final = stream.get_final_message()
 
-    return final.content[0].text
+        return final.content[0].text
+
+    except Exception as e:
+        if "413" in str(e) or "request_too_large" in str(e):
+            size_mb = len(pdf_bytes) / 1024 / 1024
+            print(f"  Claude API 413 on {size_mb:.1f} MB PDF — falling back to pdfplumber...")
+            return _extract_text_from_pdf_local(path)
+        raise
 
 
 def _extract_text_from_docx(path: Path) -> str:
@@ -527,7 +566,8 @@ def hash_file(path: Path) -> str:
 
 
 def ingest_file(path: Path, metadata: dict | None = None,
-                conn=None, db_url: str | None = None) -> str | None:
+                conn=None, db_url: str | None = None,
+                update: bool = False) -> str | None:
     """
     Full ingestion pipeline for a single file.
     Returns document UUID on success, None if skipped (already ingested).
@@ -535,6 +575,10 @@ def ingest_file(path: Path, metadata: dict | None = None,
     Pass an open psycopg2 connection via `conn` for batch efficiency —
     the function commits per-document but does NOT close a shared connection.
     If conn is None, a new connection is opened and closed per call.
+
+    update=True: if the same file path is already in the DB with a different hash
+    (i.e. the file was edited since last ingest), re-ingest it.  The new record is
+    committed FIRST; the old record is deleted only after the new one is safe.
     """
     own_conn = conn is None
     if own_conn:
@@ -542,12 +586,24 @@ def ingest_file(path: Path, metadata: dict | None = None,
 
     cur = conn.cursor()
     try:
-        # 1. Hash check — skip if already ingested
+        # 1. Hash check — skip if already ingested (same content)
         file_hash = hash_file(path)
         cur.execute("SELECT id FROM documents WHERE source_hash = %s", (file_hash,))
         if existing := cur.fetchone():
             print(f"  [skip] {path.name} (id: {existing[0]})")
             return None
+
+        # 1b. Path check — in update mode, find any existing record at this path
+        #     (different hash means the file changed since last ingest)
+        old_doc_id = None
+        if update:
+            cur.execute(
+                "SELECT id FROM documents WHERE source_file = %s",
+                (str(path.resolve()),),
+            )
+            if row := cur.fetchone():
+                old_doc_id = row[0]
+                print(f"  [update] {path.name} changed — will replace doc id {old_doc_id}")
 
         # 2. Extract text
         raw_text, auto_meta = extract_text(path)
@@ -611,10 +667,21 @@ def ingest_file(path: Path, metadata: dict | None = None,
             )
             print(f"  [ok] {len(chunks)} {label} chunks stored")
 
-        conn.commit()
+        conn.commit()  # ← new document fully committed before touching the old one
+
+        # 6. NOW it's safe to remove the old version (update mode only).
+        #    New record is durable; if this delete fails, we just have two versions
+        #    temporarily — no data is lost.
+        if old_doc_id is not None:
+            cur.execute("DELETE FROM chunks    WHERE document_id = %s", (old_doc_id,))
+            cur.execute("DELETE FROM documents WHERE id          = %s", (old_doc_id,))
+            conn.commit()
+            print(f"  [update] Old doc id {old_doc_id} removed")
+
         yr = resolved.get("school_year") or "?"
         tc = resolved.get("teacher") or "?"
-        print(f"\n  [DONE] {path.name}  [{yr} / {tc}]  (id: {doc_id})\n")
+        action = "UPDATE" if old_doc_id else "DONE"
+        print(f"\n  [{action}] {path.name}  [{yr} / {tc}]  (id: {doc_id})\n")
         return str(doc_id)
 
     except Exception as e:
@@ -660,6 +727,9 @@ Examples:
     parser.add_argument("--type", dest="doc_type",
         choices=["lesson_plan", "meeting_notes", "policy", "email", "other"])
     parser.add_argument("--unit",   help="Unit, topic, or source group (e.g. 'Orion Planning Team')")
+    parser.add_argument("--update", action="store_true",
+                        help="Re-ingest files that have changed since last run (same path, "
+                             "different hash). New version is committed before old is deleted.")
     parser.add_argument("--limit",  type=int, default=0,
                         help="Only process first N files (0 = no limit). Useful for test runs.")
     parser.add_argument("--log",    default="ingest_errors.log",
@@ -683,7 +753,7 @@ Examples:
         if target.suffix.lower() not in SUPPORTED:
             print(f"Unsupported type: {target.suffix}  (supported: {', '.join(sorted(SUPPORTED))})")
             sys.exit(1)
-        ingest_file(target, metadata=cli_metadata)
+        ingest_file(target, metadata=cli_metadata, update=args.update)
         return
 
     if not target.is_dir():
@@ -728,7 +798,7 @@ Examples:
                     except ValueError:
                         pass
 
-                result = ingest_file(f, metadata=file_meta, conn=conn)
+                result = ingest_file(f, metadata=file_meta, conn=conn, update=args.update)
                 if result:
                     ok += 1
                 else:

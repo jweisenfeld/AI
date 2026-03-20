@@ -3,3 +3,4 @@
 2026-03-20T04:46:40.227355  FAIL  C:\Users\johnw\Documents\Emails\orion-planning-team\20250321_132727_00000000CD8D.msg  —  'str' object has no attribute 'strftime'
 2026-03-20T04:46:40.533875  FAIL  C:\Users\johnw\Documents\Emails\orion-planning-team\20250321_141028_00000000CD8D.msg  —  'str' object has no attribute 'strftime'
 2026-03-20T04:46:40.891335  FAIL  C:\Users\johnw\Documents\Emails\orion-planning-team\20250321_204102_00000000CD8D.msg  —  'str' object has no attribute 'strftime'
+2026-03-20T05:47:04.986763  FAIL  C:\Users\johnw\Pasco School District #1\Orion Planning Team - Documents\Aviator 101\Day 1- Mission to Mars\Mission to Mars Presentation.pdf  —  Error code: 413 - {'error': {'type': 'request_too_large', 'message': 'Request exceeds the maximum size'}}

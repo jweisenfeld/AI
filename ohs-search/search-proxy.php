@@ -92,6 +92,9 @@ function get_embedding(string $text, string $apiKey, string $model): array {
     return $data['data'][0]['embedding'];
 }
 
+// ── Custom exception for Supabase statement timeouts ─────────────────────────
+class SupabaseTimeoutException extends RuntimeException {}
+
 // ── Step 2: Search Supabase via RPC ───────────────────────────────────────────
 
 function search_supabase(array $embedding, ?string $subject, ?string $year,
@@ -112,7 +115,7 @@ function search_supabase(array $embedding, ?string $subject, ?string $year,
     curl_setopt_array($ch, [
         CURLOPT_POST           => true,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 20,
+        CURLOPT_TIMEOUT        => 25,
         CURLOPT_HTTPHEADER     => [
             'Content-Type: application/json',
             'apikey: '         . $anonKey,
@@ -123,10 +126,23 @@ function search_supabase(array $embedding, ?string $subject, ?string $year,
 
     $response  = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curl_err  = curl_error($ch);
     curl_close($ch);
 
+    if ($curl_err) {
+        throw new RuntimeException("Supabase connection error: $curl_err");
+    }
+
     if ($http_code !== 200) {
-        throw new Exception("Supabase search failed (HTTP $http_code): $response");
+        $errBody = json_decode($response, true);
+        $pgCode  = isset($errBody['code'])    ? (string)$errBody['code'] : '';
+        $pgMsg   = isset($errBody['message']) ? $errBody['message']      : $response;
+        if ($pgCode === '57014') {
+            throw new SupabaseTimeoutException(
+                "The database search timed out (limit=$limit). $pgMsg"
+            );
+        }
+        throw new RuntimeException("Supabase search failed (HTTP $http_code): $pgMsg");
     }
 
     return json_decode($response, true) ?? [];
@@ -198,14 +214,30 @@ function synthesize_answer(string $query, array $results, string $anthropicKey,
 
 try {
     $embedding = get_embedding($query, $OPENAI_API_KEY, $EMBEDDING_MODEL);
-    $results   = search_supabase($embedding, $subject, $year, $doc_type, $chunk_size, $limit,
-                                 $SUPABASE_URL, $SUPABASE_ANON_KEY);
+
+    $warning = null;
+    try {
+        $results = search_supabase($embedding, $subject, $year, $doc_type, $chunk_size, $limit,
+                                   $SUPABASE_URL, $SUPABASE_ANON_KEY);
+    } catch (SupabaseTimeoutException $e) {
+        // Retry once with a smaller result set
+        $retryLimit = 4;
+        error_log("OHS search timeout (limit=$limit); retrying with limit=$retryLimit. " . $e->getMessage());
+        $results = search_supabase($embedding, $subject, $year, $doc_type, $chunk_size, $retryLimit,
+                                   $SUPABASE_URL, $SUPABASE_ANON_KEY);
+        $warning = "Search took longer than expected — showing top $retryLimit results instead of $limit. "
+                 . "Try a more specific query if you need more.";
+    }
 
     $response = [
         'query'   => $query,
         'count'   => count($results),
         'results' => $results,
     ];
+
+    if ($warning) {
+        $response['warning'] = $warning;
+    }
 
     if ($synthesize) {
         if (!$ANTHROPIC_API_KEY) {
@@ -219,7 +251,17 @@ try {
 
     echo json_encode($response);
 
+} catch (SupabaseTimeoutException $e) {
+    // Timeout even on the retry — give a clear, actionable message
+    http_response_code(500);
+    error_log("OHS search timeout on retry: " . $e->getMessage());
+    echo json_encode([
+        'error' => "The database search timed out. This usually means the knowledge base is under "
+                 . "heavy load or the query is very broad. Please wait a moment and try again, "
+                 . "or use the subject/year filters to narrow your search.",
+    ]);
 } catch (Exception $e) {
     http_response_code(500);
+    error_log("OHS search error: " . $e->getMessage());
     echo json_encode(['error' => $e->getMessage()]);
 }

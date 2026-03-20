@@ -7,7 +7,25 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 
-require_once 'config.php';
+// ── Secrets ────────────────────────────────────────────────────────────────────
+$secretsFile = dirname($_SERVER['DOCUMENT_ROOT']) . '/.secrets/ohskey.php';
+if (!is_readable($secretsFile)) {
+    http_response_code(500);
+    error_log("Secrets file not readable: $secretsFile");
+    echo json_encode(['error' => 'Server configuration error (secrets missing).']);
+    exit;
+}
+$secrets = require $secretsFile;
+
+$SUPABASE_URL      = $secrets['SUPABASE_URL']      ?? null;
+$SUPABASE_ANON_KEY = $secrets['SUPABASE_ANON_KEY'] ?? null;
+
+if (!$SUPABASE_URL || !$SUPABASE_ANON_KEY) {
+    http_response_code(500);
+    error_log("Missing required keys in $secretsFile");
+    echo json_encode(['error' => 'Server configuration error (key missing).']);
+    exit;
+}
 
 $subject  = trim($_GET['subject']  ?? '') ?: null;
 $year     = trim($_GET['year']     ?? '') ?: null;
@@ -18,7 +36,7 @@ if ($subject)  $params['filter_subject']  = $subject;
 if ($year)     $params['filter_year']     = $year;
 if ($doc_type) $params['filter_doc_type'] = $doc_type;
 
-$url = SUPABASE_URL . '/rest/v1/rpc/list_ohs_documents';
+$url = $SUPABASE_URL . '/rest/v1/rpc/list_ohs_documents';
 if (!empty($params)) {
     $url .= '?' . http_build_query($params);
 }
@@ -28,8 +46,8 @@ curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_TIMEOUT        => 10,
     CURLOPT_HTTPHEADER     => [
-        'apikey: '         . SUPABASE_ANON_KEY,
-        'Authorization: Bearer ' . SUPABASE_ANON_KEY,
+        'apikey: '         . $SUPABASE_ANON_KEY,
+        'Authorization: Bearer ' . $SUPABASE_ANON_KEY,
     ],
 ]);
 

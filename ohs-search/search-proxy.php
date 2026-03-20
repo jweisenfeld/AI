@@ -11,7 +11,27 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 
-require_once 'config.php';
+// ── Secrets ────────────────────────────────────────────────────────────────────
+$secretsFile = dirname($_SERVER['DOCUMENT_ROOT']) . '/.secrets/ohskey.php';
+if (!is_readable($secretsFile)) {
+    http_response_code(500);
+    error_log("Secrets file not readable: $secretsFile");
+    echo json_encode(['error' => 'Server configuration error (secrets missing).']);
+    exit;
+}
+$secrets = require $secretsFile;
+
+$OPENAI_API_KEY    = $secrets['OPENAI_API_KEY']    ?? null;
+$SUPABASE_URL      = $secrets['SUPABASE_URL']      ?? null;
+$SUPABASE_ANON_KEY = $secrets['SUPABASE_ANON_KEY'] ?? null;
+$EMBEDDING_MODEL   = 'text-embedding-3-small';
+
+if (!$OPENAI_API_KEY || !$SUPABASE_URL || !$SUPABASE_ANON_KEY) {
+    http_response_code(500);
+    error_log("Missing required keys in $secretsFile");
+    echo json_encode(['error' => 'Server configuration error (key missing).']);
+    exit;
+}
 
 // ── Input ──────────────────────────────────────────────────────────────────────
 
@@ -36,10 +56,10 @@ if (empty($query)) {
 
 // ── Step 1: Embed the query with OpenAI ───────────────────────────────────────
 
-function get_embedding(string $text): array {
+function get_embedding(string $text, string $apiKey, string $model): array {
     $payload = json_encode([
         'input' => $text,
-        'model' => EMBEDDING_MODEL,
+        'model' => $model,
     ]);
 
     $ch = curl_init('https://api.openai.com/v1/embeddings');
@@ -49,7 +69,7 @@ function get_embedding(string $text): array {
         CURLOPT_TIMEOUT        => 15,
         CURLOPT_HTTPHEADER     => [
             'Content-Type: application/json',
-            'Authorization: Bearer ' . OPENAI_API_KEY,
+            'Authorization: Bearer ' . $apiKey,
         ],
         CURLOPT_POSTFIELDS     => $payload,
     ]);
@@ -69,7 +89,8 @@ function get_embedding(string $text): array {
 // ── Step 2: Search Supabase via RPC ───────────────────────────────────────────
 
 function search_supabase(array $embedding, ?string $subject, ?string $year,
-                          ?string $doc_type, ?string $chunk_size, int $limit): array {
+                          ?string $doc_type, ?string $chunk_size, int $limit,
+                          string $supabaseUrl, string $anonKey): array {
     $params = [
         'query_embedding' => $embedding,
         'match_count'     => $limit,
@@ -81,15 +102,15 @@ function search_supabase(array $embedding, ?string $subject, ?string $year,
         $params['filter_chunk_size'] = $chunk_size;
     }
 
-    $ch = curl_init(SUPABASE_URL . '/rest/v1/rpc/search_ohs_memory');
+    $ch = curl_init($supabaseUrl . '/rest/v1/rpc/search_ohs_memory');
     curl_setopt_array($ch, [
         CURLOPT_POST           => true,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 20,
         CURLOPT_HTTPHEADER     => [
             'Content-Type: application/json',
-            'apikey: '         . SUPABASE_ANON_KEY,
-            'Authorization: Bearer ' . SUPABASE_ANON_KEY,
+            'apikey: '         . $anonKey,
+            'Authorization: Bearer ' . $anonKey,
         ],
         CURLOPT_POSTFIELDS     => json_encode($params),
     ]);
@@ -108,8 +129,9 @@ function search_supabase(array $embedding, ?string $subject, ?string $year,
 // ── Execute ────────────────────────────────────────────────────────────────────
 
 try {
-    $embedding = get_embedding($query);
-    $results   = search_supabase($embedding, $subject, $year, $doc_type, $chunk_size, $limit);
+    $embedding = get_embedding($query, $OPENAI_API_KEY, $EMBEDDING_MODEL);
+    $results   = search_supabase($embedding, $subject, $year, $doc_type, $chunk_size, $limit,
+                                 $SUPABASE_URL, $SUPABASE_ANON_KEY);
 
     echo json_encode([
         'query'   => $query,

@@ -23,7 +23,9 @@
       "Bash(grep -r \"hpfiluitzmqtdjkhyxrl\\\\|supabase-pasco\\\\|supabase.co\" C:UsersjohnwDocumentsGitHub --include=*.php --include=*.py --include=*.js --include=*.env --include=*.json --include=*.md -l)",
       "Bash(grep -r \"hpfiluitzmqtdjkhyxrl\\\\|supabase\" C:UsersjohnwDocumentsGitHubMisc --include=*.py --include=*.js --include=*.php --include=*.env --include=*.txt -l)",
       "Bash(python -c \":*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(dir \"C:\\\\Users\\\\johnw\\\\Documents\\\\GitHub\\\\AI\\\\ohs-search\")",
+      "Bash(del \"C:\\\\Users\\\\johnw\\\\Documents\\\\GitHub\\\\AI\\\\ohs-search\\\\config.php\")"
     ]
   }
 }

@@ -4,6 +4,9 @@
 .env.production
 *.env
 
+# PHP secrets templates — never commit filled-in versions
+ohskey.php
+
 # Python
 __pycache__/
 *.pyc

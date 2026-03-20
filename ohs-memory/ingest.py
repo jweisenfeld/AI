@@ -179,7 +179,7 @@ def format_vector(v: list[float]) -> str:
 
 def prompt_metadata(filename: str) -> dict:
     """Interactively collect metadata for the document being ingested."""
-    print(f"\n  📋 Metadata for: {filename}")
+    print(f"\n  Metadata for: {filename}")
     print("  (Press Enter to skip any field)\n")
 
     def ask(prompt, options=None):

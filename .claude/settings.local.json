@@ -15,7 +15,15 @@
       "Bash(git stash:*)",
       "WebFetch(domain:docs.inceptionlabs.ai)",
       "WebFetch(domain:www.inceptionlabs.ai)",
-      "WebFetch(domain:psd1.net)"
+      "WebFetch(domain:psd1.net)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "Bash(grep -r supabase /c/Users/johnw/Documents/GitHub --include=*.json --include=*.md --include=*.txt --include=*.env*)",
+      "Bash(find /c/Users/johnw/Documents/GitHub -name .env* -type f)",
+      "Bash(grep -r \"hpfiluitzmqtdjkhyxrl\\\\|supabase-pasco\\\\|supabase.co\" C:UsersjohnwDocumentsGitHub --include=*.php --include=*.py --include=*.js --include=*.env --include=*.json --include=*.md -l)",
+      "Bash(grep -r \"hpfiluitzmqtdjkhyxrl\\\\|supabase\" C:UsersjohnwDocumentsGitHubMisc --include=*.py --include=*.js --include=*.php --include=*.env --include=*.txt -l)",
+      "Bash(python -c \":*)",
+      "Bash(pip install:*)"
     ]
   }
 }

@@ -1,0 +1,24 @@
+# OHS Memory — Python dependencies
+# Install with: pip install -r requirements.txt
+
+# Anthropic SDK — PDF text extraction via Claude API
+anthropic>=0.40.0
+
+# OpenAI SDK — text embeddings (text-embedding-3-small)
+# Same model used by both ingest.py and search-proxy.php — consistency is critical
+openai>=1.30.0
+
+# PostgreSQL driver (for ingest.py direct DB writes)
+psycopg2-binary>=2.9.9
+
+# Token counting for chunking
+tiktoken>=0.7.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# MCP server framework (for mcp_server.py)
+mcp>=1.0.0
+
+# Progress bars
+tqdm>=4.66.0

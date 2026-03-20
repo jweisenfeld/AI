@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OHS Memory — Organizational Knowledge Base</title>
+  <style>
+    :root {
+      --blue:    #1a56db;
+      --blue-lt: #e8f0fe;
+      --gray:    #6b7280;
+      --border:  #e5e7eb;
+      --bg:      #f9fafb;
+      --white:   #ffffff;
+      --text:    #111827;
+      --green:   #065f46;
+      --green-bg:#d1fae5;
+      --amber:   #92400e;
+      --amber-bg:#fef3c7;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--blue);
+      color: white;
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    header h1 { font-size: 1.3rem; font-weight: 600; }
+    header p  { font-size: 0.875rem; opacity: 0.85; margin-top: 0.15rem; }
+
+    .icon { font-size: 1.75rem; }
+
+    main {
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+    }
+
+    /* Search form */
+    .search-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      margin-bottom: 1.5rem;
+    }
+
+    .search-row {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    #query {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    #query:focus { border-color: var(--blue); }
+
+    button[type="submit"] {
+      background: var(--blue);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    button[type="submit"]:hover   { background: #1446b5; }
+    button[type="submit"]:disabled { background: #9ca3af; cursor: not-allowed; }
+
+    /* Filters */
+    .filters {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .filters select {
+      padding: 0.4rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.875rem;
+      background: var(--bg);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .filter-label {
+      font-size: 0.8rem;
+      color: var(--gray);
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    /* Status */
+    #status {
+      text-align: center;
+      color: var(--gray);
+      padding: 0.75rem;
+      font-size: 0.9rem;
+    }
+
+    /* Results */
+    #results { display: flex; flex-direction: column; gap: 1rem; }
+
+    .result-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      animation: fadeIn 0.2s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+
+    .result-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .result-source {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--blue);
+      flex: 1;
+    }
+
+    .similarity-badge {
+      background: var(--green-bg);
+      color: var(--green);
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.2rem 0.6rem;
+      border-radius: 99px;
+      white-space: nowrap;
+    }
+
+    .similarity-badge.low {
+      background: var(--amber-bg);
+      color: var(--amber);
+    }
+
+    .result-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .tag {
+      background: var(--blue-lt);
+      color: var(--blue);
+      font-size: 0.75rem;
+      padding: 0.15rem 0.55rem;
+      border-radius: 99px;
+    }
+
+    .tag.type  { background: #f3e8ff; color: #6b21a8; }
+    .tag.chunk { background: #fef9c3; color: #854d0e; }
+
+    .result-content {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: #374151;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .result-content.collapsed {
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .expand-btn {
+      background: none;
+      border: none;
+      color: var(--blue);
+      font-size: 0.82rem;
+      cursor: pointer;
+      margin-top: 0.4rem;
+      padding: 0;
+    }
+    .expand-btn:hover { text-decoration: underline; }
+
+    .no-results {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--gray);
+    }
+    .no-results .big { font-size: 2.5rem; margin-bottom: 0.5rem; }
+
+    /* Document browser tab */
+    .tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 1.5rem;
+    }
+    .tab {
+      padding: 0.6rem 1.25rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      color: var(--gray);
+      font-weight: 500;
+    }
+    .tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+    #doc-list { display: none; }
+    #doc-list.visible { display: block; }
+    #search-panel.hidden { display: none; }
+
+    .doc-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+    .doc-table th {
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 2px solid var(--border);
+      color: var(--gray);
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .doc-table td {
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .doc-table tr:hover td { background: var(--bg); }
+    .doc-table tr:last-child td { border-bottom: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="icon">🧠</div>
+  <div>
+    <h1>OHS Organizational Memory</h1>
+    <p>Search decisions, policies, meeting notes, and lesson plans</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" id="tab-search" onclick="showTab('search')">🔍 Search</div>
+    <div class="tab" id="tab-docs" onclick="showTab('docs')">📚 Document Archive</div>
+  </div>
+
+  <!-- Search Panel -->
+  <div id="search-panel">
+    <div class="search-card">
+      <form id="search-form" onsubmit="doSearch(event)">
+        <div class="search-row">
+          <input type="text" id="query" placeholder="Ask anything… e.g. 'How do we handle late work?' or 'Economics unit 2 assignments 25-26'"
+                 autocomplete="off" autocorrect="off" spellcheck="false">
+          <button type="submit" id="search-btn">Search</button>
+        </div>
+
+        <div class="filters">
+          <span class="filter-label">Filter:</span>
+          <select id="filter-subject">
+            <option value="">All subjects</option>
+            <option>Economics</option>
+            <option>Physics</option>
+            <option>All-Staff</option>
+          </select>
+          <select id="filter-year">
+            <option value="">All years</option>
+            <option>2025-26</option>
+            <option>2026-27</option>
+            <option>2024-25</option>
+          </select>
+          <select id="filter-type">
+            <option value="">All types</option>
+            <option value="lesson_plan">Lesson Plans</option>
+            <option value="meeting_notes">Meeting Notes</option>
+            <option value="policy">Policies</option>
+            <option value="email">Emails</option>
+          </select>
+          <select id="filter-chunk">
+            <option value="">Best match (auto)</option>
+            <option value="small">Precise (small chunks)</option>
+            <option value="large">Contextual (large chunks)</option>
+          </select>
+        </div>
+      </form>
+    </div>
+
+    <div id="status"></div>
+    <div id="results"></div>
+  </div>
+
+  <!-- Document Archive Panel -->
+  <div id="doc-list">
+    <div id="doc-status" style="color:var(--gray); padding: 0.5rem 0; font-size:0.9rem;"></div>
+    <table class="doc-table" id="doc-table">
+      <thead>
+        <tr>
+          <th>Document</th>
+          <th>Subject</th>
+          <th>Year</th>
+          <th>Teacher</th>
+          <th>Type</th>
+          <th>Unit</th>
+        </tr>
+      </thead>
+      <tbody id="doc-tbody"></tbody>
+    </table>
+  </div>
+
+</main>
+
+<script>
+  const PROXY = 'search-proxy.php';
+  const LIST_PROXY = 'list-proxy.php';
+
+  // ── Tab switching ────────────────────────────────────────────────────────────
+  function showTab(tab) {
+    document.getElementById('tab-search').classList.toggle('active', tab === 'search');
+    document.getElementById('tab-docs').classList.toggle('active',   tab === 'docs');
+    document.getElementById('search-panel').classList.toggle('hidden', tab !== 'search');
+    document.getElementById('doc-list').classList.toggle('visible',   tab === 'docs');
+
+    if (tab === 'docs') loadDocuments();
+  }
+
+  // ── Search ───────────────────────────────────────────────────────────────────
+  async function doSearch(e) {
+    e.preventDefault();
+
+    const query = document.getElementById('query').value.trim();
+    if (!query) return;
+
+    const btn = document.getElementById('search-btn');
+    btn.disabled = true;
+    btn.textContent = 'Searching…';
+
+    document.getElementById('status').textContent = 'Embedding your query and searching…';
+    document.getElementById('results').innerHTML = '';
+
+    const body = {
+      query,
+      subject:    document.getElementById('filter-subject').value || null,
+      year:       document.getElementById('filter-year').value    || null,
+      doc_type:   document.getElementById('filter-type').value    || null,
+      chunk_size: document.getElementById('filter-chunk').value   || null,
+      limit:      8,
+    };
+
+    try {
+      const res  = await fetch(PROXY, {
+        method:  'POST',
+        headers: {'Content-Type': 'application/json'},
+        body:    JSON.stringify(body),
+      });
+      const data = await res.json();
+
+      if (data.error) throw new Error(data.error);
+
+      document.getElementById('status').textContent =
+        data.count === 0 ? '' : `${data.count} result${data.count !== 1 ? 's' : ''} for "${query}"`;
+
+      renderResults(data.results || []);
+
+    } catch (err) {
+      document.getElementById('status').textContent = '';
+      document.getElementById('results').innerHTML =
+        `<div class="no-results"><div class="big">⚠️</div><p>Error: ${err.message}</p></div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Search';
+    }
+  }
+
+  function renderResults(results) {
+    const container = document.getElementById('results');
+
+    if (!results.length) {
+      container.innerHTML = `
+        <div class="no-results">
+          <div class="big">🤷</div>
+          <p>No results found. Try rephrasing your query, or check the Document Archive to see what's been ingested.</p>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = results.map((r, i) => {
+      const sim = Math.round(r.similarity * 100);
+      const simClass = sim >= 70 ? '' : 'low';
+
+      const tags = [];
+      if (r.subject)     tags.push(`<span class="tag">${esc(r.subject)}</span>`);
+      if (r.school_year) tags.push(`<span class="tag">${esc(r.school_year)}</span>`);
+      if (r.teacher)     tags.push(`<span class="tag">👤 ${esc(r.teacher)}</span>`);
+      if (r.doc_type)    tags.push(`<span class="tag type">${esc(r.doc_type.replace('_',' '))}</span>`);
+      if (r.unit)        tags.push(`<span class="tag">📖 ${esc(r.unit)}</span>`);
+      if (r.chunk_size)  tags.push(`<span class="tag chunk">${r.chunk_size} chunk</span>`);
+
+      const contentId = `content-${i}`;
+      const btnId = `btn-${i}`;
+
+      return `
+        <div class="result-card">
+          <div class="result-header">
+            <div class="result-source">📄 ${esc(r.original_filename || r.source || 'Unknown source')}</div>
+            <div class="similarity-badge ${simClass}">${sim}% match</div>
+          </div>
+          ${tags.length ? `<div class="result-meta">${tags.join('')}</div>` : ''}
+          <div class="result-content collapsed" id="${contentId}">${esc(r.content || '')}</div>
+          <button class="expand-btn" id="${btnId}" onclick="toggleExpand('${contentId}', '${btnId}')">
+            Show more ▾
+          </button>
+        </div>`;
+    }).join('');
+  }
+
+  function toggleExpand(contentId, btnId) {
+    const el  = document.getElementById(contentId);
+    const btn = document.getElementById(btnId);
+    const collapsed = el.classList.toggle('collapsed');
+    btn.textContent = collapsed ? 'Show more ▾' : 'Show less ▴';
+  }
+
+  function esc(s) {
+    if (!s) return '';
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Document list ────────────────────────────────────────────────────────────
+  let docsLoaded = false;
+
+  async function loadDocuments() {
+    if (docsLoaded) return;
+    document.getElementById('doc-status').textContent = 'Loading archive…';
+
+    try {
+      const res  = await fetch('list-proxy.php');
+      const data = await res.json();
+
+      if (data.error) throw new Error(data.error);
+
+      docsLoaded = true;
+      document.getElementById('doc-status').textContent =
+        `${data.count} document${data.count !== 1 ? 's' : ''} in archive`;
+
+      const tbody = document.getElementById('doc-tbody');
+      tbody.innerHTML = (data.documents || []).map(d => `
+        <tr>
+          <td>${esc(d.original_filename)}</td>
+          <td>${esc(d.subject || '')}</td>
+          <td>${esc(d.school_year || '')}</td>
+          <td>${esc(d.teacher || '')}</td>
+          <td>${esc((d.doc_type || '').replace('_',' '))}</td>
+          <td>${esc(d.unit || '')}</td>
+        </tr>`).join('');
+
+    } catch (err) {
+      document.getElementById('doc-status').textContent = `Error: ${err.message}`;
+    }
+  }
+
+  // Focus search box on load
+  document.getElementById('query').focus();
+</script>
+</body>
+</html>

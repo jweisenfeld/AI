@@ -58,13 +58,15 @@ Sub ExportCurrentFolder()
         Exit Sub
     End If
 
-    ' Confirm with user before starting
+    ' Confirm with user before starting — show FULL path so you can tell
+    ' "\\Orion Planning Team - Email Group\Inbox" from "\\john@psd1.net\Inbox"
     total = oFolder.Items.Count
     If MsgBox("Ready to export from:" & vbCrLf & vbCrLf & _
-              "  Folder: " & oFolder.Name & vbCrLf & _
+              "  " & oFolder.FullFolderPath & vbCrLf & vbCrLf & _
               "  Items:  " & total & vbCrLf & _
               "  To:     " & SAVE_PATH & vbCrLf & vbCrLf & _
-              "Is this the right folder? Continue?", _
+              "Does the path above show the GROUP inbox, not your personal inbox?" & vbCrLf & _
+              "Continue?", _
               vbYesNo + vbQuestion, "OHS Memory Export") = vbNo Then
         Exit Sub
     End If

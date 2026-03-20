@@ -715,7 +715,20 @@ Examples:
     try:
         for f in tqdm(files, desc="Ingesting", unit="file"):
             try:
-                result = ingest_file(f, metadata=cli_metadata, conn=conn)
+                # Auto-derive unit from top-level subfolder when --unit not given.
+                # e.g. target=".../Orion Planning Team - Documents/"
+                #      file  =".../Bell Schedules/somefile.docx"
+                #      → unit = "Bell Schedules"
+                file_meta = cli_metadata
+                if file_meta is not None and not file_meta.get("unit"):
+                    try:
+                        rel_parts = f.relative_to(target).parts
+                        if len(rel_parts) > 1:
+                            file_meta = {**file_meta, "unit": rel_parts[0]}
+                    except ValueError:
+                        pass
+
+                result = ingest_file(f, metadata=file_meta, conn=conn)
                 if result:
                     ok += 1
                 else:

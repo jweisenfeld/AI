@@ -245,4 +245,38 @@ class SearchProxy
         }
         return $text;
     }
+
+    // ── Step 4: Log query (fire-and-forget) ───────────────────────────────────
+
+    /**
+     * Writes a row to query_log.  Never throws — logging must not break search.
+     *
+     * @param int  $resultCount  number of chunks returned
+     * @param bool $hadAnswer    whether Claude synthesis ran
+     */
+    public function logQuery(string $query, int $resultCount, bool $hadAnswer = false): void
+    {
+        $payload = json_encode([
+            'query_text'   => $query,
+            'result_count' => $resultCount,
+            'had_answer'   => $hadAnswer,
+        ]);
+
+        $ch = curl_init($this->supabaseUrl . '/rest/v1/query_log');
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 3,          // fire-and-forget — short timeout
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: application/json',
+                'apikey: '         . $this->supabaseAnonKey,
+                'Authorization: Bearer ' . $this->supabaseAnonKey,
+                'Prefer: return=minimal',
+            ],
+            CURLOPT_POSTFIELDS => $payload,
+        ]);
+
+        curl_exec($ch);   // ignore response
+        curl_close($ch);
+    }
 }

@@ -95,6 +95,8 @@ try {
         }
     }
 
+    $proxy->logQuery($query, count($results), $synthesize && isset($response['answer']));
+
     echo json_encode($response);
 
 } catch (SupabaseTimeoutException $e) {

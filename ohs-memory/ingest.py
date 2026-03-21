@@ -390,15 +390,32 @@ def _extract_text_from_msg(path: Path) -> tuple[str, dict]:
     except ImportError:
         raise ImportError("extract-msg required for .msg files.  Run: pip install extract-msg")
 
-    with em.Message(str(path)) as msg:
-        subject  = (msg.subject or "(no subject)").strip()
-        sender   = (msg.sender  or "").strip()
-        to_field = (msg.to      or "").strip()
+    # Some MSG files carry a non-UTF-8 / non-cp1252 code page.
+    # Try opening normally; if a codec error surfaces, re-open with errors='replace'
+    # so we always get usable text rather than a hard failure.
+    try:
+        _msg_ctx = em.Message(str(path))
+    except (UnicodeDecodeError, LookupError):
+        _msg_ctx = em.Message(str(path), encoding="utf-8")  # extract-msg ≥ 0.48
+
+    def _safe_str(val) -> str:
+        """Return val as a plain string, decoding bytes with UTF-8 (replace errors)."""
+        if val is None:
+            return ""
+        if isinstance(val, bytes):
+            return val.decode("utf-8", errors="replace")
+        return str(val)
+
+    with _msg_ctx as msg:
+        subject  = _safe_str(msg.subject).strip() or "(no subject)"
+        sender   = _safe_str(msg.sender).strip()
+        to_field = _safe_str(msg.to).strip()
         sent_dt  = _parse_msg_date(msg.date)
 
-        body = msg.body or ""
+        body = _safe_str(msg.body)
         if not body.strip() and msg.htmlBody:
-            body = re.sub(r"<[^>]+>", " ", msg.htmlBody or "")
+            html = _safe_str(msg.htmlBody)
+            body = re.sub(r"<[^>]+>", " ", html)
             body = re.sub(r"\s{2,}", " ", body).strip()
 
         parts = []

@@ -4,3 +4,9 @@
 2026-03-20T04:46:40.533875  FAIL  C:\Users\johnw\Documents\Emails\orion-planning-team\20250321_141028_00000000CD8D.msg  —  'str' object has no attribute 'strftime'
 2026-03-20T04:46:40.891335  FAIL  C:\Users\johnw\Documents\Emails\orion-planning-team\20250321_204102_00000000CD8D.msg  —  'str' object has no attribute 'strftime'
 2026-03-20T05:47:04.986763  FAIL  C:\Users\johnw\Pasco School District #1\Orion Planning Team - Documents\Aviator 101\Day 1- Mission to Mars\Mission to Mars Presentation.pdf  —  Error code: 413 - {'error': {'type': 'request_too_large', 'message': 'Request exceeds the maximum size'}}
+2026-03-20T07:08:06.162448  FAIL  C:\Users\johnw\Documents\Emails\orion-planning-team\00009_20250930_085532.msg  —  cannot use a string pattern on a bytes-like object
+2026-03-20T07:10:10.749985  FAIL  C:\Users\johnw\Documents\Emails\orion-planning-team\00023_20251006_124730.msg  —  'charmap' codec can't decode byte 0x81 in position 38: character maps to <undefined>
+2026-03-20T07:18:35.715381  FAIL  C:\Users\johnw\Documents\Emails\orion-planning-team\00103_20250430_074757.msg  —  cannot use a string pattern on a bytes-like object
+2026-03-20T21:38:09.125730  FAIL  c:\Users\johnw\Documents\Emails\orion-planning-team\00009_20250930_085532.msg  —  cannot use a string pattern on a bytes-like object
+2026-03-20T21:38:11.974035  FAIL  c:\Users\johnw\Documents\Emails\orion-planning-team\00023_20251006_124730.msg  —  'charmap' codec can't decode byte 0x81 in position 38: character maps to <undefined>
+2026-03-20T21:38:30.234199  FAIL  c:\Users\johnw\Documents\Emails\orion-planning-team\00103_20250430_074757.msg  —  cannot use a string pattern on a bytes-like object

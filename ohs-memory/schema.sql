@@ -115,6 +115,7 @@ RETURNS TABLE (
     unit              text
 )
 LANGUAGE sql STABLE SECURITY DEFINER
+SET statement_timeout = '30s'   -- function owns its timeout regardless of caller role
 AS $$
     SELECT
         c.content,

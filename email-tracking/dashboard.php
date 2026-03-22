@@ -80,6 +80,9 @@ if (!in_array($sort_column, $valid_columns)) {
 }
 $sort_dir = strtoupper($sort_dir) === 'ASC' ? 'ASC' : 'DESC';
 
+// Campaign filter
+$selected_campaign = $_GET['campaign'] ?? '';
+
 // Fetch data from database
 try {
     $pdo = new PDO(
@@ -89,13 +92,30 @@ try {
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
     );
 
-    // Get overall statistics
+    // Load all campaigns for the dropdown (newest first)
+    $campaigns = $pdo->query("
+        SELECT campaign_id, label, folder_name, sent_date
+        FROM campaigns
+        ORDER BY sent_date DESC, created_at DESC
+    ")->fetchAll(PDO::FETCH_ASSOC);
+
+    // Validate selected campaign exists (prevents arbitrary injection via URL)
+    $valid_campaign_ids = array_column($campaigns, 'campaign_id');
+    if ($selected_campaign !== '' && !in_array($selected_campaign, $valid_campaign_ids)) {
+        $selected_campaign = '';
+    }
+
+    // Build WHERE clause
+    $where = $selected_campaign !== '' ? 'WHERE campaign_id = ' . $pdo->quote($selected_campaign) : '';
+
+    // Get statistics (scoped to selected campaign or all)
     $stmt = $pdo->query("
         SELECT
             COUNT(*) as total_sent,
             SUM(CASE WHEN open_count > 0 THEN 1 ELSE 0 END) as total_opened,
             ROUND(SUM(CASE WHEN open_count > 0 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as open_rate
         FROM email_stats
+        $where
     ");
     $stats = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -111,8 +131,9 @@ try {
             first_opened_at,
             status
         FROM email_stats
+        $where
         ORDER BY $sort_column $sort_dir
-        LIMIT 100
+        LIMIT 500
     ");
     $emails = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -120,14 +141,15 @@ try {
     die("Database error: " . $e->getMessage());
 }
 
-// Helper function to generate sort link
-function sortLink($column, $label, $current_sort, $current_dir) {
+// Helper function to generate sort link (preserves campaign filter)
+function sortLink($column, $label, $current_sort, $current_dir, $campaign = '') {
     $new_dir = ($current_sort === $column && $current_dir === 'ASC') ? 'DESC' : 'ASC';
     $arrow = '';
     if ($current_sort === $column) {
         $arrow = $current_dir === 'ASC' ? ' ▲' : ' ▼';
     }
-    return "<a href=\"?sort=$column&dir=$new_dir\" style=\"color: white; text-decoration: none;\">$label$arrow</a>";
+    $campaign_param = $campaign !== '' ? '&campaign=' . urlencode($campaign) : '';
+    return "<a href=\"?sort=$column&dir=$new_dir$campaign_param\" style=\"color: white; text-decoration: none;\">$label$arrow</a>";
 }
 ?>
 <!DOCTYPE html>
@@ -357,6 +379,43 @@ function sortLink($column, $label, $current_sort, $current_dir) {
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
+        .campaign-bar {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .campaign-bar label {
+            font-weight: 600;
+            font-size: 14px;
+            color: #555;
+            white-space: nowrap;
+        }
+        .campaign-bar select {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #333;
+            background: #f9f9f9;
+        }
+        .campaign-bar .campaign-badge {
+            background: #007bff;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        .campaign-bar .campaign-badge.all {
+            background: #6c757d;
+        }
     </style>
 </head>
 <body>
@@ -365,9 +424,43 @@ function sortLink($column, $label, $current_sort, $current_dir) {
             Email Tracking Dashboard
             <a href="?logout" class="logout">Logout</a>
             <a href="dashboard.php" class="refresh">Refresh</a>
-            <a href="export_unopened.php" class="export">Export Unopened</a>
+            <a href="export_unopened.php<?= $selected_campaign !== '' ? '?campaign=' . urlencode($selected_campaign) : '' ?>" class="export">Export Unopened</a>
             <button class="flush" onclick="document.getElementById('flushModal').style.display='flex'">Flush Database</button>
         </h1>
+
+        <!-- Campaign filter -->
+        <div class="campaign-bar">
+            <label for="campaign-select">Campaign:</label>
+            <select id="campaign-select" onchange="
+                var val = this.value;
+                var url = 'dashboard.php';
+                if (val) url += '?campaign=' + encodeURIComponent(val);
+                window.location = url;
+            ">
+                <option value="" <?= $selected_campaign === '' ? 'selected' : '' ?>>
+                    All Campaigns (<?= count($valid_campaign_ids) ?> registered)
+                </option>
+                <?php foreach ($campaigns as $c): ?>
+                    <option value="<?= htmlspecialchars($c['campaign_id']) ?>"
+                        <?= $selected_campaign === $c['campaign_id'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($c['label']) ?>
+                        <?php if ($c['folder_name']): ?>
+                            — <?= htmlspecialchars($c['folder_name']) ?>
+                        <?php endif; ?>
+                        <?php if ($c['sent_date']): ?>
+                            (<?= date('m/d/Y', strtotime($c['sent_date'])) ?>)
+                        <?php endif; ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <?php if ($selected_campaign !== ''): ?>
+                <?php $active = array_values(array_filter($campaigns, fn($c) => $c['campaign_id'] === $selected_campaign))[0] ?? null; ?>
+                <span class="campaign-badge"><?= htmlspecialchars($active['label'] ?? '') ?></span>
+                <a href="dashboard.php" style="font-size:13px; color:#666;">✕ Clear filter</a>
+            <?php else: ?>
+                <span class="campaign-badge all">All</span>
+            <?php endif; ?>
+        </div>
 
         <?php if ($flush_message === 'success'): ?>
             <div class="alert alert-success">
@@ -397,14 +490,14 @@ function sortLink($column, $label, $current_sort, $current_dir) {
         <table>
             <thead>
                 <tr>
-                    <th><?= sortLink('student_id', 'Student ID', $sort_column, $sort_dir) ?></th>
-                    <th><?= sortLink('recipient_name', 'Name', $sort_column, $sort_dir) ?></th>
-                    <th><?= sortLink('recipient_email', 'Email', $sort_column, $sort_dir) ?></th>
-                    <th><?= sortLink('subject', 'Subject', $sort_column, $sort_dir) ?></th>
-                    <th><?= sortLink('sent_at', 'Sent', $sort_column, $sort_dir) ?></th>
-                    <th><?= sortLink('open_count', 'Opens', $sort_column, $sort_dir) ?></th>
+                    <th><?= sortLink('student_id', 'Student ID', $sort_column, $sort_dir, $selected_campaign) ?></th>
+                    <th><?= sortLink('recipient_name', 'Name', $sort_column, $sort_dir, $selected_campaign) ?></th>
+                    <th><?= sortLink('recipient_email', 'Email', $sort_column, $sort_dir, $selected_campaign) ?></th>
+                    <th><?= sortLink('subject', 'Subject', $sort_column, $sort_dir, $selected_campaign) ?></th>
+                    <th><?= sortLink('sent_at', 'Sent', $sort_column, $sort_dir, $selected_campaign) ?></th>
+                    <th><?= sortLink('open_count', 'Opens', $sort_column, $sort_dir, $selected_campaign) ?></th>
                     <th>First Opened</th>
-                    <th><?= sortLink('status', 'Status', $sort_column, $sort_dir) ?></th>
+                    <th><?= sortLink('status', 'Status', $sort_column, $sort_dir, $selected_campaign) ?></th>
                 </tr>
             </thead>
             <tbody>

@@ -53,13 +53,19 @@ if (($data['api_key'] ?? '') !== $API_KEY) {
 }
 
 // Required fields
-foreach (['campaign_id', 'folder_name', 'label', 'like_pattern'] as $field) {
+foreach (['campaign_id', 'folder_name', 'label', 'like_pattern_b64'] as $field) {
     if (empty($data[$field])) {
         http_response_code(400);
         echo json_encode(['error' => "Missing required field: $field"]);
         exit;
     }
 }
+
+// Decode base64-encoded fields (sent this way to avoid ModSecurity false positives)
+$like_pattern     = base64_decode($data['like_pattern_b64']);
+$subject_template = isset($data['subject_template_b64'])
+    ? base64_decode($data['subject_template_b64'])
+    : null;
 
 try {
     $pdo = new PDO(
@@ -78,7 +84,7 @@ try {
         ':cid'      => $data['campaign_id'],
         ':folder'   => $data['folder_name'],
         ':label'    => $data['label'],
-        ':template' => $data['subject_template'] ?? null,
+        ':template' => $subject_template,
         ':sent_date'=> $data['sent_date'] ?? null,
     ]);
     $campaign_inserted = $stmt->rowCount() > 0;
@@ -92,7 +98,7 @@ try {
     ");
     $stmt->execute([
         ':cid'     => $data['campaign_id'],
-        ':pattern' => $data['like_pattern'],
+        ':pattern' => $like_pattern,
     ]);
     $records_updated = $stmt->rowCount();
 

@@ -6,7 +6,7 @@
  * before the tracking pixel is triggered.
  *
  * POST /email-tracking/api/record_sent.php
- * Body: JSON with email_id, student_id, recipient_email, recipient_name, subject, sent_at
+ * Body: JSON with email_id, campaign_id, student_id, recipient_email, recipient_name, subject, sent_at
  */
 
 header('Content-Type: application/json');
@@ -65,10 +65,11 @@ try {
     // Insert sent email record
     $stmt = $pdo->prepare("
         INSERT INTO email_sent
-        (email_id, student_id, recipient_email, recipient_name, subject, sent_at)
+        (email_id, campaign_id, student_id, recipient_email, recipient_name, subject, sent_at)
         VALUES
-        (:email_id, :student_id, :recipient_email, :recipient_name, :subject, :sent_at)
+        (:email_id, :campaign_id, :student_id, :recipient_email, :recipient_name, :subject, :sent_at)
         ON DUPLICATE KEY UPDATE
+        campaign_id = :campaign_id,
         student_id = :student_id,
         recipient_name = :recipient_name,
         subject = :subject
@@ -76,6 +77,7 @@ try {
 
     $stmt->execute([
         ':email_id' => $data['email_id'],
+        ':campaign_id' => $data['campaign_id'] ?? null,
         ':student_id' => $data['student_id'] ?? null,
         ':recipient_email' => $data['recipient_email'],
         ':recipient_name' => $data['recipient_name'] ?? null,

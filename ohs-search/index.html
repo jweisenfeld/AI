@@ -704,6 +704,16 @@
   }
 
   document.getElementById('query').focus();
+
+  // ── Auto-search from URL ?q= parameter ───────────────────────────────────
+  // Used by IngestSelectedEmail.bas to verify a freshly-ingested email.
+  // Example: https://orionhs.us/flightlog?q=Bell+Schedule+Spring+2026
+  const urlQ = new URLSearchParams(window.location.search).get('q');
+  if (urlQ) {
+    document.getElementById('query').value = urlQ;
+    // Small delay so the page is fully rendered before the search fires
+    setTimeout(() => doSearch({ preventDefault: () => {} }), 400);
+  }
 </script>
 </body>
 </html>

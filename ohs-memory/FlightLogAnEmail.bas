@@ -1,3 +1,5 @@
+Attribute VB_Name = "FlightLogAnEmail"
+Option Explicit
 ' ============================================================================
 ' FlightLog — Add Selected Email to the Archive
 ' ============================================================================
@@ -41,7 +43,7 @@
 ' ── Configuration (set by your IT contact — do not share the INGEST_KEY) ─────
 
 Private Const ENDPOINT_URL As String = "https://psd1.net/ohs-search/ingest-email-proxy.php"
-Private Const FLIGHTLOG_URL As String = "https://orionhs.us/flightlog"
+Private Const FLIGHTLOG_URL As String = "https://psd1.net/ohs-search"
 Private Const INGEST_KEY    As String = "369d865a081516765fd934611a2afda2813774aeaee36f3cca1e8ccfe1156f4f"
 
 Private Const MAX_BODY_CHARS As Long = 50000

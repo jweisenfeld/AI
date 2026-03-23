@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Al-Baqarah Section Quiz</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Georgia', serif;
+      background: #0d1f0d;
+      color: #e8e4d8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    header {
+      text-align: center;
+      padding: 30px 0 20px;
+    }
+    header h1 {
+      font-size: 2rem;
+      color: #c8a84b;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    header .arabic {
+      font-size: 1.5rem;
+      color: #8dbb6e;
+      margin-top: 4px;
+      letter-spacing: 1px;
+    }
+    header p {
+      color: #7a8c6a;
+      margin-top: 6px;
+      font-size: 0.95rem;
+      font-style: italic;
+    }
+
+    #loading {
+      text-align: center;
+      padding: 60px 20px;
+    }
+    #loading p { color: #7a8c6a; margin-bottom: 16px; }
+    #progress-bar-wrap {
+      width: 260px;
+      height: 6px;
+      background: #1a2e1a;
+      border-radius: 3px;
+      margin: 0 auto;
+      overflow: hidden;
+    }
+    #progress-bar {
+      height: 100%;
+      background: #c8a84b;
+      border-radius: 3px;
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    #quiz {
+      display: none;
+      width: 100%;
+      max-width: 720px;
+    }
+
+    /* Score bar */
+    #scorebar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #0a180a;
+      border-radius: 10px;
+      padding: 12px 20px;
+      margin-bottom: 24px;
+      font-size: 0.9rem;
+      color: #7a8c6a;
+    }
+    #scorebar span { color: #c8a84b; font-weight: bold; font-size: 1rem; }
+    #streak-display { font-size: 0.85rem; }
+
+    /* Verse card */
+    #verse-card {
+      background: #0a180a;
+      border: 1px solid #1a3a1a;
+      border-radius: 14px;
+      padding: 36px 40px;
+      margin-bottom: 28px;
+      position: relative;
+    }
+    #verse-text {
+      font-size: 1.25rem;
+      line-height: 1.85;
+      color: #e8e4d8;
+      text-align: center;
+    }
+    #verse-text::before { content: '\201C'; }
+    #verse-text::after  { content: '\201D'; }
+
+    #verse-ref {
+      margin-top: 18px;
+      text-align: center;
+      font-size: 0.85rem;
+      color: #3a5a3a;
+      font-style: italic;
+      letter-spacing: 1px;
+      min-height: 1.2em;
+    }
+
+    /* Question */
+    #question {
+      text-align: center;
+      color: #c8a84b;
+      font-size: 1.1rem;
+      margin-bottom: 20px;
+      letter-spacing: 0.5px;
+    }
+
+    /* Section grid — 5 columns: checkbox + 4 section buttons */
+    #section-grid {
+      display: grid;
+      grid-template-columns: 32px repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 24px;
+      align-items: center;
+    }
+
+    /* Group checkbox */
+    .group-cb-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .group-cb-cell input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #2a5a2a;
+      border-radius: 5px;
+      background: #0a180a;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.15s, background 0.15s;
+      flex-shrink: 0;
+    }
+    .group-cb-cell input[type="checkbox"]:checked {
+      background: #c8a84b;
+      border-color: #c8a84b;
+    }
+    .group-cb-cell input[type="checkbox"]:checked::after {
+      content: '';
+      position: absolute;
+      left: 4px;
+      top: 1px;
+      width: 8px;
+      height: 12px;
+      border: 2px solid #0d1f0d;
+      border-top: none;
+      border-left: none;
+      transform: rotate(45deg);
+    }
+    .group-cb-cell input[type="checkbox"]:hover {
+      border-color: #c8a84b;
+    }
+
+    /* Section buttons */
+    .sec-btn {
+      background: #0f3010;
+      border: 1px solid #1e5020;
+      color: #8dbb6e;
+      padding: 14px 8px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-family: Georgia, serif;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+      line-height: 1.3;
+    }
+    .sec-btn:hover:not(:disabled) {
+      background: #1a4a1a;
+      border-color: #c8a84b;
+      color: #fff;
+      transform: translateY(-1px);
+    }
+    .sec-btn:disabled { cursor: default; opacity: 0.7; }
+    .sec-btn.correct {
+      background: #1a4a2e;
+      border-color: #4caf7a;
+      color: #7ddf9c;
+    }
+    .sec-btn.wrong {
+      background: #4a1a1a;
+      border-color: #c04040;
+      color: #e07070;
+    }
+    .sec-btn.inactive-group {
+      opacity: 0.35;
+    }
+
+    /* Feedback */
+    #feedback {
+      display: none;
+      background: #0a180a;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 20px;
+      border-left: 4px solid #c8a84b;
+    }
+    #feedback.correct-fb { border-left-color: #4caf7a; }
+    #feedback.wrong-fb   { border-left-color: #c04040; }
+
+    #feedback-result {
+      font-size: 1.05rem;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+    .correct-fb #feedback-result { color: #7ddf9c; }
+    .wrong-fb   #feedback-result { color: #e07070; }
+
+    #feedback-theme {
+      color: #9a9a7a;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+    #feedback-theme strong { color: #c8a84b; }
+
+    /* Next button */
+    #next-btn {
+      display: none;
+      width: 100%;
+      padding: 16px;
+      background: #c8a84b;
+      color: #0d1f0d;
+      border: none;
+      border-radius: 10px;
+      font-size: 1.05rem;
+      font-family: Georgia, serif;
+      font-weight: bold;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: background 0.15s;
+    }
+    #next-btn:hover { background: #dfc060; }
+
+    /* Footer */
+    footer {
+      margin-top: 40px;
+      color: #2a4a2a;
+      font-size: 0.78rem;
+      text-align: center;
+      padding-bottom: 20px;
+    }
+
+    @media (max-width: 500px) {
+      #verse-card { padding: 24px 20px; }
+      #verse-text { font-size: 1.05rem; }
+      #section-grid { grid-template-columns: 28px repeat(4, 1fr); gap: 7px; }
+      .sec-btn { padding: 10px 4px; font-size: 0.78rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Al-Baqarah</h1>
+  <div class="arabic">سُورَةُ الْبَقَرَة</div>
+  <p>Which section is this verse from?</p>
+</header>
+
+<div id="loading">
+  <p id="loading-msg">Loading Al-Baqarah…</p>
+  <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+</div>
+
+<div id="quiz">
+  <div id="scorebar">
+    <div>Score: <span id="score-display">0 / 0</span></div>
+    <div id="streak-display"></div>
+  </div>
+
+  <div id="verse-card">
+    <div id="verse-text"></div>
+    <div id="verse-ref"></div>
+  </div>
+
+  <div id="question">Which section is this verse from?</div>
+
+  <div id="section-grid"></div>
+
+  <div id="feedback">
+    <div id="feedback-result"></div>
+    <div id="feedback-theme"></div>
+  </div>
+
+  <button id="next-btn" onclick="nextVerse()">Next Verse &rarr;</button>
+</div>
+
+<footer>
+  Sahih International Translation &mdash; Public Domain
+</footer>
+
+<script>
+// 16 thematic sections of Al-Baqarah
+const SECTION_THEMES = {
+   1: "The Quran as guidance; believers, disbelievers, and hypocrites introduced",
+   2: "The hypocrites — they say they believe, but do not",
+   3: "Call to worship the Creator; the story of Adam in the Garden",
+   4: "Covenant with the Children of Israel; miracles of the Exodus",
+   5: "The golden calf; the slaughtered cow (origin of the surah's name)",
+   6: "Hearts hardened; scripture sold for worldly gain; Harut & Marut",
+   7: "Muhammad's prophethood affirmed; relations with Jews and Christians",
+   8: "Abraham's legacy; Ka'bah built; the Muslim nation established",
+   9: "One faith of all prophets; the change of the Qibla; steadfastness in trials",
+  10: "Safa & Marwa; Ramadan fasting ordained; the meaning of true piety",
+  11: "Retaliation and justice; fasting rules; pilgrimage rituals",
+  12: "Hypocrites vs. believers; wine & gambling forbidden; marriage and divorce",
+  13: "Divorce and waiting periods; nursing; Saul and Goliath",
+  14: "Prophets ranked; the Throne Verse (Ayat al-Kursi); Ibrahim vs. Nimrod",
+  15: "Parables of charity; beginning of the prohibition of usury",
+  16: "Usury forbidden; the great debt contract; final supplication",
+};
+
+// Groups: 1 = sec 1-4, 2 = sec 5-8, 3 = sec 9-12, 4 = sec 13-16
+function groupForSection(s) { return Math.ceil(s / 4); }
+function sectionsInGroup(g) { return [g*4-3, g*4-2, g*4-1, g*4]; }
+
+function getActiveGroups() {
+  const stored = localStorage.getItem('koran_groups');
+  return stored ? JSON.parse(stored) : [1];
+}
+
+function toggleGroup(g) {
+  const groups = getActiveGroups();
+  const idx = groups.indexOf(g);
+  if (idx >= 0) {
+    if (groups.length === 1) {
+      document.getElementById('group-cb-' + g).checked = true;
+      return;
+    }
+    groups.splice(idx, 1);
+  } else {
+    groups.push(g);
+  }
+  localStorage.setItem('koran_groups', JSON.stringify(groups));
+  location.reload();
+}
+
+let allVerses = [];
+let currentVerse = null;
+let correct = 0;
+let total = 0;
+let streak = 0;
+
+async function loadKoran() {
+  let raw;
+  try {
+    const res = await fetch('data.json');
+    if (!res.ok) throw new Error(res.status);
+    raw = await res.json();
+  } catch (e) {
+    document.getElementById('loading-msg').textContent =
+      'Could not load data.json. Please refresh or check your connection.';
+    return;
+  }
+
+  const activeGroups = getActiveGroups();
+  const activeSections = new Set(activeGroups.flatMap(g => sectionsInGroup(g)));
+
+  allVerses = raw
+    .filter(v => v.t.length >= 40 && activeSections.has(v.s))
+    .map(v => ({ section: v.s, verse: v.v, text: v.t }));
+
+  document.getElementById('progress-bar').style.width = '100%';
+  setTimeout(startQuiz, 150);
+}
+
+function startQuiz() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('quiz').style.display = 'block';
+  buildGrid();
+  nextVerse();
+}
+
+function buildGrid() {
+  const grid = document.getElementById('section-grid');
+  grid.innerHTML = '';
+  const activeGroups = getActiveGroups();
+
+  for (let g = 1; g <= 4; g++) {
+    // Checkbox cell
+    const cell = document.createElement('div');
+    cell.className = 'group-cb-cell';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.id = 'group-cb-' + g;
+    cb.checked = activeGroups.includes(g);
+    cb.addEventListener('change', () => toggleGroup(g));
+    cell.appendChild(cb);
+    grid.appendChild(cell);
+
+    // Four section buttons
+    for (let s = g*4-3; s <= g*4; s++) {
+      const btn = document.createElement('button');
+      btn.className = 'sec-btn' + (activeGroups.includes(g) ? '' : ' inactive-group');
+      btn.textContent = s;
+      btn.title = SECTION_THEMES[s];
+      btn.dataset.s = s;
+      btn.addEventListener('click', () => guess(s, btn));
+      grid.appendChild(btn);
+    }
+  }
+}
+
+function nextVerse() {
+  let pick;
+  do {
+    pick = allVerses[Math.floor(Math.random() * allVerses.length)];
+  } while (allVerses.length > 1 && pick === currentVerse);
+  currentVerse = pick;
+
+  document.getElementById('verse-text').textContent = pick.text;
+  document.getElementById('verse-ref').textContent = '';
+  document.getElementById('feedback').style.display = 'none';
+  document.getElementById('next-btn').style.display = 'none';
+
+  const activeGroups = getActiveGroups();
+  document.querySelectorAll('.sec-btn').forEach(b => {
+    b.disabled = false;
+    const g = groupForSection(Number(b.dataset.s));
+    b.className = 'sec-btn' + (activeGroups.includes(g) ? '' : ' inactive-group');
+  });
+}
+
+function guess(s, btn) {
+  const answer = currentVerse.section;
+  total++;
+
+  document.querySelectorAll('.sec-btn').forEach(b => { b.disabled = true; });
+
+  document.getElementById('verse-ref').textContent =
+    `Al-Baqarah 2:${currentVerse.verse}`;
+
+  if (s === answer) {
+    correct++;
+    streak++;
+    btn.className = 'sec-btn correct';
+    showFeedback(true, answer);
+  } else {
+    streak = 0;
+    btn.className = 'sec-btn wrong';
+    document.querySelector(`.sec-btn[data-s="${answer}"]`).className = 'sec-btn correct';
+    showFeedback(false, answer);
+  }
+
+  updateScore();
+  document.getElementById('next-btn').style.display = 'block';
+}
+
+function showFeedback(isCorrect, section) {
+  const fb = document.getElementById('feedback');
+  fb.style.display = 'block';
+  fb.className = isCorrect ? 'correct-fb' : 'wrong-fb';
+  document.getElementById('feedback-result').textContent =
+    isCorrect ? '✓ Correct!' : `✗ That was Section ${section}`;
+  document.getElementById('feedback-theme').innerHTML =
+    `<strong>Section ${section} theme:</strong> ${SECTION_THEMES[section]}`;
+}
+
+function updateScore() {
+  document.getElementById('score-display').textContent = `${correct} / ${total}`;
+  const pct = total ? Math.round(correct / total * 100) : 0;
+  let streakText = '';
+  if (streak >= 3) streakText = `🔥 ${streak} in a row!`;
+  else if (streak === 2) streakText = '2 in a row';
+  document.getElementById('streak-display').textContent =
+    total ? `${pct}%${streakText ? ' · ' + streakText : ''}` : '';
+}
+
+// Kick off
+loadKoran();
+</script>
+</body>
+</html>

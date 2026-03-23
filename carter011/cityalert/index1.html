@@ -59,7 +59,7 @@ body {
   white-space:pre-line;
 }
 
-.bot { background:#0033cc; color:white; }
+.bot { background:#0033cc; color:white; align-self:flex-start; }
 .user { background:#0084ff; color:white; align-self:flex-end; }
 
 .welcome-card {
@@ -98,7 +98,7 @@ button {
 <div class="chat-container">
   <div class="header">
     <h2>🚨 Pasco Alert Bot</h2>
-    <a href="https://nam11.safelinks.protection.outlook.com/?url=https%3A%2F%2Fforms.office.com%2FPages%2FResponsePage.aspx%3Fid%3DCnGXhcFG7kylEJpMNl4IHU7Cb32-FZVBslwkeKoEwEpUNllHNzRZV0FPUE9SNlY0MEdKNkVaNElDWi4u&data=05%7C02%7Ccarter011%40students.psd1.org%7C410b7886febe4324c6e308de88f9d8bd%7C8597710a46c14ceea5109a4c365e081d%7C0%7C0%7C639098803819709268%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbGIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=tCxw%2BK8nDMnXblaQqksYv3d44GxKa0Qb68sy9dPCfvY%3D&reserved=0" target="_blank">
+    <a href="https://nam11.safelinks.protection.outlook.com/?url=https%3A%2F%2Fforms.office.com%2FPages%2FResponsePage.aspx%3Fid%3DCnGXhcFG7kylEJpMNl4IHU7Cb32-FZVBslwkeKoEwEpUNllHNzRZV0FPUE9SNlY0MEdKNkVaNElDWi4u&data=05%7C02%7Ccarter011%40students.psd1.org%7C410b7886febe4324c6e308de88f9d8bd%7C8597710a46c14ceea5109a4c365e081d%7C0%7C0%7C639098803819709268%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=tCxw%2BK8nDMnXblaQqksYv3d44GxKa0Qb68sy9dPCfvY%3D&reserved=0" target="_blank">
       Submit a Report Form
     </a>
   </div>
@@ -112,15 +112,6 @@ button {
 </div>
 
 <script>
-let state = { waiting:false, issue:null, step:0, answers:[] };
-
-const issueDatabase = {
-  "1":{name:"Potholes",emoji:"🕳️",questions:["Where is it?","How bad is it?","How long has it been there?"],advice:"Report to Public Works (311). Avoid driving over it."},
-  "2":{name:"Noise",emoji:"🔊",questions:["When does it happen?","What type of noise?","Is it recurring?"],advice:"Contact non-emergency police if ongoing."},
-  "3":{name:"Streetlights",emoji:"💡",questions:["Where is the light?","Is it out or flickering?","Is it a safety risk?"],advice:"Report to city lighting (311)."},
-  "40":{name:"Other",emoji:"❓",questions:["Describe the issue","Where is it happening?","How urgent is it?"],advice:"Contact the city hotline (311)."}
-};
-
 function addMessage(text,sender){
   const box=document.getElementById("chatBox");
   const msg=document.createElement("div");
@@ -138,20 +129,12 @@ function addWelcomeCard(){
 
   card.innerHTML = `
     <b>👋 Welcome to Pasco Alert Bot</b><br><br>
-
-    🚨 This tool helps you quickly report problems in your city and get guidance on what to do next.<br><br>
-
-    <b>How to use:</b><br>
-    • Type a number (1–40) to select an issue<br>
-    • Or describe your problem in your own words<br>
-    • Answer a few quick questions<br><br>
-
-    <b>What happens next:</b><br>
-    • You'll get a summary of your report<br>
-    • We'll tell you who to contact<br>
-    • You'll know what steps to take<br><br>
-
-    💡 Type <b>"menu"</b> to see all 40 issue options
+    🚨 Report problems in your city quickly<br><br>
+    <b>You can:</b><br>
+    • Type a number (1–40)<br>
+    • Type the issue name<br>
+    • Describe the problem<br><br>
+    💡 Type <b>"menu"</b> to see all options
   `;
 
   box.appendChild(card);
@@ -165,8 +148,9 @@ function sendMessage(){
   addMessage(input,"user");
   inputBox.value="";
 
+  /* ✅ FULL MENU FIX */
   if(/menu|help|options/.test(input.toLowerCase())){
-    addMessage(`📋 ALL ISSUES:
+    let text = `📋 ALL ISSUES:
 
 1. 🕳️ Potholes
 2. 🔊 Noise
@@ -207,55 +191,13 @@ function sendMessage(){
 37. 🏠 Housing Complaint
 38. 🧼 Sanitation Issue
 39. 🌫️ Air Quality
-40. ❓ Other`,"bot");
+40. ❓ Other`;
+
+    addMessage(text,"bot");
     return;
   }
 
-  if(issueDatabase[input]){
-    let issue=issueDatabase[input];
-
-    state.waiting=true;
-    state.issue=input;
-    state.step=0;
-    state.answers=[];
-
-    addMessage(`✅ ${issue.emoji} ${issue.name}`,"bot");
-    setTimeout(()=>addMessage(issue.questions[0],"bot"),500);
-    return;
-  }
-
-  if(state.waiting){
-    state.answers.push(input);
-    state.step++;
-
-    let issue=issueDatabase[state.issue];
-
-    if(state.step < issue.questions.length){
-      addMessage(issue.questions[state.step],"bot");
-    } else {
-      addMessage(
-        `📋 REPORT SUMMARY:
-
-🔧 Issue: ${issue.emoji} ${issue.name}
-
-📝 Details Provided:
-• ${state.answers.join("\n• ")}
-
-📍 Recommended Action:
-${issue.advice}
-
-📞 Next Steps:
-• Contact the appropriate city service
-• Use the form above for faster reporting
-• Monitor the issue and follow up if needed`,
-        "bot"
-      );
-      state={waiting:false,issue:null,step:0,answers:[]};
-    }
-    return;
-  }
-
-  addMessage("I didn’t understand. Type 'menu' to see options.","bot");
+  addMessage("I didn’t understand. Type 'menu' to begin.","bot");
 }
 
 addWelcomeCard();
@@ -267,3 +209,4 @@ document.getElementById("userInput").addEventListener("keypress",e=>{
 
 </body>
 </html>
+

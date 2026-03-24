@@ -203,6 +203,87 @@
     }
     .toggle-sources-btn:hover { background: rgba(99,102,241,0.08); }
 
+    /* Vote buttons */
+    .vote-buttons {
+      display: flex;
+      gap: 0.4rem;
+      align-items: center;
+    }
+    .vote-btn {
+      background: none;
+      border: 1px solid var(--indigo-border);
+      border-radius: 6px;
+      font-size: 1rem;
+      padding: 0.2rem 0.55rem;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      line-height: 1.4;
+    }
+    .vote-btn:hover          { background: rgba(99,102,241,0.08); }
+    .vote-btn.voted-up       { background: #d1fae5; border-color: #6ee7b7; }
+    .vote-btn.voted-down     { background: #fee2e2; border-color: #fca5a5; }
+
+    /* Inline feedback form */
+    #feedback-form {
+      background: white;
+      border: 1px solid var(--indigo-border);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.25rem;
+      display: none;
+      animation: fadeIn 0.2s ease;
+    }
+    #feedback-form.visible { display: block; }
+    #feedback-form p {
+      font-size: 0.875rem;
+      color: var(--indigo);
+      margin-bottom: 0.75rem;
+    }
+    #feedback-form input,
+    #feedback-form textarea {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-family: inherit;
+      margin-bottom: 0.6rem;
+      box-sizing: border-box;
+      resize: vertical;
+    }
+    #feedback-form input:focus,
+    #feedback-form textarea:focus { outline: none; border-color: var(--indigo); }
+    .feedback-actions { display: flex; gap: 0.5rem; }
+    .feedback-submit-btn {
+      background: var(--indigo);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 0.45rem 1rem;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .feedback-submit-btn:hover { background: #4338ca; }
+    .feedback-cancel-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.45rem 0.9rem;
+      font-size: 0.875rem;
+      cursor: pointer;
+      color: var(--gray);
+    }
+    .feedback-cancel-btn:hover { background: var(--bg); }
+
+    /* Page footer */
+    .page-footer {
+      text-align: center;
+      padding: 1.5rem 1rem;
+      font-size: 0.75rem;
+      color: var(--gray);
+      opacity: 0.7;
+    }
+
     /* Thinking / loading states */
     .thinking {
       display: flex;
@@ -480,9 +561,26 @@
       <div id="answer-text"></div>
       <div class="answer-footer">
         <span class="answer-footer-note" id="answer-note"></span>
-        <button class="toggle-sources-btn" id="toggle-sources-btn" onclick="toggleSources()">
-          Show sources ▾
-        </button>
+        <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+          <div class="vote-buttons">
+            <button class="vote-btn" id="vote-up-btn"   onclick="handleVote('up')"   title="This answer was helpful">👍</button>
+            <button class="vote-btn" id="vote-down-btn" onclick="handleVote('down')" title="This answer was wrong or unhelpful">👎</button>
+          </div>
+          <button class="toggle-sources-btn" id="toggle-sources-btn" onclick="toggleSources()">
+            Show sources ▾
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inline feedback form — appears after voting -->
+    <div id="feedback-form">
+      <p id="feedback-prompt">Thanks for voting! Add an optional note:</p>
+      <input type="text" id="feedback-name" placeholder="Your name (optional)">
+      <textarea id="feedback-comment" rows="2" placeholder="What went wrong or what was helpful? (optional)"></textarea>
+      <div class="feedback-actions">
+        <button class="feedback-submit-btn" onclick="submitFeedback()">Send feedback</button>
+        <button class="feedback-cancel-btn" onclick="dismissFeedback()">Cancel</button>
       </div>
     </div>
 
@@ -516,11 +614,20 @@
 
 </main>
 
+<footer class="page-footer" id="page-footer">FlightLog · Orion High School</footer>
+
 <script>
-  const PROXY      = 'search-proxy.php';
-  const LIST_PROXY = 'list-proxy.php';
+  const PROXY           = 'search-proxy.php';
+  const LIST_PROXY      = 'list-proxy.php';
+  const FEEDBACK_PROXY  = 'feedback-proxy.php';
 
   let sourcesVisible = false;
+
+  // ── Feedback state ────────────────────────────────────────────────────────────
+  let lastQuery       = '';
+  let lastAnswer      = '';
+  let lastResultCount = 0;
+  let pendingVote     = null;   // 'up' | 'down' | null
 
   // ── Tab switching ────────────────────────────────────────────────────────────
   function showTab(tab) {
@@ -567,8 +674,12 @@
     document.getElementById('answer-card').classList.remove('visible');
     document.getElementById('sources-section').classList.remove('visible');
     document.getElementById('search-warning').classList.remove('visible');
+    document.getElementById('feedback-form').classList.remove('visible');
     sourcesVisible = false;
+    pendingVote    = null;
     document.getElementById('toggle-sources-btn').textContent = 'Show sources ▾';
+    document.getElementById('vote-up-btn').className   = 'vote-btn';
+    document.getElementById('vote-down-btn').className = 'vote-btn';
     document.getElementById('results').innerHTML = '';
     document.getElementById('status').innerHTML = `
       <div class="thinking">
@@ -613,6 +724,10 @@
           ? `Drawn from ${n} source record${n !== 1 ? 's' : ''}`
           : 'No strong matches found — answer may be speculative';
         document.getElementById('answer-card').classList.add('visible');
+        // Capture context for feedback logging
+        lastQuery       = query;
+        lastAnswer      = data.answer;
+        lastResultCount = data.count;
       } else if (data.answer_error) {
         document.getElementById('status').textContent = `Note: ${data.answer_error}`;
       }
@@ -703,6 +818,75 @@
       document.getElementById('doc-status').textContent = `Error: ${err.message}`;
     }
   }
+
+  // ── Vote & feedback ──────────────────────────────────────────────────────────
+  function handleVote(direction) {
+    if (!lastQuery) return;   // no answer to vote on yet
+
+    pendingVote = direction;
+
+    // Highlight the clicked button
+    document.getElementById('vote-up-btn').className   = direction === 'up'   ? 'vote-btn voted-up'   : 'vote-btn';
+    document.getElementById('vote-down-btn').className = direction === 'down' ? 'vote-btn voted-down' : 'vote-btn';
+
+    // Show feedback form with context-appropriate prompt
+    const form = document.getElementById('feedback-form');
+    document.getElementById('feedback-prompt').textContent =
+      direction === 'up'
+        ? 'Glad it helped! Add an optional note:'
+        : 'Sorry about that! Tell us what went wrong (optional):';
+    document.getElementById('feedback-name').value    = '';
+    document.getElementById('feedback-comment').value = '';
+    form.classList.add('visible');
+    document.getElementById('feedback-name').focus();
+  }
+
+  async function submitFeedback() {
+    if (!pendingVote || !lastQuery) return;
+
+    const reporter = document.getElementById('feedback-name').value.trim()    || null;
+    const comment  = document.getElementById('feedback-comment').value.trim() || null;
+
+    const btn = document.querySelector('.feedback-submit-btn');
+    btn.disabled    = true;
+    btn.textContent = 'Sending…';
+
+    try {
+      await fetch(FEEDBACK_PROXY, {
+        method:  'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          query:        lastQuery,
+          answer:       lastAnswer,
+          vote:         pendingVote,
+          result_count: lastResultCount,
+          reporter,
+          comment,
+        }),
+      });
+    } catch (_) { /* fire-and-forget; don't block the user */ }
+
+    const form = document.getElementById('feedback-form');
+    form.innerHTML = `<p style="color:var(--green); font-weight:600;">
+      ${ pendingVote === 'up' ? '👍 Thanks — feedback recorded!' : '👎 Reported — we\'ll review it.' }
+    </p>`;
+  }
+
+  function dismissFeedback() {
+    document.getElementById('feedback-form').classList.remove('visible');
+    pendingVote = null;
+    document.getElementById('vote-up-btn').className   = 'vote-btn';
+    document.getElementById('vote-down-btn').className = 'vote-btn';
+  }
+
+  // ── Publish timestamp ─────────────────────────────────────────────────────────
+  (function () {
+    const d    = new Date(document.lastModified);
+    const date = d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('page-footer').textContent =
+      'FlightLog · Orion High School · Published ' + date + ' ' + time;
+  })();
 
   document.getElementById('query').focus();
 

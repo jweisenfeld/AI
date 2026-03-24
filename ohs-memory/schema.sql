@@ -314,3 +314,51 @@ returns json language sql security definer as $$
 
   );
 $$;
+
+-- ── feedback ───────────────────────────────────────────────────────────────────
+-- Thumbs-up / thumbs-down votes on synthesized answers.
+-- Both directions are logged so we can identify reliably-good answers too.
+
+create table if not exists feedback (
+    id           bigint      primary key generated always as identity,
+    query_text   text        not null,
+    answer_text  text,
+    vote         text        not null check (vote in ('up', 'down')),
+    result_count int         not null default 0,
+    reporter     text,
+    comment      text,
+    reported_at  timestamptz default now()
+);
+
+comment on table  feedback             is 'Thumbs-up/down votes on FlightLog synthesized answers. Used to identify wrong or misleading answers and prioritize re-ingestion.';
+comment on column feedback.query_text  is 'The verbatim query string — exact text needed to reproduce the bad answer';
+comment on column feedback.answer_text is 'The full answer text that was voted on';
+comment on column feedback.vote        is '''up'' = helpful answer, ''down'' = wrong or unhelpful';
+comment on column feedback.reporter   is 'Optional: name of the teacher who voted';
+comment on column feedback.comment    is 'Optional: free-form note about what was wrong or right';
+
+create index if not exists feedback_reported_idx on feedback (reported_at desc);
+create index if not exists feedback_vote_idx     on feedback (vote);
+
+-- RPC: insert_feedback
+-- Called by feedback-proxy.php. security definer so anon key can insert.
+create or replace function insert_feedback(
+    p_query_text   text,
+    p_answer_text  text    default null,
+    p_vote         text    default 'down',
+    p_result_count int     default 0,
+    p_reporter     text    default null,
+    p_comment      text    default null
+)
+returns jsonb
+language plpgsql security definer
+as $$
+declare
+    v_id bigint;
+begin
+    insert into feedback (query_text, answer_text, vote, result_count, reporter, comment)
+    values (p_query_text, p_answer_text, p_vote, p_result_count, p_reporter, p_comment)
+    returning id into v_id;
+    return jsonb_build_object('id', v_id);
+end;
+$$;

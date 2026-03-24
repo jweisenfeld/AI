@@ -5,90 +5,101 @@
 <title>Pasco Alert Bot</title>
 
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
+*{margin:0;padding:0;box-sizing:border-box;}
 
-body {
-  font-family:'Segoe UI', sans-serif;
-  background:#000080;
+body{
+  font-family:'Segoe UI',sans-serif;
+  background:linear-gradient(135deg,#000080,#0033cc);
+  height:100vh;
   display:flex;
   justify-content:center;
   align-items:center;
-  min-height:100vh;
 }
 
-.chat-container {
-  background:#fff;
-  width:560px;
-  max-width:100%;
-  height:600px;
-  border-radius:12px;
+/* CHAT WRAPPER */
+.chat-container{
+  width:100%;
+  height:100vh;
   display:flex;
   flex-direction:column;
-  box-shadow:0 0 15px rgba(0,0,0,0.4);
-  overflow:hidden;
 }
 
-.header {
-  padding:18px;
-  background:linear-gradient(135deg,#0033cc,#001a66);
+/* HEADER */
+.header{
+  padding:15px;
+  background:#001a66;
   color:white;
   text-align:center;
+  position:relative;
 }
 
-.header a {
-  color:#cce0ff;
+/* LINK BUTTON */
+.link-bubble{
+  position:absolute;
+  right:15px;
+  top:15px;
+  background:#0084ff;
+  padding:8px 14px;
+  border-radius:20px;
   font-size:13px;
-  text-decoration:underline;
+  cursor:pointer;
 }
 
-.chat-box {
+/* CHAT BOX */
+.chat-box{
   flex:1;
-  padding:15px;
+  padding:20px;
   overflow-y:auto;
-  background:#f2f4f8;
   display:flex;
   flex-direction:column;
   gap:12px;
 }
 
-.message {
-  max-width:85%;
+/* MESSAGES (WHITE BUBBLES) */
+.message{
+  max-width:75%;
   padding:12px 16px;
   border-radius:18px;
   font-size:14px;
+  animation:fadeIn .2s ease;
+  background:white;
+  color:black;
   white-space:pre-line;
 }
 
-.bot { background:#0033cc; color:white; }
-.user { background:#0084ff; color:white; align-self:flex-end; }
+/* ALIGNMENT */
+.bot{align-self:flex-start;}
+.user{align-self:flex-end;}
 
-.welcome-card {
-  background:linear-gradient(135deg,#0033cc,#0055ff);
-  color:white;
-  padding:18px;
-  border-radius:16px;
+/* ANIMATION */
+@keyframes fadeIn{
+  from{opacity:0;transform:translateY(5px);}
+  to{opacity:1;}
 }
 
-.input-area {
+/* INPUT AREA */
+.input-area{
   display:flex;
-  padding:10px;
-  border-top:1px solid #ddd;
+  padding:12px;
+  background:#001a66;
 }
 
-input {
+input{
   flex:1;
-  padding:10px;
+  padding:12px;
   border-radius:20px;
-  border:1px solid #ccc;
+  border:none;
+  outline:none;
 }
 
-button {
+button{
   margin-left:10px;
-  padding:10px 15px;
+  padding:12px 18px;
   border:none;
   border-radius:20px;
   background:#0084ff;
   color:white;
+  cursor:pointer;
 }
 </style>
 </head>
@@ -96,11 +107,12 @@ button {
 <body>
 
 <div class="chat-container">
+
   <div class="header">
-    <h2>🚨 Pasco Alert Bot</h2>
-    <a href="https://nam11.safelinks.protection.outlook.com/?url=https%3A%2F%2Fforms.office.com%2FPages%2FResponsePage.aspx%3Fid%3DCnGXhcFG7kylEJpMNl4IHU7Cb32-FZVBslwkeKoEwEpUNllHNzRZV0FPUE9SNlY0MEdKNkVaNElDWi4u&data=05%7C02%7Ccarter011%40students.psd1.org%7C410b7886febe4324c6e308de88f9d8bd%7C8597710a46c14ceea5109a4c365e081d%7C0%7C0%7C639098803819709268%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbGIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=tCxw%2BK8nDMnXblaQqksYv3d44GxKa0Qb68sy9dPCfvY%3D&reserved=0" target="_blank">
-      Submit a Report Form
-    </a>
+    🚨 Pasco Alert Bot
+    <div class="link-bubble" onclick="window.open('https://forms.office.com')">
+      Submit Report
+    </div>
   </div>
 
   <div id="chatBox" class="chat-box"></div>
@@ -109,118 +121,96 @@ button {
     <input id="userInput" placeholder="Type a number or describe an issue...">
     <button onclick="sendMessage()">Send</button>
   </div>
+
 </div>
 
 <script>
-let state = { waiting:false, issue:null, step:0, answers:[] };
 
-const issueDatabase = {
-  "1":{name:"Potholes",emoji:"🕳️",questions:["Where is it?","How bad is it?","How long has it been there?"],advice:"Report to Public Works (311). Avoid driving over it."},
-  "2":{name:"Noise",emoji:"🔊",questions:["When does it happen?","What type of noise?","Is it recurring?"],advice:"Contact non-emergency police if ongoing."},
-  "3":{name:"Streetlights",emoji:"💡",questions:["Where is the light?","Is it out or flickering?","Is it a safety risk?"],advice:"Report to city lighting (311)."},
-  "40":{name:"Other",emoji:"❓",questions:["Describe the issue","Where is it happening?","How urgent is it?"],advice:"Contact the city hotline (311)."}
-};
+let state = {waiting:false, issue:null, step:0, answers:[]};
 
-function addMessage(text,sender){
-  const box=document.getElementById("chatBox");
-  const msg=document.createElement("div");
-  msg.className="message "+sender;
+const issues = [
+"Potholes","Noise","Streetlights","Flooding","Trash","Graffiti","Pests","Parking","Sidewalk","Trees",
+"Power","Water Quality","Snow/Ice","Abandoned Car","Dumping","Signs","Traffic Lights","Bus Issues","School Issues","Parks",
+"Fire Hazard","Building Damage","Animal Control","Suspicious Activity","Construction","Broken Fence","Road Damage","Water Leak","Safety Hazard","Package Theft",
+"Trespassing","Loitering","Bike Issues","Taxi Complaint","Utility Lines","Broken Windows","Housing Complaint","Sanitation","Air Quality","Other"
+];
+
+function addMessage(text,type){
+  let msg=document.createElement("div");
+  msg.className="message "+type;
   msg.textContent=text;
-  box.appendChild(msg);
-  box.scrollTop=box.scrollHeight;
+  chatBox.appendChild(msg);
+  chatBox.scrollTop=chatBox.scrollHeight;
 }
 
-function addWelcomeCard(){
-  const box=document.getElementById("chatBox");
+/* WELCOME */
+function welcome(){
+  addMessage(
+`👋 Welcome to Pasco Alert Bot!
 
-  const card=document.createElement("div");
-  card.className="welcome-card";
+I help you figure out:
+• What’s wrong
+• What you should do
+• Who to contact
 
-  card.innerHTML = `
-    <b>👋 Welcome to Pasco Alert Bot</b><br><br>
+📝 How to use:
+Type "menu" to see all 40 issues
+or just type a number
 
-    🚨 This tool helps you quickly report problems in your city and get guidance on what to do next.<br><br>
+I’ll guide you step-by-step.`,
+"bot");
+}
 
-    <b>How to use:</b><br>
-    • Type a number (1–40) to select an issue<br>
-    • Or describe your problem in your own words<br>
-    • Answer a few quick questions<br><br>
+/* MENU */
+function showMenu(){
+  let text = "📋 ALL ISSUES:\n\n";
+  issues.forEach((i,index)=>{
+    text += (index+1) + ". " + i + "\n";
+  });
+  addMessage(text,"bot");
+}
 
-    <b>What happens next:</b><br>
-    • You'll get a summary of your report<br>
-    • We'll tell you who to contact<br>
-    • You'll know what steps to take<br><br>
+function getQuestions(){
+  return [
+    "Where is it happening?",
+    "How serious is it?",
+    "When did it start?"
+  ];
+}
 
-    💡 Type <b>"menu"</b> to see all 40 issue options
-  `;
+function getAdvice(){
+  return `📍 WHAT TO DO:
+• Report to city services (311)
+• Contact non-emergency police if needed
+• Monitor the issue
 
-  box.appendChild(card);
+📞 CONTACT:
+• City Services: 311
+• Emergency: 911 (if dangerous)`;
 }
 
 function sendMessage(){
-  const inputBox=document.getElementById("userInput");
-  const input=inputBox.value.trim();
+  let input = document.getElementById("userInput").value.trim();
   if(!input) return;
 
   addMessage(input,"user");
-  inputBox.value="";
+  document.getElementById("userInput").value="";
 
-  if(/menu|help|options/.test(input.toLowerCase())){
-    addMessage(`📋 ALL ISSUES:
-
-1. 🕳️ Potholes
-2. 🔊 Noise
-3. 💡 Streetlights
-4. 💧 Flooding
-5. 🗑️ Trash
-6. 🎨 Graffiti
-7. 🐭 Pests
-8. 🅿️ Parking
-9. 🚶 Sidewalk
-10. 🌳 Trees
-11. ⚡ Power
-12. 🚰 Water Quality
-13. ❄️ Snow/Ice
-14. 🚗 Abandoned Car
-15. 🗑️ Dumping
-16. 🚧 Signs
-17. 🚦 Traffic Lights
-18. 🚌 Bus Issues
-19. 🏫 School Issues
-20. 🏞️ Parks
-21. 🔥 Fire Hazard
-22. 🏚️ Building Damage
-23. 🐕 Animal Control
-24. 🚨 Suspicious Activity
-25. 🏗️ Construction Issue
-26. 🧱 Broken Fence
-27. 🛣️ Road Damage
-28. 🚿 Water Leak
-29. 🧯 Safety Hazard
-30. 📦 Package Theft
-31. 🚪 Trespassing
-32. 🧍 Loitering
-33. 🚲 Bike Issues
-34. 🚕 Taxi Complaint
-35. 📡 Internet/Utility Lines
-36. 🪟 Broken Windows
-37. 🏠 Housing Complaint
-38. 🧼 Sanitation Issue
-39. 🌫️ Air Quality
-40. ❓ Other`,"bot");
+  if(/menu|help/i.test(input)){
+    showMenu();
     return;
   }
 
-  if(issueDatabase[input]){
-    let issue=issueDatabase[input];
+  if(!state.waiting && !isNaN(input) && input>=1 && input<=40){
+    state = {
+      waiting:true,
+      issue:issues[input-1],
+      step:0,
+      answers:[]
+    };
 
-    state.waiting=true;
-    state.issue=input;
-    state.step=0;
-    state.answers=[];
-
-    addMessage(`✅ ${issue.emoji} ${issue.name}`,"bot");
-    setTimeout(()=>addMessage(issue.questions[0],"bot"),500);
+    addMessage("✅ " + state.issue,"bot");
+    addMessage(getQuestions()[0],"bot");
     return;
   }
 
@@ -228,40 +218,40 @@ function sendMessage(){
     state.answers.push(input);
     state.step++;
 
-    let issue=issueDatabase[state.issue];
+    let q = getQuestions();
 
-    if(state.step < issue.questions.length){
-      addMessage(issue.questions[state.step],"bot");
+    if(state.step < q.length){
+      addMessage(q[state.step],"bot");
     } else {
       addMessage(
-        `📋 REPORT SUMMARY:
+`📋 SUMMARY
 
-🔧 Issue: ${issue.emoji} ${issue.name}
+Issue: ${state.issue}
 
-📝 Details Provided:
+Details:
 • ${state.answers.join("\n• ")}
 
-📍 Recommended Action:
-${issue.advice}
+${getAdvice()}`,
+"bot");
 
-📞 Next Steps:
-• Contact the appropriate city service
-• Use the form above for faster reporting
-• Monitor the issue and follow up if needed`,
-        "bot"
-      );
-      state={waiting:false,issue:null,step:0,answers:[]};
+      state = {waiting:false,issue:null,step:0,answers:[]};
     }
     return;
   }
 
-  addMessage("I didn’t understand. Type 'menu' to see options.","bot");
+  addMessage("Type 'menu' or pick a number (1–40).","bot");
 }
 
-addWelcomeCard();
+document.addEventListener("DOMContentLoaded",welcome);
+document.addEventListener("DOMContentLoaded", function () {
+  const input = document.getElementById("userInput");
 
-document.getElementById("userInput").addEventListener("keypress",e=>{
-  if(e.key==="Enter") sendMessage();
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
 });
 </script>
 

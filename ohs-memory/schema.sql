@@ -117,7 +117,8 @@ create or replace function search_ohs_memory(
     filter_subject    text    default null,
     filter_year       text    default null,
     filter_doc_type   text    default null,
-    filter_chunk_size text    default null
+    filter_chunk_size text    default null,
+    min_similarity    float   default 0.25
 )
 returns table (
     id                uuid,
@@ -147,6 +148,7 @@ language sql stable as $$
     and (filter_year       is null or d.school_year =            filter_year)
     and (filter_doc_type   is null or d.doc_type    =            filter_doc_type)
     and (filter_chunk_size is null or c.chunk_size  =            filter_chunk_size)
+    and (1 - (c.embedding <=> query_embedding))     >=           min_similarity
     order by c.embedding <=> query_embedding
     limit match_count;
 $$;

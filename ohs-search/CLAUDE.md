@@ -91,3 +91,176 @@ OHS Search is read-only. It cannot add documents to the database. Document inges
 Every new teacher hired at Orion High School should be able to come to this page on their first day and learn how we do things — from the actual decisions we made, in the actual words we used, sourced from the actual documents where those decisions were recorded. Not from memory, not from a single person's interpretation, but from the archive.
 
 The system will be as good as the documents we put into it. The technology is not the constraint. The discipline of archiving our decisions is the constraint.
+
+---
+
+## Technical Reference (for Claude Code)
+
+> This section exists so Claude Code can skip the codebase exploration phase.
+> Point here and say "fix BUG-001" or "build FEATURE-001."
+
+### Full File Map
+
+**ohs-search/ (this folder — PHP/HTML, deployed to psd1.net/ohs-search/)**
+
+| File | Role |
+|------|------|
+| `index.html` | Single-page UI. Tabs: "Ask the Log" (synthesized answers) + "Flight Records" (archive browser). |
+| `search-proxy.php` | Entry point for search POST. Calls SearchProxy, handles timeout retry, logs query. Default `limit=8`. |
+| `src/SearchProxy.php` | Core logic: `getEmbedding()` → OpenAI, `searchSupabase()` → Supabase RPC, `synthesizeAnswer()` → Claude Haiku (claude-haiku-4-5, max_tokens=600, top 6 results), `logQuery()` → fire-and-forget. |
+| `list-proxy.php` | Returns document list for archive tab via `list_ohs_documents()` RPC. |
+| `ingest-email-proxy.php` | HTTP endpoint for Outlook VBA macro. Receives email headers + body, chunks (~150 words small / ~675 words large), embeds, inserts to Supabase. |
+| `dashboard.php` | Admin stats: corpus counts, storage %, ingestion trends, low-hit queries. Calls `flightlog_stats()` RPC. |
+| `ohskey.php` | **Not in git.** At `../.secrets/ohskey.php` on server. Keys: `OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `ANTHROPIC_API_KEY`. |
+
+**ohs-memory/ (sibling folder — Python, runs locally)**
+
+| File | Role |
+|------|------|
+| `ingest.py` | CLI ingestion. Handles `.pdf` (Claude API, falls back to pdfplumber), `.docx` (python-docx), `.pptx`, `.xlsx`, `.md`, `.txt`, `.msg` (extract-msg). SHA-256 dedup. Two chunk sizes per doc. |
+| `schema.sql` | Source-of-truth DB schema. `documents`, `chunks`, `query_log` tables + HNSW index + all RPC functions. Re-run in Supabase SQL Editor to apply changes. |
+| `search.py` | CLI search tool. Direct psycopg2. Good for debugging retrieval without the web layer. |
+| `mcp_server.py` | MCP server for Claude Desktop / Claude Code. Tools: `search_decisions()`, `list_documents()`, `get_corpus_stats()`. |
+| `FlightLogAnEmail.bas` | Outlook macro: select email → POST to `ingest-email-proxy.php`. |
+| `export_outlook_folder.vba` | Outlook macro: bulk-export selected Outlook folder to `.msg` files. |
+
+### Data Flow
+
+```
+INGEST (Python, local)
+  File → extract_text() → SHA-256 dedup → chunk at 2 sizes (small ~200tok / large ~900tok)
+       → embed via OpenAI → INSERT documents + chunks → Supabase
+
+SEARCH (PHP, server)
+  Browser POST {query, synthesize:true, limit:8}
+  → search-proxy.php → OpenAI embed query
+  → Supabase RPC search_ohs_memory() → top-N chunks by cosine similarity (no threshold)
+  → Claude Haiku synthesizeAnswer() → prose with [Source N] citations
+  → JSON {answer, count, results[]} → browser
+  → logQuery() → query_log table
+```
+
+### Database Schema (key points)
+
+**`documents`** — one row per source file
+- `source_hash` VARCHAR unique — SHA-256 dedup key
+- `doc_type`: `email` | `lesson_plan` | `meeting_notes` | `policy` | `other`
+- `school_year`: `pre-opening` | `2024-25` | `2025-26`
+- `raw_text` — full extracted text stored for future re-embedding
+
+**`chunks`** — many per document
+- `chunk_size`: `'small'` (~200 tok) | `'large'` (~900 tok)
+- `embedding vector(1536)` — OpenAI text-embedding-3-small
+- HNSW index: `chunks_embedding_hnsw`, m=16, ef_construction=64
+
+**`query_log`** — every search query logged: `query_text`, `result_count`, `had_answer`, `queried_at`
+
+**Key RPC functions** (edit in `schema.sql`, apply in Supabase SQL Editor):
+- `search_ohs_memory(query_embedding, match_count, filter_subject, filter_year, filter_doc_type, filter_chunk_size)` — the heart of search; returns ranked chunks + document metadata
+- `list_ohs_documents(...)` — archive browser
+- `flightlog_stats()` — all dashboard data in one round trip; `security definer` so anon key can read
+- `insert_email_document()` — dedup-aware insert called by `ingest-email-proxy.php`
+
+---
+
+## Known Bugs
+
+### BUG-001 — Search Always Returns Exactly 8 Hits
+**Symptom:** Answer card always says "Drawn from 8 source records." Result count in `query_log` is always 8.
+
+**Root cause:** `index.html` hardcodes `limit: 8` in `doSearch()`. `search-proxy.php` passes this as `match_count` to the SQL RPC. The SQL function has no similarity threshold — it returns exactly `match_count` rows regardless of relevance. With thousands of chunks in the corpus, all 8 slots are always filled.
+
+**Fix:**
+Option A (SQL) — Add `min_similarity float default 0.25` parameter to `search_ohs_memory()` in `schema.sql`:
+```sql
+and (1 - (c.embedding <=> query_embedding)) >= min_similarity
+```
+Option B (PHP) — Filter in `SearchProxy::searchSupabase()` after retrieval:
+```php
+return array_values(array_filter($results, fn($r) => $r['similarity'] >= 0.25));
+```
+Option A is cleaner. Apply by updating `schema.sql` and running in Supabase SQL Editor.
+
+Side benefit: `query_log.result_count` becomes meaningful — queries with no good matches will return 0-3 instead of always 8, making the dashboard "Knowledge Gaps" report accurate.
+
+---
+
+### BUG-002 — Meeting Notes Not Surfaced; Only Emails Return for People/Event Queries
+**Symptom:** Query "When did Weisenfeld join the Team" returns only `.msg` email chunks. Meeting notes from OneNote (containing "Welcome John Weisenfeld to the team!" dated 3/10/25) are not in the results.
+
+**Root causes (in order of probability):**
+
+1. **Doc may not be in corpus.** If the OneNote export was a `.xml` file (Word XML format), `ingest.py`'s `extract_text()` only matches `.docx` — the file would be silently skipped. Check: go to Flight Records tab and search for the document by name.
+
+2. **OneNote → Word XML text extraction failure.** `_extract_text_from_docx()` (ingest.py lines 267-299) iterates `doc.paragraphs` and `doc.tables`. OneNote exports sometimes put content in **floating text boxes / shapes** — a known python-docx blind spot. Result: extracted text is near-empty → weak embedding → low similarity score.
+
+3. **Email volume dominance.** No deduplication across source documents — multiple chunks from the same email fill result slots. With far more email chunks than meeting-note chunks, emails flood the top-8 even when a meeting note is the right answer. BUG-001's fix (similarity threshold) also helps here.
+
+**Diagnostic steps:**
+```bash
+# Check if doc is in corpus
+python ohs-memory/search.py --list | grep -i "weisenfeld\|3-10\|minutes\|3.10"
+
+# Check raw similarity scores
+python ohs-memory/search.py "When did Weisenfeld join the team" --compare
+
+# If doc exists but text is empty, check in Supabase SQL Editor:
+# SELECT original_filename, length(raw_text), LEFT(raw_text,200)
+# FROM documents WHERE original_filename ILIKE '%minutes%' OR original_filename ILIKE '%3-10%';
+```
+
+**Fix:**
+- If doc missing/empty: re-ingest as PDF (print to PDF from OneNote — Claude API extraction handles it perfectly)
+- Long-term: add Claude API fallback in `_extract_text_from_docx()` when `len(extracted_text) < 200`
+
+---
+
+## Feature Backlog
+
+### FEATURE-001 — Thumbs-Down Feedback / Quality Incident Reporting
+**Request:** When a synthesized answer is wrong, user clicks 👎. Modal captures optional reporter name + comment. Stored persistently. Dashboard shows "Quality Reports" section.
+
+**Files to change:**
+
+1. **`schema.sql`** — Add `feedback` table + `insert_feedback` RPC + update `flightlog_stats()`:
+```sql
+create table if not exists feedback (
+  id           bigint      primary key generated always as identity,
+  query_text   text        not null,
+  answer_text  text,
+  result_count int,
+  reporter     text,
+  comment      text,
+  reported_at  timestamptz default now()
+);
+```
+
+2. **`index.html`** — Add 👎 button in `.answer-footer` next to toggle-sources-btn. On click: show inline modal (name field optional, comment textarea optional, Submit + Cancel). On submit: `POST feedback-proxy.php {query, answer, result_count, reporter, comment}`. Show confirmation inline ("Reported — thanks").
+
+3. **New `feedback-proxy.php`** — Thin wrapper: read secrets → call Supabase `insert_feedback()` RPC → return `{ok:true, id:N}`.
+
+4. **`dashboard.php`** — New "Quality Reports" section: stat card for total thumbs-down count, table showing recent reports (Query | Comment | Reporter | Date | re-run link).
+
+---
+
+## CLI Quick Reference
+
+```bash
+# Search without the web layer (good for debugging)
+python ohs-memory/search.py "your query here"
+python ohs-memory/search.py "your query" --compare        # small vs large chunks side-by-side
+python ohs-memory/search.py "your query" --subject Physics
+python ohs-memory/search.py --list                        # all ingested documents
+
+# Ingest
+python ohs-memory/ingest.py path/to/file.docx --subject All-Staff --year 2024-25 --type meeting_notes
+python ohs-memory/ingest.py ./folder/ --subject All-Staff --year 2024-25  # batch
+python ohs-memory/ingest.py path/to/file.docx --update   # re-ingest changed file
+```
+
+## Deployment
+
+- PHP files: deploy to cPanel at psd1.net via FTP/cPanel File Manager
+- Secrets: `/home/{user}/.secrets/ohskey.php` (above document root)
+- SQL changes: paste updated sections from `schema.sql` into Supabase SQL Editor → Run
+- Python scripts: run locally on John's machine only

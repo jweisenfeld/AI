@@ -609,8 +609,9 @@
       if (data.answer) {
         document.getElementById('answer-text').innerHTML = renderMarkdown(data.answer);
         const n = data.count;
-        document.getElementById('answer-note').textContent =
-          `Drawn from ${n} source record${n !== 1 ? 's' : ''}`;
+        document.getElementById('answer-note').textContent = n > 0
+          ? `Drawn from ${n} source record${n !== 1 ? 's' : ''}`
+          : 'No strong matches found — answer may be speculative';
         document.getElementById('answer-card').classList.add('visible');
       } else if (data.answer_error) {
         document.getElementById('status').textContent = `Note: ${data.answer_error}`;

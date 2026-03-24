@@ -113,11 +113,13 @@ class SearchProxy
         ?string $year,
         ?string $docType,
         ?string $chunkSize,
-        int     $limit
+        int     $limit,
+        float   $minSimilarity = 0.25
     ): array {
         $params = [
             'query_embedding' => $embedding,
             'match_count'     => max(1, min($limit, 20)),
+            'min_similarity'  => $minSimilarity,
         ];
         if ($subject)   $params['filter_subject']    = $subject;
         if ($year)      $params['filter_year']       = $year;

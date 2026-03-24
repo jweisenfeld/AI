@@ -43,13 +43,14 @@ foreach (['OPENAI_API_KEY', 'SUPABASE_URL', 'SUPABASE_ANON_KEY'] as $key) {
 
 $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
 
-$query      = trim($input['query']      ?? '');
-$subject    = trim($input['subject']    ?? '') ?: null;
-$year       = trim($input['year']       ?? '') ?: null;
-$doc_type   = trim($input['doc_type']   ?? '') ?: null;
-$chunk_size = trim($input['chunk_size'] ?? '') ?: null;
-$limit      = min((int)($input['limit'] ?? 8), 20);
-$synthesize = !empty($input['synthesize']);
+$query          = trim($input['query']      ?? '');
+$subject        = trim($input['subject']    ?? '') ?: null;
+$year           = trim($input['year']       ?? '') ?: null;
+$doc_type       = trim($input['doc_type']   ?? '') ?: null;
+$chunk_size     = trim($input['chunk_size'] ?? '') ?: null;
+$limit          = min((int)($input['limit'] ?? 8), 20);
+$min_similarity = isset($input['min_similarity']) ? (float)$input['min_similarity'] : 0.25;
+$synthesize     = !empty($input['synthesize']);
 
 if (empty($query)) {
     http_response_code(400);
@@ -67,11 +68,11 @@ try {
     // Search with automatic retry on timeout
     $warning = null;
     try {
-        $results = $proxy->searchSupabase($embedding, $subject, $year, $doc_type, $chunk_size, $limit);
+        $results = $proxy->searchSupabase($embedding, $subject, $year, $doc_type, $chunk_size, $limit, $min_similarity);
     } catch (SupabaseTimeoutException $e) {
         $retryLimit = 4;
         error_log("OHS search timeout (limit=$limit); retrying with limit=$retryLimit. " . $e->getMessage());
-        $results = $proxy->searchSupabase($embedding, $subject, $year, $doc_type, $chunk_size, $retryLimit);
+        $results = $proxy->searchSupabase($embedding, $subject, $year, $doc_type, $chunk_size, $retryLimit, $min_similarity);
         $warning = "Search took longer than expected — showing top $retryLimit results instead of $limit. "
                  . "Try a more specific query if you need more.";
     }

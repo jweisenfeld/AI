@@ -157,19 +157,29 @@ language sql stable as $$
         limit match_count * 10
     ),
     -- ── BM25 lane: full-text keyword search (only when query_text supplied) ───
+    -- Uses OR across all stemmed query lexemes so partial matches surface
+    -- (e.g. "join" in the query still finds "Welcome Weisenfeld to the team!")
     bm25 as (
         select
-            c.id                                                                                           as cid,
-            row_number() over (order by ts_rank_cd(c.fts, websearch_to_tsquery('english', query_text)) desc) as rnk
+            c.id                                                  as cid,
+            row_number() over (order by ts_rank_cd(c.fts, q) desc) as rnk
         from chunks c
-        join documents d on d.id = c.document_id
+        join documents d on d.id = c.document_id,
+             lateral (
+                 select to_tsquery('english',
+                     array_to_string(
+                         array(select lexeme from unnest(to_tsvector('english', query_text))),
+                         ' | '
+                     )
+                 ) as q
+             ) tsq
         where query_text is not null
-          and c.fts @@ websearch_to_tsquery('english', query_text)
+          and c.fts @@ tsq.q
           and (filter_subject    is null or d.subject     ilike '%' || filter_subject    || '%')
           and (filter_year       is null or d.school_year =            filter_year)
           and (filter_doc_type   is null or d.doc_type    =            filter_doc_type)
           and (filter_chunk_size is null or c.chunk_size  =            filter_chunk_size)
-        order by ts_rank_cd(c.fts, websearch_to_tsquery('english', query_text)) desc
+        order by ts_rank_cd(c.fts, tsq.q) desc
         limit match_count * 10
     ),
     -- ── Reciprocal Rank Fusion (k=60 is standard; higher k = gentler blending) ─

@@ -118,6 +118,7 @@ The system will be as good as the documents we put into it. The technology is no
 | File | Role |
 |------|------|
 | `ingest.py` | CLI ingestion. Handles `.pdf` (Claude API, falls back to pdfplumber), `.docx` (python-docx), `.pptx`, `.xlsx`, `.md`, `.txt`, `.msg` (extract-msg). SHA-256 dedup. Two chunk sizes per doc. |
+| `split_and_ingest_meetings.py` | Splits the OneNote meetings export (pandoc → .md) into one .txt per meeting date and ingests each. Run after updating the master Meetings .docx. See BUG-002. |
 | `schema.sql` | Source-of-truth DB schema. `documents`, `chunks`, `query_log` tables + HNSW index + all RPC functions. Re-run in Supabase SQL Editor to apply changes. |
 | `search.py` | CLI search tool. Direct psycopg2. Good for debugging retrieval without the web layer. |
 | `mcp_server.py` | MCP server for Claude Desktop / Claude Code. Tools: `search_decisions()`, `list_documents()`, `get_corpus_stats()`. |
@@ -140,6 +141,25 @@ SEARCH (PHP, server)
   → logQuery() → query_log table
 ```
 
+### Schema Changes Applied (March 2026)
+
+**Hybrid search (BM25 + pgvector, Reciprocal Rank Fusion):**
+- `chunks` table gained a `fts tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED` column
+- GIN index `chunks_fts_gin` added for fast keyword search
+- `search_ohs_memory()` updated to run two parallel lanes (vector cosine + BM25 keyword) and fuse
+  results using RRF (`1/(k+rank)` where k=60). Chunks appearing in both lanes rank highest.
+- BM25 uses OR semantics: the query is stemmed via `to_tsvector()` and lexemes joined with `|` so
+  "When did John Weisenfeld join the team?" matches chunks with ANY of: join, john, weisenfeld, team.
+  This prevents AND-requiring keyword search from missing chunks that don't contain every query word.
+- `min_similarity` applies only to the vector lane. BM25 hits with no vector match appear at 0% in the UI.
+
+**Applying DDL on Supabase when SQL editor times out:**
+- `SET statement_timeout = '120000';` at the top of the editor tab (120 seconds)
+- Or use Python psycopg2 directly (no timeout): `python -c` won't work on Windows CMD for multi-line;
+  write a `.py` file instead. `psql` is not installed on this machine.
+
+---
+
 ### Database Schema (key points)
 
 **`documents`** — one row per source file
@@ -151,7 +171,9 @@ SEARCH (PHP, server)
 **`chunks`** — many per document
 - `chunk_size`: `'small'` (~200 tok) | `'large'` (~900 tok)
 - `embedding vector(1536)` — OpenAI text-embedding-3-small
+- `fts tsvector` — GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
 - HNSW index: `chunks_embedding_hnsw`, m=16, ef_construction=64
+- GIN index: `chunks_fts_gin` on `fts` column (BM25 keyword search)
 
 **`query_log`** — every search query logged: `query_text`, `result_count`, `had_answer`, `queried_at`
 
@@ -181,20 +203,32 @@ Nonsense queries ("syzygy kumquat") return 0 results. PHP files need deploying t
 
 ---
 
-### BUG-002 — Meeting Notes Chunk Exists But Scores Below Threshold ✅ RESOLVED BY BUG-003
-**Symptom:** Query "When did Weisenfeld join the team" returns only email signature chunks (51-59%)
-instead of the meeting notes containing "Welcome John Weisenfeld to the team!" (3/10/25).
+### BUG-002 — Meeting Notes Chunk Diluted by Multi-Meeting DOCX ✅ FIXED
+**Symptom:** Query "When did Weisenfeld join the team" returns only emails, never the meeting notes
+containing "Welcome John Weisenfeld to the team!" (3/10/25).
 
-**Full diagnosis (completed):**
-- `Meetings (FlightLog 2026-03-22).docx` IS in the corpus (confirmed via `search.py --list`)
-- Text extraction works correctly — paragraphs 800-804 contain the target content (confirmed with python-docx)
-- The relevant chunk IS in Supabase — small chunk #30 contains "Welcome John Weisenfeld to the team!"
-- **But small chunk #30 scores only 34.9%** for the query, below the 0.40 threshold
-- Why so low: chunk starts with unrelated content ("info on asynchronous role and Ipal / more info econ
-  and core/career") before the 3/10/25 meeting notes begin, diluting the embedding
-- Email signature chunks score 51-59% because Weisenfeld's name dominates short SafeLinks signature chunks
+**Full diagnosis:**
+- `Meetings (FlightLog 2026-03-22).docx` IS in the corpus; text extraction works correctly
+- The relevant chunk IS in Supabase — contains "Welcome John Weisenfeld to the team!"
+- **But it scores only 34.9%** because the OneNote export concatenates all 45 meetings into one file.
+  When chunked at ~900 tokens, one chunk spans multiple meeting dates, so the 3/10/25 content is
+  diluted by surrounding unrelated meeting content. The embedding averages across all of it.
+- Additionally, this chunk was being outranked by emails even after BUG-003 (pure cosine similarity
+  favors the email corpus by volume).
 
-**Resolved:** BUG-003 fix removes the signature false positives. Threshold lowered to 0.30 so the 34.9% meeting notes chunk will now rank #1 after re-ingestion.
+**What was done:**
+1. Deleted the monolithic `Meetings (FlightLog 2026-03-22).docx` from the DB (and its two duplicate
+   `Meetings.docx` entries that were ingested twice in quick succession — same content, same chunk count)
+2. Added hybrid search (BM25 + pgvector RRF) — see Schema Changes below
+3. Created `ohs-memory/split_and_ingest_meetings.py` — splits the OneNote export into one `.txt`
+   per meeting date, then ingests each with clean isolated embeddings
+4. Run: `python ohs-memory/split_and_ingest_meetings.py`
+   - Reads `meetings_extracted.md` (pandoc output of the .docx)
+   - Writes ~45 individual files to `split_meetings/pre-opening/` and `split_meetings/2025-26/`
+   - Ingests each group with `--subject All-Staff --type meeting_notes --year {group}`
+
+**Source file location:** `C:\Users\johnw\Documents\orion-planning-team-onenote\Meetings (FlightLog 2026-03-22).docx`
+**Pandoc extraction:** `pandoc "Meetings (FlightLog 2026-03-22).docx" -o meetings_extracted.md`
 
 ---
 
@@ -223,14 +257,17 @@ verbatim, including:
 - Lowered `min_similarity` default from 0.40 → 0.30 in `schema.sql`, `SearchProxy.php`, `search-proxy.php`
 
 **Remaining manual steps (run once):**
-1. Identify and delete affected documents from Supabase (chunks cascade):
+1. Identify and delete affected documents from Supabase (chunks cascade).
+   **Use `doc_type = 'email'` as a guard** — the base64 regex `[A-Za-z0-9+/]{60,}` is too broad
+   and will also match long URLs or SHA hashes in non-email documents:
    ```sql
-   -- Find candidates
-   SELECT id, original_filename FROM documents
-   WHERE raw_text ILIKE '%safelinks.protection.outlook.com%'
-      OR raw_text ILIKE '%xsdata=%'
-      OR raw_text ~ '[A-Za-z0-9+/]{60,}';
-   -- Then: DELETE FROM documents WHERE id IN (...);
+   -- Safe: scoped to emails only
+   DELETE FROM documents
+   WHERE doc_type = 'email'
+     AND (
+       raw_text ILIKE '%safelinks.protection.outlook.com%'
+       OR raw_text ILIKE '%xsdata=%'
+     );
    ```
 2. Re-ingest the source `.msg` files with the cleaned extractor:
    ```bash
@@ -239,6 +276,28 @@ verbatim, including:
 3. Re-run Supabase SQL function update (paste updated `search_ohs_memory` from `schema.sql`)
 4. Deploy updated PHP files to psd1.net
 5. Verify "When did Weisenfeld join the team" now surfaces the 3/10/25 meeting notes chunk
+
+---
+
+## Per-Document-Type Ingestion Notes
+
+Each document type has quirks that require custom pre-processing before standard ingest works well.
+This is not a bug — it is the nature of unstructured organizational data.
+
+| Type | Problem | Solution |
+|------|---------|----------|
+| **Emails (.msg)** | Microsoft SafeLinks wraps every URL in a redirect; signature blocks (name, title, LinkedIn, phone) become dense URL-encoded chunks that score 50%+ on any name query. Base64-encoded MIME parts add general noise. | `_sanitize_email_body()` in `ingest.py` strips SafeLinks, `%XX`-heavy lines, `xsdata=` tokens, base64 lines, and `-- ` signature delimiters. |
+| **Meeting notes (.docx from OneNote export)** | OneNote exports all meetings into one file. When chunked at 900 tokens, each chunk spans multiple meeting dates. Embeddings are diluted averages across unrelated content. | Use `split_and_ingest_meetings.py` to split into one .txt per meeting date before ingesting. |
+| **PDFs** | Generally fine. Claude API extraction handles scanned pages. | No special treatment needed unless handwritten. |
+| **Policy docs (.docx)** | Generally fine if one topic per file. | No special treatment needed. |
+| **Presentations (.pptx)** | Slide text can be sparse; speaker notes contain more content. | Ingest as-is; consider extracting notes separately if retrieval is poor. |
+
+**Guiding principle for ingestion problems:**
+1. Confirm the chunk exists in the DB first (SQL `ILIKE` search on `content`)
+2. Check its actual similarity score for the failing query (use `search_ohs_memory` RPC with `match_count=30, min_similarity=0.0`)
+3. If chunk exists but scores low → embedding is diluted → fix the source document structure (split, clean, re-ingest)
+4. If chunk doesn't rank in top-N despite adequate score → increase limit or check for volume imbalance (1200 emails vs 4 meeting docs)
+5. Only add search complexity (hybrid, reranking) after confirming the simple fixes are insufficient
 
 ---
 

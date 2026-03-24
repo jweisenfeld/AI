@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2 Nephi Chapter Quiz</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Georgia', serif;
+      background: #1a1a2e;
+      color: #e8e0d0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    header {
+      text-align: center;
+      padding: 30px 0 20px;
+    }
+    header h1 {
+      font-size: 2rem;
+      color: #c9a84c;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    header p {
+      color: #9a8c7a;
+      margin-top: 6px;
+      font-size: 0.95rem;
+      font-style: italic;
+    }
+
+    #loading {
+      text-align: center;
+      padding: 60px 20px;
+    }
+    #loading p { color: #9a8c7a; margin-bottom: 16px; }
+    #progress-bar-wrap {
+      width: 260px;
+      height: 6px;
+      background: #2a2a4a;
+      border-radius: 3px;
+      margin: 0 auto;
+      overflow: hidden;
+    }
+    #progress-bar {
+      height: 100%;
+      background: #c9a84c;
+      border-radius: 3px;
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    #quiz {
+      display: none;
+      width: 100%;
+      max-width: 760px;
+    }
+
+    /* Score bar */
+    #scorebar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #16213e;
+      border-radius: 10px;
+      padding: 12px 20px;
+      margin-bottom: 24px;
+      font-size: 0.9rem;
+      color: #9a8c7a;
+    }
+    #scorebar span { color: #c9a84c; font-weight: bold; font-size: 1rem; }
+    #streak-display { font-size: 0.85rem; }
+
+    /* Verse card */
+    #verse-card {
+      background: #16213e;
+      border: 1px solid #2a2a4a;
+      border-radius: 14px;
+      padding: 36px 40px;
+      margin-bottom: 28px;
+      position: relative;
+    }
+    #verse-text {
+      font-size: 1.25rem;
+      line-height: 1.85;
+      color: #e8e0d0;
+      text-align: center;
+    }
+    #verse-text::before { content: '\201C'; }
+    #verse-text::after  { content: '\201D'; }
+
+    #verse-ref {
+      margin-top: 18px;
+      text-align: center;
+      font-size: 0.85rem;
+      color: #5a5a7a;
+      font-style: italic;
+      letter-spacing: 1px;
+      min-height: 1.2em;
+    }
+
+    /* Question */
+    #question {
+      text-align: center;
+      color: #c9a84c;
+      font-size: 1.1rem;
+      margin-bottom: 20px;
+      letter-spacing: 0.5px;
+    }
+
+    /* Groups container */
+    #chapter-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    /* Each group row: [checkbox] [buttons...] */
+    .group-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Group checkbox */
+    .group-cb-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      width: 28px;
+    }
+    .group-cb-cell input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #4a5a8a;
+      border-radius: 5px;
+      background: #16213e;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.15s, background 0.15s;
+      flex-shrink: 0;
+    }
+    .group-cb-cell input[type="checkbox"]:checked {
+      background: #c9a84c;
+      border-color: #c9a84c;
+    }
+    .group-cb-cell input[type="checkbox"]:checked::after {
+      content: '';
+      position: absolute;
+      left: 4px;
+      top: 1px;
+      width: 8px;
+      height: 12px;
+      border: 2px solid #1a1a2e;
+      border-top: none;
+      border-left: none;
+      transform: rotate(45deg);
+    }
+    .group-cb-cell input[type="checkbox"]:hover {
+      border-color: #c9a84c;
+    }
+
+    /* Buttons within a group row */
+    .group-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      flex: 1;
+    }
+
+    /* Chapter buttons */
+    .ch-btn {
+      background: #0f3460;
+      border: 1px solid #1e4d8c;
+      color: #b0c4e0;
+      padding: 13px 8px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-family: Georgia, serif;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+      min-width: 48px;
+      flex: 1;
+    }
+    .ch-btn:hover:not(:disabled) {
+      background: #1a5490;
+      border-color: #c9a84c;
+      color: #fff;
+      transform: translateY(-1px);
+    }
+    .ch-btn:disabled { cursor: default; opacity: 0.7; }
+    .ch-btn.correct {
+      background: #1a4a2e;
+      border-color: #4caf7a;
+      color: #7ddf9c;
+    }
+    .ch-btn.wrong {
+      background: #4a1a1a;
+      border-color: #c04040;
+      color: #e07070;
+    }
+    .ch-btn.inactive-group {
+      opacity: 0.35;
+    }
+
+    /* Feedback */
+    #feedback {
+      display: none;
+      background: #16213e;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 20px;
+      border-left: 4px solid #c9a84c;
+    }
+    #feedback.correct-fb { border-left-color: #4caf7a; }
+    #feedback.wrong-fb   { border-left-color: #c04040; }
+
+    #feedback-result {
+      font-size: 1.05rem;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+    .correct-fb #feedback-result { color: #7ddf9c; }
+    .wrong-fb   #feedback-result { color: #e07070; }
+
+    #feedback-theme {
+      color: #b0a090;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+    #feedback-theme strong { color: #c9a84c; }
+
+    /* Next button */
+    #next-btn {
+      display: none;
+      width: 100%;
+      padding: 16px;
+      background: #c9a84c;
+      color: #1a1a2e;
+      border: none;
+      border-radius: 10px;
+      font-size: 1.05rem;
+      font-family: Georgia, serif;
+      font-weight: bold;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: background 0.15s;
+    }
+    #next-btn:hover { background: #e0bf60; }
+
+    /* Footer */
+    footer {
+      margin-top: 40px;
+      color: #4a4a6a;
+      font-size: 0.78rem;
+      text-align: center;
+      padding-bottom: 20px;
+    }
+
+    @media (max-width: 540px) {
+      #verse-card { padding: 24px 20px; }
+      #verse-text { font-size: 1.05rem; }
+      .ch-btn { padding: 11px 4px; font-size: 0.88rem; min-width: 38px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>2 Nephi</h1>
+  <p>Which chapter is this verse from?</p>
+</header>
+
+<div id="loading">
+  <p id="loading-msg">Loading 2 Nephi…</p>
+  <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+</div>
+
+<div id="quiz">
+  <div id="scorebar">
+    <div>Score: <span id="score-display">0 / 0</span></div>
+    <div id="streak-display"></div>
+  </div>
+
+  <div id="verse-card">
+    <div id="verse-text"></div>
+    <div id="verse-ref"></div>
+  </div>
+
+  <div id="question">Which chapter is this verse from?</div>
+
+  <div id="chapter-grid"></div>
+
+  <div id="feedback">
+    <div id="feedback-result"></div>
+    <div id="feedback-theme"></div>
+  </div>
+
+  <button id="next-btn" onclick="nextVerse()">Next Verse &rarr;</button>
+</div>
+
+<footer>
+  Book of Mormon &mdash; The Church of Jesus Christ of Latter-day Saints
+</footer>
+
+<script>
+// 2 Nephi has 33 chapters. We group them thematically into 4 sections:
+//   Group 1: Ch  1– 8  (Lehi's last words, Nephi's psalm, Jacob's intro, Isaiah 48–52)
+//   Group 2: Ch  9–16  (Jacob's atonement sermon, Isaiah 1–8)
+//   Group 3: Ch 17–24  (Isaiah 9–22)
+//   Group 4: Ch 25–33  (Nephi's interpretation & doctrine, final testimony)
+
+const GROUPS = [
+  { label: "Ch 1–8",   chapters: [1,2,3,4,5,6,7,8] },
+  { label: "Ch 9–16",  chapters: [9,10,11,12,13,14,15,16] },
+  { label: "Ch 17–24", chapters: [17,18,19,20,21,22,23,24] },
+  { label: "Ch 25–33", chapters: [25,26,27,28,29,30,31,32,33] },
+];
+
+const CHAPTER_THEMES = {
+   1: "Lehi's last counsel: promised land, repentance, and the choice between liberty and captivity",
+   2: "Opposition in all things; the fall; the infinite atonement — 'men are that they might have joy'",
+   3: "Lehi's blessing on Joseph; prophecy of Joseph Smith and the Book of Mormon",
+   4: "Nephi's psalm: lamentation over weakness, trust in God's deliverance",
+   5: "Nephi's people separate from Lamanites; temple built; gold plates made",
+   6: "Jacob quotes Isaiah on Israel's scattering, nursing kings, and the Lord's covenant",
+   7: "Isaiah 50 — the Lord's hand is not shortened; patient trust amid persecution",
+   8: "Isaiah 51–52 — awake, O Israel; Zion redeemed; beautiful feet of the messenger",
+   9: "Jacob's atonement sermon: infinite atonement, resurrection, judgment, woe to the wicked, rejoice",
+  10: "Jacob continues: Christ shall come to this land; Gentiles to help Israel; no kings here",
+  11: "Nephi rejoices in Isaiah; Christ is the way; Isaiah's words prove the covenant",
+  12: "Isaiah 2 — last days, mountain of the Lord, millennial peace; pride and idols rebuked",
+  13: "Isaiah 3–4 — Judah's wickedness and leadership collapse; the Branch and purification of Zion",
+  14: "Isaiah 4–5 — cloud of glory over Zion; the vineyard parable; woe to the wicked",
+  15: "Isaiah 5 continued — the Lord's anger; Assyria as instrument of judgment",
+  16: "Isaiah 6 — Isaiah's vision of the Lord, his call, and the hardening commission",
+  17: "Isaiah 7 — the sign of Immanuel given to Ahaz; 'a virgin shall conceive'",
+  18: "Isaiah 8 — Maher-shalal-hash-baz; seek the law and the testimony, not wizards",
+  19: "Isaiah 9 — 'Unto us a child is born… Prince of Peace'; Ephraim's pride falls",
+  20: "Isaiah 10 — woe to unjust rulers; Assyria humbled; a remnant of Israel shall return",
+  21: "Isaiah 11–12 — the Branch of Jesse; the Spirit's gifts; gathering of Israel; songs of praise",
+  22: "Isaiah 13 — the burden of Babylon; the day of the Lord against the proud",
+  23: "Isaiah 14 — the fall of Lucifer; Babylon destroyed; Israel restored to its land",
+  24: "Isaiah 15–16 — the burden of Moab; plea for Judah's protection",
+  25: "Nephi explains Isaiah: Christ shall come 600 years after Lehi; Israel will be restored",
+  26: "Signs at Christ's death; Nephites dwindle in unbelief; church of the devil in last days",
+  27: "The sealed book (Isaiah 29): the Book of Mormon to come forth; the learned man's refusal",
+  28: "False churches, pride, and apostasy in the last days; hearken to the Spirit",
+  29: "'A Bible! A Bible!' — God speaks to all nations; Jews, Gentiles, and lost tribes",
+  30: "Conversion of Lamanites and Jews; the earth at peace in the millennium",
+  31: "The doctrine of Christ: faith, repentance, baptism by water and fire, endure to the end",
+  32: "The Holy Ghost shows all things; angels speak by the Holy Ghost; pray always",
+  33: "Nephi's final witness: his words are Christ's words; he will meet us at the judgment bar",
+};
+
+function groupForChapter(ch) {
+  for (let g = 0; g < GROUPS.length; g++) {
+    if (GROUPS[g].chapters.includes(ch)) return g;
+  }
+  return -1;
+}
+
+const STORAGE_KEY = '2nephi_groups';
+
+function getActiveGroups() {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  return stored ? JSON.parse(stored) : [0];
+}
+
+function toggleGroup(g) {
+  const groups = getActiveGroups();
+  const idx = groups.indexOf(g);
+  if (idx >= 0) {
+    if (groups.length === 1) {
+      document.getElementById('group-cb-' + g).checked = true;
+      return;
+    }
+    groups.splice(idx, 1);
+  } else {
+    groups.push(g);
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(groups));
+  location.reload();
+}
+
+let allVerses = [];
+let currentVerse = null;
+let correct = 0;
+let total = 0;
+let streak = 0;
+
+async function loadData() {
+  let raw;
+  try {
+    const res = await fetch('data.json');
+    if (!res.ok) throw new Error(res.status);
+    raw = await res.json();
+  } catch (e) {
+    document.getElementById('loading-msg').textContent =
+      'Could not load data.json. Please refresh or check your connection.';
+    return;
+  }
+
+  const activeGroups = getActiveGroups();
+  const activeChapters = new Set(activeGroups.flatMap(g => GROUPS[g].chapters));
+
+  allVerses = raw
+    .filter(v => v.t.length >= 40 && activeChapters.has(v.c))
+    .map(v => ({ chapter: v.c, verse: v.v, text: v.t }));
+
+  document.getElementById('progress-bar').style.width = '100%';
+  setTimeout(startQuiz, 150);
+}
+
+function startQuiz() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('quiz').style.display = 'block';
+  buildGrid();
+  nextVerse();
+}
+
+function buildGrid() {
+  const grid = document.getElementById('chapter-grid');
+  grid.innerHTML = '';
+  const activeGroups = getActiveGroups();
+
+  GROUPS.forEach((group, g) => {
+    const row = document.createElement('div');
+    row.className = 'group-row';
+
+    // Checkbox
+    const cbCell = document.createElement('div');
+    cbCell.className = 'group-cb-cell';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.id = 'group-cb-' + g;
+    cb.checked = activeGroups.includes(g);
+    cb.addEventListener('change', () => toggleGroup(g));
+    cbCell.appendChild(cb);
+    row.appendChild(cbCell);
+
+    // Chapter buttons
+    const btnWrap = document.createElement('div');
+    btnWrap.className = 'group-buttons';
+    group.chapters.forEach(ch => {
+      const btn = document.createElement('button');
+      btn.className = 'ch-btn' + (activeGroups.includes(g) ? '' : ' inactive-group');
+      btn.textContent = ch;
+      btn.dataset.ch = ch;
+      btn.addEventListener('click', () => guess(ch, btn));
+      btnWrap.appendChild(btn);
+    });
+    row.appendChild(btnWrap);
+    grid.appendChild(row);
+  });
+}
+
+function nextVerse() {
+  let pick;
+  do {
+    pick = allVerses[Math.floor(Math.random() * allVerses.length)];
+  } while (allVerses.length > 1 && pick === currentVerse);
+  currentVerse = pick;
+
+  document.getElementById('verse-text').textContent = pick.text;
+  document.getElementById('verse-ref').textContent = '';
+  document.getElementById('feedback').style.display = 'none';
+  document.getElementById('next-btn').style.display = 'none';
+
+  const activeGroups = getActiveGroups();
+  document.querySelectorAll('.ch-btn').forEach(b => {
+    b.disabled = false;
+    const g = groupForChapter(Number(b.dataset.ch));
+    b.className = 'ch-btn' + (activeGroups.includes(g) ? '' : ' inactive-group');
+  });
+}
+
+function guess(ch, btn) {
+  const answer = currentVerse.chapter;
+  total++;
+
+  document.querySelectorAll('.ch-btn').forEach(b => { b.disabled = true; });
+
+  document.getElementById('verse-ref').textContent =
+    `2 Nephi ${answer}:${currentVerse.verse}`;
+
+  if (ch === answer) {
+    correct++;
+    streak++;
+    btn.className = 'ch-btn correct';
+    showFeedback(true, answer);
+  } else {
+    streak = 0;
+    btn.className = 'ch-btn wrong';
+    document.querySelector(`.ch-btn[data-ch="${answer}"]`).className = 'ch-btn correct';
+    showFeedback(false, answer);
+  }
+
+  updateScore();
+  document.getElementById('next-btn').style.display = 'block';
+}
+
+function showFeedback(isCorrect, chapter) {
+  const fb = document.getElementById('feedback');
+  fb.style.display = 'block';
+  fb.className = isCorrect ? 'correct-fb' : 'wrong-fb';
+  document.getElementById('feedback-result').textContent =
+    isCorrect ? '✓ Correct!' : `✗ That was 2 Nephi ${chapter}`;
+  document.getElementById('feedback-theme').innerHTML =
+    `<strong>Chapter ${chapter} theme:</strong> ${CHAPTER_THEMES[chapter]}`;
+}
+
+function updateScore() {
+  document.getElementById('score-display').textContent = `${correct} / ${total}`;
+  const pct = total ? Math.round(correct / total * 100) : 0;
+  let streakText = '';
+  if (streak >= 3) streakText = `🔥 ${streak} in a row!`;
+  else if (streak === 2) streakText = '2 in a row';
+  document.getElementById('streak-display').textContent =
+    total ? `${pct}%${streakText ? ' · ' + streakText : ''}` : '';
+}
+
+loadData();
+</script>
+</body>
+</html>

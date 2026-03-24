@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pasco Alert Bot</title>
+
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family:'Segoe UI', sans-serif;
+  background:#000080;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  min-height:100vh;
+}
+
+.chat-container {
+  background:#fff;
+  width:560px;
+  max-width:100%;
+  height:600px;
+  border-radius:12px;
+  display:flex;
+  flex-direction:column;
+  box-shadow:0 0 15px rgba(0,0,0,0.4);
+  overflow:hidden;
+}
+
+.header {
+  padding:18px;
+  background:linear-gradient(135deg,#0033cc,#001a66);
+  color:white;
+  text-align:center;
+}
+
+.header a {
+  color:#cce0ff;
+  font-size:13px;
+  text-decoration:underline;
+}
+
+.chat-box {
+  flex:1;
+  padding:15px;
+  overflow-y:auto;
+  background:#f2f4f8;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+.message {
+  max-width:85%;
+  padding:12px 16px;
+  border-radius:18px;
+  font-size:14px;
+  white-space:pre-line;
+}
+
+.bot { background:#0033cc; color:white; align-self:flex-start; }
+.user { background:#0084ff; color:white; align-self:flex-end; }
+
+.welcome-card {
+  background:linear-gradient(135deg,#0033cc,#0055ff);
+  color:white;
+  padding:18px;
+  border-radius:16px;
+}
+
+.input-area {
+  display:flex;
+  padding:10px;
+  border-top:1px solid #ddd;
+}
+
+input {
+  flex:1;
+  padding:10px;
+  border-radius:20px;
+  border:1px solid #ccc;
+}
+
+button {
+  margin-left:10px;
+  padding:10px 15px;
+  border:none;
+  border-radius:20px;
+  background:#0084ff;
+  color:white;
+}
+</style>
+</head>
+
+<body>
+
+<div class="chat-container">
+  <div class="header">
+    <h2>🚨 Pasco Alert Bot</h2>
+    <a href="https://nam11.safelinks.protection.outlook.com/?url=https%3A%2F%2Fforms.office.com%2FPages%2FResponsePage.aspx%3Fid%3DCnGXhcFG7kylEJpMNl4IHU7Cb32-FZVBslwkeKoEwEpUNllHNzRZV0FPUE9SNlY0MEdKNkVaNElDWi4u&data=05%7C02%7Ccarter011%40students.psd1.org%7C410b7886febe4324c6e308de88f9d8bd%7C8597710a46c14ceea5109a4c365e081d%7C0%7C0%7C639098803819709268%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=tCxw%2BK8nDMnXblaQqksYv3d44GxKa0Qb68sy9dPCfvY%3D&reserved=0" target="_blank">
+      Submit a Report Form
+    </a>
+  </div>
+
+  <div id="chatBox" class="chat-box"></div>
+
+  <div class="input-area">
+    <input id="userInput" placeholder="Type a number or describe an issue...">
+    <button onclick="sendMessage()">Send</button>
+  </div>
+</div>
+
+<script>
+function addMessage(text,sender){
+  const box=document.getElementById("chatBox");
+  const msg=document.createElement("div");
+  msg.className="message "+sender;
+  msg.textContent=text;
+  box.appendChild(msg);
+  box.scrollTop=box.scrollHeight;
+}
+
+function addWelcomeCard(){
+  const box=document.getElementById("chatBox");
+
+  const card=document.createElement("div");
+  card.className="welcome-card";
+
+  card.innerHTML = `
+    <b>👋 Welcome to Pasco Alert Bot</b><br><br>
+    🚨 Report problems in your city quickly<br><br>
+    <b>You can:</b><br>
+    • Type a number (1–40)<br>
+    • Type the issue name<br>
+    • Describe the problem<br><br>
+    💡 Type <b>"menu"</b> to see all options
+  `;
+
+  box.appendChild(card);
+}
+
+function sendMessage(){
+  const inputBox=document.getElementById("userInput");
+  const input=inputBox.value.trim();
+  if(!input) return;
+
+  addMessage(input,"user");
+  inputBox.value="";
+
+  /* ✅ FULL MENU FIX */
+  if(/menu|help|options/.test(input.toLowerCase())){
+    let text = `📋 ALL ISSUES:
+
+1. 🕳️ Potholes
+2. 🔊 Noise
+3. 💡 Streetlights
+4. 💧 Flooding
+5. 🗑️ Trash
+6. 🎨 Graffiti
+7. 🐭 Pests
+8. 🅿️ Parking
+9. 🚶 Sidewalk
+10. 🌳 Trees
+11. ⚡ Power
+12. 🚰 Water Quality
+13. ❄️ Snow/Ice
+14. 🚗 Abandoned Car
+15. 🗑️ Dumping
+16. 🚧 Signs
+17. 🚦 Traffic Lights
+18. 🚌 Bus Issues
+19. 🏫 School Issues
+20. 🏞️ Parks
+21. 🔥 Fire Hazard
+22. 🏚️ Building Damage
+23. 🐕 Animal Control
+24. 🚨 Suspicious Activity
+25. 🏗️ Construction Issue
+26. 🧱 Broken Fence
+27. 🛣️ Road Damage
+28. 🚿 Water Leak
+29. 🧯 Safety Hazard
+30. 📦 Package Theft
+31. 🚪 Trespassing
+32. 🧍 Loitering
+33. 🚲 Bike Issues
+34. 🚕 Taxi Complaint
+35. 📡 Internet/Utility Lines
+36. 🪟 Broken Windows
+37. 🏠 Housing Complaint
+38. 🧼 Sanitation Issue
+39. 🌫️ Air Quality
+40. ❓ Other`;
+
+    addMessage(text,"bot");
+    return;
+  }
+
+  addMessage("I didn’t understand. Type 'menu' to begin.","bot");
+}
+
+addWelcomeCard();
+
+document.getElementById("userInput").addEventListener("keypress",e=>{
+  if(e.key==="Enter") sendMessage();
+});
+</script>
+
+</body>
+</html>
+

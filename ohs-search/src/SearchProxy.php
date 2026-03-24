@@ -113,11 +113,14 @@ class SearchProxy
         ?string $year,
         ?string $docType,
         ?string $chunkSize,
-        int     $limit
+        int     $limit,
+        float   $minSimilarity = 0.30,
+        ?string $queryText     = null   // enables BM25 lane + RRF when provided
     ): array {
         $params = [
             'query_embedding' => $embedding,
             'match_count'     => max(1, min($limit, 20)),
+            'min_similarity'  => $minSimilarity,
         ];
         if ($subject)   $params['filter_subject']    = $subject;
         if ($year)      $params['filter_year']       = $year;
@@ -125,6 +128,7 @@ class SearchProxy
         if ($chunkSize && in_array($chunkSize, ['small', 'large'], true)) {
             $params['filter_chunk_size'] = $chunkSize;
         }
+        if ($queryText) $params['query_text']        = $queryText;
 
         $ch = curl_init($this->supabaseUrl . '/rest/v1/rpc/search_ohs_memory');
         curl_setopt_array($ch, [

@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unit 23 — Electric Field, Force &amp; Potential Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 950px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 6px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 25px;
+            font-style: italic;
+        }
+        .instructions {
+            background-color: #fff3e0;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #ff9800;
+        }
+        .instructions p { margin: 5px 0; color: #e65100; }
+
+        .input-section {
+            background-color: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .input-section h3 { margin-top: 0; color: #2c3e50; }
+
+        .section-label {
+            font-size: 13px;
+            font-weight: bold;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 16px 0 8px 0;
+        }
+
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 11px;
+        }
+        .input-label {
+            width: 340px;
+            font-weight: bold;
+            color: #34495e;
+            flex-shrink: 0;
+            font-size: 15px;
+        }
+        select.sign-select {
+            width: 120px;
+            padding: 7px 6px;
+            border: 2px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+        }
+        input[type="text"] {
+            width: 140px;
+            padding: 7px 9px;
+            border: 2px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 15px;
+        }
+        input[type="text"]:focus, select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        .unit-label {
+            color: #7f8c8d;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+        select.dir-select {
+            padding: 7px 8px;
+            border: 2px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+        }
+        select.wide-select {
+            padding: 7px 8px;
+            border: 2px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+            width: 300px;
+        }
+
+        hr.divider {
+            border: none;
+            border-top: 1px solid #bdc3c7;
+            margin: 18px 0 14px 0;
+        }
+        hr.section-break {
+            border: none;
+            border-top: 2px solid #95a5a6;
+            margin: 22px 0 16px 0;
+        }
+
+        .button-container { text-align: center; margin: 22px 0; }
+        .calculate-btn {
+            background-color: #3498db;
+            color: white;
+            padding: 12px 32px;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .calculate-btn:hover { background-color: #2980b9; }
+        .clear-btn {
+            background-color: #95a5a6;
+            color: white;
+            padding: 10px 25px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-left: 12px;
+            transition: background-color 0.3s;
+        }
+        .clear-btn:hover { background-color: #7f8c8d; }
+
+        .results-section {
+            background-color: #e8f5e9;
+            padding: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+        .results-section.show { display: block; }
+        .results-section h3 { margin-top: 0; color: #27ae60; }
+
+        .results-group-label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #27ae60;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 14px 0 6px 4px;
+        }
+
+        .result-item {
+            display: grid;
+            grid-template-columns: 340px 1fr auto;
+            gap: 12px;
+            align-items: center;
+            padding: 10px 14px;
+            background-color: white;
+            border-radius: 5px;
+            margin-bottom: 8px;
+        }
+        .result-label { font-weight: bold; color: #27ae60; }
+        .result-value {
+            font-size: 17px;
+            color: #2c3e50;
+            font-family: 'Courier New', monospace;
+        }
+        .result-direction {
+            color: #8e44ad;
+            font-weight: bold;
+            text-align: right;
+            white-space: nowrap;
+        }
+        .result-yes  { color: #e74c3c; font-weight: bold; }
+        .result-no   { color: #27ae60; font-weight: bold; }
+        .unknown { color: #95a5a6; font-style: italic; }
+
+        .error-box {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            display: none;
+        }
+        .error-box.show { display: block; }
+
+        .hint-text {
+            font-size: 12px;
+            color: #95a5a6;
+            font-style: italic;
+            margin: -6px 0 10px 0;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Unit 23: Electric Field, Force &amp; Potential Calculator</h1>
+    <div class="subtitle">Enter known values — the calculator solves for the rest</div>
+
+    <div class="instructions">
+        <p><strong>Instructions:</strong> Enter the values you know and leave unknowns blank. Then click <strong>Calculate</strong>.</p>
+        <p>Scientific notation: type <strong>6.62e-14</strong> or <strong>919000</strong> — either works.</p>
+        <p>For charges, select the sign and enter the magnitude (always positive). For electric potential (V<sub>close</sub>), include the sign in the number itself (e.g. <strong>−478</strong>).</p>
+        <p>The <em>far</em> location is always assumed to be very far away, so its electric potential = 0.</p>
+    </div>
+
+    <div class="input-section">
+        <h3>Known Values</h3>
+
+        <!-- ── Charges ───────────────────────────────────────────── -->
+        <p class="section-label">Charges</p>
+
+        <div class="input-row">
+            <span class="input-label">Particle 1 charge (q₁):</span>
+            <select class="sign-select" id="q1-sign">
+                <option value="">sign unknown</option>
+                <option value="+">+ (positive)</option>
+                <option value="-">− (negative)</option>
+            </select>
+            <input type="text" id="q1-mag" placeholder="magnitude, e.g. 7.36e-18">
+            <span class="unit-label">C</span>
+        </div>
+
+        <div class="input-row">
+            <span class="input-label">Test particle charge (q<sub>test</sub>):</span>
+            <select class="sign-select" id="qt-sign">
+                <option value="">sign unknown</option>
+                <option value="+">+ (positive)</option>
+                <option value="-">− (negative)</option>
+            </select>
+            <input type="text" id="qt-mag" placeholder="magnitude, e.g. 1.60e-19">
+            <span class="unit-label">C</span>
+        </div>
+
+        <!-- ── Distance ──────────────────────────────────────────── -->
+        <hr class="divider">
+        <p class="section-label">Distance</p>
+
+        <div class="input-row">
+            <span class="input-label">Distance from particle 1 to close location (r):</span>
+            <input type="text" id="r-val" placeholder="e.g. 4.17e-7">
+            <span class="unit-label">m</span>
+        </div>
+
+        <!-- ── Electric Field ────────────────────────────────────── -->
+        <hr class="divider">
+        <p class="section-label">Electric Field at Close Location</p>
+
+        <div class="input-row">
+            <span class="input-label">Electric field magnitude (E):</span>
+            <input type="text" id="e-val" placeholder="e.g. 919000">
+            <span class="unit-label">N/C</span>
+        </div>
+
+        <div class="input-row">
+            <span class="input-label">Electric field direction:</span>
+            <select class="dir-select" id="e-dir">
+                <option value="">unknown / not given</option>
+                <option value="away">away from particle 1</option>
+                <option value="toward">toward particle 1</option>
+            </select>
+        </div>
+
+        <!-- ── Force ─────────────────────────────────────────────── -->
+        <hr class="divider">
+        <p class="section-label">Electric Force on Test Particle</p>
+
+        <div class="input-row">
+            <span class="input-label">Electric force magnitude (F):</span>
+            <input type="text" id="f-val" placeholder="e.g. 6.62e-14">
+            <span class="unit-label">N</span>
+        </div>
+
+        <div class="input-row">
+            <span class="input-label">Electric force direction:</span>
+            <select class="dir-select" id="f-dir">
+                <option value="">unknown / not given</option>
+                <option value="away">away from particle 1</option>
+                <option value="toward">toward particle 1</option>
+            </select>
+        </div>
+
+        <!-- ── Electric Potential & PE ───────────────────────────── -->
+        <hr class="section-break">
+        <p class="section-label">Electric Potential &amp; Potential Energy</p>
+        <p class="hint-text">Uses the same distance (r) above. The "far" location always has V = 0.</p>
+
+        <div class="input-row">
+            <span class="input-label">Test particle moves:</span>
+            <select class="wide-select" id="move-dir">
+                <option value="">unknown / not given</option>
+                <option value="close-to-far">close location → far away</option>
+                <option value="far-to-close">far away → close location</option>
+            </select>
+        </div>
+
+        <div class="input-row">
+            <span class="input-label">Electric potential at close location (V<sub>close</sub>):</span>
+            <input type="text" id="vclose-val" placeholder="signed, e.g. −478">
+            <span class="unit-label">V &nbsp;<em>(include sign)</em></span>
+        </div>
+
+        <div class="input-row">
+            <span class="input-label">Magnitude of potential difference |ΔV|:</span>
+            <input type="text" id="deltav-val" placeholder="e.g. 478">
+            <span class="unit-label">V</span>
+        </div>
+
+        <div class="input-row">
+            <span class="input-label">Magnitude of change in PE |ΔPE|:</span>
+            <input type="text" id="deltape-val" placeholder="e.g. 4.87e-19">
+            <span class="unit-label">J</span>
+        </div>
+
+        <div class="input-row">
+            <span class="input-label">Work to move test particle:</span>
+            <select class="wide-select" id="work-dir">
+                <option value="">unknown / not given</option>
+                <option value="required">work is required</option>
+                <option value="spontaneous">no work required (moves on its own)</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="button-container">
+        <button class="calculate-btn" onclick="calculate()">Calculate</button>
+        <button class="clear-btn" onclick="clearAll()">Clear All</button>
+    </div>
+
+    <div class="error-box" id="error-box"></div>
+
+    <div class="results-section" id="results-section">
+        <h3>Results</h3>
+        <div id="results-content"></div>
+    </div>
+</div>
+
+<script>
+const k = 8.99e9; // Coulomb's constant, N·m²/C²
+
+function parseVal(id) {
+    const s = document.getElementById(id).value.trim();
+    if (!s) return null;
+    const n = parseFloat(s);
+    return isNaN(n) ? null : Math.abs(n);
+}
+
+function parseSignedVal(id) {
+    const s = document.getElementById(id).value.trim();
+    if (!s) return null;
+    // Allow "−" (unicode minus) in addition to regular "-"
+    const cleaned = s.replace(/\u2212/g, '-');
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? null : n;
+}
+
+function formatSci(num, sigFigs) {
+    if (num === null || num === undefined || isNaN(num)) return null;
+    sigFigs = sigFigs || 3;
+    const str = Math.abs(num).toExponential(sigFigs - 1);
+    const [mantissa, expPart] = str.split('e');
+    const exp = parseInt(expPart);
+    const coeff = parseFloat(mantissa);
+    return coeff + ' &times; 10<sup>' + exp + '</sup>';
+}
+
+function formatSignedSci(num, sigFigs) {
+    if (num === null || num === undefined || isNaN(num)) return null;
+    const sign = num < 0 ? '&minus;' : '+';
+    return sign + formatSci(Math.abs(num), sigFigs);
+}
+
+function showError(msg) {
+    const box = document.getElementById('error-box');
+    box.innerHTML = msg;
+    box.classList.add('show');
+}
+function clearError() {
+    document.getElementById('error-box').classList.remove('show');
+}
+
+function calculate() {
+    clearError();
+    document.getElementById('results-section').classList.remove('show');
+
+    // ── Read inputs ───────────────────────────────────────────────
+    let q1Sign = document.getElementById('q1-sign').value;
+    let q1Mag  = parseVal('q1-mag');
+
+    let qtSign = document.getElementById('qt-sign').value;
+    let qtMag  = parseVal('qt-mag');
+
+    let r    = parseVal('r-val');
+    let E    = parseVal('e-val');
+    let Edir = document.getElementById('e-dir').value;
+
+    let F    = parseVal('f-val');
+    let Fdir = document.getElementById('f-dir').value;
+
+    // Potential / PE inputs
+    let moveDir    = document.getElementById('move-dir').value;   // 'close-to-far', 'far-to-close', ''
+    let Vclose     = parseSignedVal('vclose-val');                 // signed V, null if blank
+    let absDeltaV  = parseVal('deltav-val');                       // magnitude V
+    let absDeltaPE = parseVal('deltape-val');                      // magnitude J
+    let workDir    = document.getElementById('work-dir').value;   // 'required', 'spontaneous', ''
+
+    // Count knowns (need at least 2 meaningful entries to proceed)
+    const numericKnowns = [q1Mag, qtMag, r, E, F,
+                           (Vclose !== null ? 1 : null),
+                           absDeltaV, absDeltaPE].filter(v => v !== null).length;
+    const qualKnowns = [q1Sign, qtSign, Edir, Fdir, moveDir, workDir].filter(v => v !== '').length;
+    if (numericKnowns + qualKnowns < 2) {
+        showError('Please enter at least 2 known values.');
+        return;
+    }
+
+    // Signed charge values (kept in sync inside loop)
+    let q1Signed = (q1Sign && q1Mag !== null) ? (q1Sign === '+' ? 1 : -1) * q1Mag : null;
+    let qtSigned = (qtSign && qtMag !== null) ? (qtSign === '+' ? 1 : -1) * qtMag : null;
+
+    // Derived potential quantities (computed inside loop)
+    let deltaV  = null;  // signed ΔV = V_final - V_initial  (V_far = 0)
+    let deltaPE = null;  // signed ΔPE = q_test × ΔV
+
+    // ── Iterative solve ───────────────────────────────────────────
+    for (let iter = 0; iter < 8; iter++) {
+
+        // Sync signed ↔ sign+magnitude
+        if (q1Sign && q1Mag !== null) q1Signed = (q1Sign === '+' ? 1 : -1) * q1Mag;
+        if (qtSign && qtMag !== null) qtSigned = (qtSign === '+' ? 1 : -1) * qtMag;
+
+        // ── Direction / sign propagation ──────────────────────────
+        // E direction ↔ sign of q1
+        if (!Edir && q1Sign) Edir = (q1Sign === '+') ? 'away' : 'toward';
+        if (!q1Sign && Edir) q1Sign = (Edir === 'away') ? '+' : '-';
+
+        // Force direction ↔ charge signs
+        if (!Fdir && q1Sign && qtSign)
+            Fdir = (q1Sign === qtSign) ? 'away' : 'toward';
+        if (Fdir && q1Sign && !qtSign)
+            qtSign = (Fdir === 'away') ? q1Sign : (q1Sign === '+' ? '-' : '+');
+        if (Fdir && !q1Sign && qtSign)
+            q1Sign = (Fdir === 'away') ? qtSign : (qtSign === '+' ? '-' : '+');
+
+        // ── E / F / r / q1 magnitude equations ───────────────────
+        // E = k|q1|/r²
+        if (E === null && q1Mag !== null && r !== null) E = k * q1Mag / (r * r);
+        if (r === null && q1Mag !== null && E !== null) r = Math.sqrt(k * q1Mag / E);
+        if (q1Mag === null && E !== null && r !== null) q1Mag = E * r * r / k;
+
+        // F = |q_test| · E
+        if (F === null && qtMag !== null && E !== null) F = qtMag * E;
+        if (E === null && qtMag !== null && F !== null) E = F / qtMag;
+        if (qtMag === null && E !== null && F !== null) qtMag = F / E;
+
+        // ── Electric potential at close location ──────────────────
+        // V_close = k·q1_signed / r   (signed — negative if q1 < 0)
+        if (Vclose === null && q1Signed !== null && r !== null)
+            Vclose = k * q1Signed / r;
+
+        // q1_signed from V_close and r
+        if (q1Signed === null && Vclose !== null && r !== null) {
+            q1Signed = Vclose * r / k;
+            q1Sign   = q1Signed >= 0 ? '+' : '-';
+            q1Mag    = Math.abs(q1Signed);
+        }
+
+        // r from V_close and q1_signed  (r = k·q1/V_close)
+        if (r === null && q1Signed !== null && Vclose !== null && Vclose !== 0) {
+            const rCalc = k * q1Signed / Vclose;
+            if (rCalc > 0) r = rCalc;
+        }
+
+        // |ΔV| = |V_close|  (since V_far = 0)
+        if (absDeltaV === null && Vclose !== null)
+            absDeltaV = Math.abs(Vclose);
+
+        // V_close sign from q1 sign when only |ΔV| is known
+        if (Vclose === null && absDeltaV !== null && q1Sign) {
+            Vclose = (q1Sign === '+') ? absDeltaV : -absDeltaV;
+        }
+
+        // ── Signed ΔV (depends on movement direction) ─────────────
+        // close→far:  ΔV = V_far  − V_close = 0 − V_close = −V_close
+        // far→close:  ΔV = V_close − V_far  = V_close − 0 =  V_close
+        if (deltaV === null && Vclose !== null && moveDir)
+            deltaV = (moveDir === 'close-to-far') ? -Vclose : Vclose;
+
+        // V_close from deltaV when movement direction is known
+        if (Vclose === null && deltaV !== null && moveDir)
+            Vclose = (moveDir === 'close-to-far') ? -deltaV : deltaV;
+
+        // ── ΔPE = q_test × ΔV ────────────────────────────────────
+        if (deltaPE === null && qtSigned !== null && deltaV !== null)
+            deltaPE = qtSigned * deltaV;
+
+        // Sign of ΔPE from work direction
+        if (deltaPE === null && absDeltaPE !== null && workDir)
+            deltaPE = (workDir === 'required') ? absDeltaPE : -absDeltaPE;
+
+        // |ΔPE| from deltaPE
+        if (absDeltaPE === null && deltaPE !== null)
+            absDeltaPE = Math.abs(deltaPE);
+
+        // Work direction from deltaPE sign
+        if (!workDir && deltaPE !== null)
+            workDir = (deltaPE >= 0) ? 'required' : 'spontaneous';
+
+        // q_test from ΔPE and ΔV
+        if (qtSigned === null && deltaPE !== null && deltaV !== null && Math.abs(deltaV) > 1e-40) {
+            qtSigned = deltaPE / deltaV;
+            qtSign   = qtSigned >= 0 ? '+' : '-';
+            qtMag    = Math.abs(qtSigned);
+        }
+
+        // qtMag from |ΔPE| and |ΔV|  (sign still unknown without more info)
+        if (qtMag === null && absDeltaPE !== null && absDeltaV !== null && absDeltaV > 0)
+            qtMag = absDeltaPE / absDeltaV;
+
+        // |ΔV| from |ΔPE| and qtMag
+        if (absDeltaV === null && absDeltaPE !== null && qtMag !== null && qtMag > 0)
+            absDeltaV = absDeltaPE / qtMag;
+
+        // ΔV from ΔPE and qtSigned
+        if (deltaV === null && deltaPE !== null && qtSigned !== null && qtSigned !== 0)
+            deltaV = deltaPE / qtSigned;
+
+        // Sync sign+magnitude after potential section may have set q1Signed / qtSigned
+        if (q1Signed !== null) {
+            if (!q1Sign) q1Sign = q1Signed >= 0 ? '+' : '-';
+            if (q1Mag === null) q1Mag = Math.abs(q1Signed);
+        }
+        if (qtSigned !== null) {
+            if (!qtSign) qtSign = qtSigned >= 0 ? '+' : '-';
+            if (qtMag === null) qtMag = Math.abs(qtSigned);
+        }
+    }
+
+    displayResults({ q1Sign, q1Mag, qtSign, qtMag, r, E, Edir, F, Fdir,
+                     moveDir, Vclose, absDeltaV, absDeltaPE, workDir });
+}
+
+function displayResults(v) {
+    const section = document.getElementById('results-section');
+    const content = document.getElementById('results-content');
+
+    function row(label, valueHTML, extra) {
+        const ext = extra
+            ? '<span class="result-direction">' + extra + '</span>'
+            : '<span></span>';
+        return '<div class="result-item">'
+            + '<span class="result-label">' + label + '</span>'
+            + '<span class="result-value">' + valueHTML + '</span>'
+            + ext + '</div>';
+    }
+
+    function groupLabel(text) {
+        return '<div class="results-group-label">' + text + '</div>';
+    }
+
+    function dash() {
+        return '<span class="unknown">not determined</span>';
+    }
+
+    function chargeHTML(sign, mag) {
+        if (mag === null) return dash();
+        const s = sign || '?';
+        return '<strong>' + s + '</strong> ' + formatSci(mag) + ' C';
+    }
+
+    const eDirText = v.Edir ? (v.Edir === 'away' ? 'away from particle 1' : 'toward particle 1') : null;
+    const fDirText = v.Fdir ? (v.Fdir === 'away' ? 'away from particle 1' : 'toward particle 1') : null;
+
+    let html = '';
+
+    // ── Charges ───────────────────────────────────────────────────
+    html += groupLabel('Charges');
+    html += row('Particle 1 charge (q₁):', chargeHTML(v.q1Sign, v.q1Mag), '');
+    html += row('Test particle charge (q<sub>test</sub>):', chargeHTML(v.qtSign, v.qtMag), '');
+
+    // ── Distance ──────────────────────────────────────────────────
+    html += groupLabel('Distance');
+    html += row('Distance to close location (r):',
+        v.r !== null ? formatSci(v.r) + ' m' : dash(), '');
+
+    // ── Electric Field & Force ────────────────────────────────────
+    html += groupLabel('Electric Field &amp; Force');
+    html += row('Electric field magnitude (E):',
+        v.E !== null ? formatSci(v.E) + ' N/C' : dash(), eDirText);
+    html += row('Electric force on test particle (F):',
+        v.F !== null ? formatSci(v.F) + ' N' : dash(), fDirText);
+
+    // ── Electric Potential & PE ───────────────────────────────────
+    html += groupLabel('Electric Potential &amp; Potential Energy');
+
+    // V_close (signed)
+    let vcloseHTML;
+    if (v.Vclose !== null) {
+        const sign = v.Vclose < 0 ? '&minus;' : '+';
+        vcloseHTML = sign + ' ' + formatSci(Math.abs(v.Vclose)) + ' V';
+    } else {
+        vcloseHTML = dash();
+    }
+    html += row('Electric potential at close location (V<sub>close</sub>):', vcloseHTML, '');
+
+    // V_far is always 0
+    html += row('Electric potential at far location (V<sub>far</sub>):',
+        '<span style="color:#7f8c8d">0 V &nbsp;(very far away)</span>', '');
+
+    html += row('Magnitude of potential difference |&Delta;V|:',
+        v.absDeltaV !== null ? formatSci(v.absDeltaV) + ' V' : dash(), '');
+
+    html += row('Magnitude of change in PE |&Delta;PE|:',
+        v.absDeltaPE !== null ? formatSci(v.absDeltaPE) + ' J' : dash(), '');
+
+    // Work required?
+    let workHTML;
+    if (v.workDir === 'required')
+        workHTML = '<span class="result-yes">Yes — work is required</span>';
+    else if (v.workDir === 'spontaneous')
+        workHTML = '<span class="result-no">No — particle moves on its own</span>';
+    else
+        workHTML = dash();
+
+    let moveLabelSuffix = '';
+    if (v.moveDir === 'close-to-far')   moveLabelSuffix = ' <span style="color:#95a5a6;font-size:13px;">(close → far)</span>';
+    if (v.moveDir === 'far-to-close')   moveLabelSuffix = ' <span style="color:#95a5a6;font-size:13px;">(far → close)</span>';
+    html += row('Work required to move test particle?' + moveLabelSuffix, workHTML, '');
+
+    content.innerHTML = html;
+    section.classList.add('show');
+}
+
+function clearAll() {
+    ['q1-sign','q1-mag','qt-sign','qt-mag','r-val',
+     'e-val','e-dir','f-val','f-dir',
+     'move-dir','vclose-val','deltav-val','deltape-val','work-dir'
+    ].forEach(id => {
+        const el = document.getElementById(id);
+        el.value = '';
+    });
+    document.getElementById('results-section').classList.remove('show');
+    clearError();
+}
+</script>
+</body>
+</html>

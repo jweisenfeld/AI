@@ -12,3 +12,4 @@
 2026-03-20T21:38:30.234199  FAIL  c:\Users\johnw\Documents\Emails\orion-planning-team\00103_20250430_074757.msg  —  cannot use a string pattern on a bytes-like object
 2026-03-22T21:33:26.505239  FAIL  C:\Users\johnw\Documents\orion-planning-team-onenote\~$etings.docx  —  Package not found at 'C:\Users\johnw\Documents\orion-planning-team-onenote\~$etings.docx'
 2026-03-22T22:06:27.454827  FAIL  C:\Users\johnw\Documents\orion-planning-team-onenote\~$ergency Procedures.docx  —  Package not found at 'C:\Users\johnw\Documents\orion-planning-team-onenote\~$ergency Procedures.docx'
+2026-03-23T22:24:52.985548  FAIL  c:\Users\johnw\Documents\Emails\orion-planning-team\00023_20251006_124730.msg  —  'charmap' codec can't decode byte 0x81 in position 38: character maps to <undefined>

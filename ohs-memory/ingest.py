@@ -371,6 +371,42 @@ def _extract_text_from_xlsx(path: Path) -> str:
     return "\n".join(parts)
 
 
+def _sanitize_email_body(text: str) -> str:
+    """Strip noise lines from extracted email body text before chunking.
+
+    Removes:
+    1. Lines containing SafeLinks URLs (safelinks.protection.outlook.com)
+    2. Lines with >30% URL-percent-encoded characters (%XX density)
+    3. Lines containing xsdata= or &reserved=0 (SharePoint tokens)
+    4. Lines that look like base64 (60+ chars, no spaces, base64 alphabet only)
+    5. Email signature blocks starting with '-- ' on its own line
+    """
+    # Strip standard email signature delimiter and everything after
+    m = re.search(r'^-- $', text, re.MULTILINE)
+    if m:
+        text = text[:m.start()].rstrip()
+
+    lines = text.splitlines()
+    clean = []
+    for line in lines:
+        # 1. SafeLinks URLs
+        if 'safelinks.protection.outlook.com' in line:
+            continue
+        # 3. SharePoint tokens
+        if 'xsdata=' in line or '&reserved=0' in line:
+            continue
+        # 2. High percent-encoding density
+        encoded_chars = len(re.findall(r'%[0-9A-Fa-f]{2}', line))
+        if len(line) > 20 and encoded_chars / max(len(line), 1) > 0.30:
+            continue
+        # 4. Base64-looking lines
+        stripped = line.strip()
+        if len(stripped) >= 60 and ' ' not in stripped and re.fullmatch(r'[A-Za-z0-9+/=]+', stripped):
+            continue
+        clean.append(line)
+    return '\n'.join(clean)
+
+
 def _extract_text_from_msg(path: Path) -> tuple[str, dict]:
     """
     Extract text and metadata from an Outlook .msg file.
@@ -424,7 +460,7 @@ def _extract_text_from_msg(path: Path) -> tuple[str, dict]:
         if to_field: parts.append(f"To: {to_field}")
         if sent_dt:  parts.append(f"Date: {sent_dt.strftime('%Y-%m-%d %H:%M')}")
         parts.append("")
-        parts.append(body.strip())
+        parts.append(_sanitize_email_body(body.strip()))
 
         # ── Inline attachment extraction ──────────────────────────────────────
         attachment_notes = []

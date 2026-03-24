@@ -61,7 +61,8 @@ create table if not exists chunks (
     content     text        not null,
     embedding   vector(1536),
     position    int         not null,
-    token_count int
+    token_count int,
+    fts         tsvector    generated always as (to_tsvector('english', content)) stored
 );
 
 comment on table  chunks              is 'Chunked + embedded text from every document. Two rows per logical chunk (small and large). This is what pgvector similarity search queries.';
@@ -102,6 +103,7 @@ create index if not exists chunks_embedding_hnsw
     with (m = 16, ef_construction = 64);
 
 create index if not exists chunks_document_id_idx on chunks    (document_id);
+create index if not exists chunks_fts_gin         on chunks using gin (fts);
 create index if not exists documents_hash_idx     on documents (source_hash);
 create index if not exists documents_type_idx     on documents (doc_type);
 create index if not exists documents_unit_idx     on documents (unit);
@@ -118,7 +120,8 @@ create or replace function search_ohs_memory(
     filter_year       text    default null,
     filter_doc_type   text    default null,
     filter_chunk_size text    default null,
-    min_similarity    float   default 0.40
+    min_similarity    float   default 0.30,
+    query_text        text    default null   -- when supplied, enables BM25 lane + RRF ranking
 )
 returns table (
     id                uuid,
@@ -136,20 +139,58 @@ returns table (
     notes             text
 )
 language sql stable as $$
+    with
+    -- ── Vector lane: cosine similarity ────────────────────────────────────────
+    vec as (
+        select
+            c.id                                                         as cid,
+            row_number() over (order by c.embedding <=> query_embedding) as rnk,
+            (1 - (c.embedding <=> query_embedding))::float               as sim
+        from chunks c
+        join documents d on d.id = c.document_id
+        where (filter_subject    is null or d.subject     ilike '%' || filter_subject    || '%')
+          and (filter_year       is null or d.school_year =            filter_year)
+          and (filter_doc_type   is null or d.doc_type    =            filter_doc_type)
+          and (filter_chunk_size is null or c.chunk_size  =            filter_chunk_size)
+          and (1 - (c.embedding <=> query_embedding)) >= min_similarity
+        order by c.embedding <=> query_embedding
+        limit match_count * 10
+    ),
+    -- ── BM25 lane: full-text keyword search (only when query_text supplied) ───
+    bm25 as (
+        select
+            c.id                                                                                           as cid,
+            row_number() over (order by ts_rank_cd(c.fts, websearch_to_tsquery('english', query_text)) desc) as rnk
+        from chunks c
+        join documents d on d.id = c.document_id
+        where query_text is not null
+          and c.fts @@ websearch_to_tsquery('english', query_text)
+          and (filter_subject    is null or d.subject     ilike '%' || filter_subject    || '%')
+          and (filter_year       is null or d.school_year =            filter_year)
+          and (filter_doc_type   is null or d.doc_type    =            filter_doc_type)
+          and (filter_chunk_size is null or c.chunk_size  =            filter_chunk_size)
+        order by ts_rank_cd(c.fts, websearch_to_tsquery('english', query_text)) desc
+        limit match_count * 10
+    ),
+    -- ── Reciprocal Rank Fusion (k=60 is standard; higher k = gentler blending) ─
+    fused as (
+        select
+            coalesce(v.cid, b.cid)                          as cid,
+            coalesce(1.0 / (60 + v.rnk), 0::float) +
+            coalesce(1.0 / (60 + b.rnk), 0::float)         as rrf_score,
+            coalesce(v.sim, 0::float)                       as similarity
+        from vec v
+        full outer join bm25 b on b.cid = v.cid
+    )
     select
         c.id, c.document_id, c.chunk_size, c.content,
-        1 - (c.embedding <=> query_embedding) as similarity,
+        f.similarity,
         d.original_filename, d.source_file,
         d.subject, d.school_year, d.teacher, d.doc_type, d.unit, d.notes
-    from chunks c
+    from fused f
+    join chunks c on c.id = f.cid
     join documents d on d.id = c.document_id
-    where
-        (filter_subject    is null or d.subject     ilike '%' || filter_subject    || '%')
-    and (filter_year       is null or d.school_year =            filter_year)
-    and (filter_doc_type   is null or d.doc_type    =            filter_doc_type)
-    and (filter_chunk_size is null or c.chunk_size  =            filter_chunk_size)
-    and (1 - (c.embedding <=> query_embedding))     >=           min_similarity
-    order by c.embedding <=> query_embedding
+    order by f.rrf_score desc
     limit match_count;
 $$;
 

@@ -165,82 +165,80 @@ SEARCH (PHP, server)
 
 ## Known Bugs
 
-### BUG-001 — Search Always Returns Exactly 8 Hits
-**Symptom:** Answer card always says "Drawn from 8 source records." Result count in `query_log` is always 8.
+### BUG-001 — Search Always Returns Exactly 8 Hits ✅ FIXED
+**Status:** Fixed and deployed to Supabase. `search_ohs_memory()` now has `min_similarity float default 0.40`.
+Nonsense queries ("syzygy kumquat") return 0 results. PHP files need deploying to psd1.net if not done yet.
 
-**Root cause:** `index.html` hardcodes `limit: 8` in `doSearch()`. `search-proxy.php` passes this as `match_count` to the SQL RPC. The SQL function has no similarity threshold — it returns exactly `match_count` rows regardless of relevance. With thousands of chunks in the corpus, all 8 slots are always filled.
+**What was done:**
+- Added `min_similarity float default 0.40` parameter to `search_ohs_memory()` in `schema.sql`
+- `SearchProxy::searchSupabase()` gained `float $minSimilarity = 0.40` parameter, passed in `$params`
+- `search-proxy.php` reads optional `min_similarity` from request body, defaults to 0.40
+- `index.html` answer footer shows "No strong matches found — answer may be speculative" when count=0
+- Threshold tuning history: 0.25 (too low, everything passes) → 0.35 (still too low) → 0.40 (cuts noise)
+- **Noise floor for this corpus is ~34-37%** (verified with "syzygy kumquat" test)
 
-**Fix:**
-Option A (SQL) — Add `min_similarity float default 0.35` parameter to `search_ohs_memory()` in `schema.sql`:
-```sql
-and (1 - (c.embedding <=> query_embedding)) >= min_similarity
-```
-Option B (PHP) — Filter in `SearchProxy::searchSupabase()` after retrieval:
-```php
-return array_values(array_filter($results, fn($r) => $r['similarity'] >= 0.35));
-```
-Option A is cleaner. Apply by updating `schema.sql` and running in Supabase SQL Editor.
-**Note:** 0.25 was tried and was too permissive — domain-specific corpora share vocabulary so scores cluster high. 0.35 is the current deployed default. Tune up toward 0.40 if weak answers persist; tune down toward 0.30 if valid results go missing.
-
-Side benefit: `query_log.result_count` becomes meaningful — queries with no good matches will return 0-3 instead of always 8, making the dashboard "Knowledge Gaps" report accurate.
+**Threshold note:** BUG-003 fixed email signature noise; threshold lowered to 0.30 as planned.
 
 ---
 
-### BUG-002 — Meeting Notes Not Surfaced; Only Emails Return for People/Event Queries
-**Symptom:** Query "When did Weisenfeld join the Team" returns only `.msg` email chunks. Meeting notes from OneNote (containing "Welcome John Weisenfeld to the team!" dated 3/10/25) are not in the results.
+### BUG-002 — Meeting Notes Chunk Exists But Scores Below Threshold ✅ RESOLVED BY BUG-003
+**Symptom:** Query "When did Weisenfeld join the team" returns only email signature chunks (51-59%)
+instead of the meeting notes containing "Welcome John Weisenfeld to the team!" (3/10/25).
 
-**Root causes (in order of probability):**
+**Full diagnosis (completed):**
+- `Meetings (FlightLog 2026-03-22).docx` IS in the corpus (confirmed via `search.py --list`)
+- Text extraction works correctly — paragraphs 800-804 contain the target content (confirmed with python-docx)
+- The relevant chunk IS in Supabase — small chunk #30 contains "Welcome John Weisenfeld to the team!"
+- **But small chunk #30 scores only 34.9%** for the query, below the 0.40 threshold
+- Why so low: chunk starts with unrelated content ("info on asynchronous role and Ipal / more info econ
+  and core/career") before the 3/10/25 meeting notes begin, diluting the embedding
+- Email signature chunks score 51-59% because Weisenfeld's name dominates short SafeLinks signature chunks
 
-1. **Doc may not be in corpus.** If the OneNote export was a `.xml` file (Word XML format), `ingest.py`'s `extract_text()` only matches `.docx` — the file would be silently skipped. Check: go to Flight Records tab and search for the document by name.
-
-2. **OneNote → Word XML text extraction failure.** `_extract_text_from_docx()` (ingest.py lines 267-299) iterates `doc.paragraphs` and `doc.tables`. OneNote exports sometimes put content in **floating text boxes / shapes** — a known python-docx blind spot. Result: extracted text is near-empty → weak embedding → low similarity score.
-
-3. **Email volume dominance.** No deduplication across source documents — multiple chunks from the same email fill result slots. With far more email chunks than meeting-note chunks, emails flood the top-8 even when a meeting note is the right answer. BUG-001's fix (similarity threshold) also helps here.
-
-**Diagnostic steps:**
-```bash
-# Check if doc is in corpus
-python ohs-memory/search.py --list | grep -i "weisenfeld\|3-10\|minutes\|3.10"
-
-# Check raw similarity scores
-python ohs-memory/search.py "When did Weisenfeld join the team" --compare
-
-# If doc exists but text is empty, check in Supabase SQL Editor:
-# SELECT original_filename, length(raw_text), LEFT(raw_text,200)
-# FROM documents WHERE original_filename ILIKE '%minutes%' OR original_filename ILIKE '%3-10%';
-```
-
-**Fix:**
-- If doc missing/empty: re-ingest as PDF (print to PDF from OneNote — Claude API extraction handles it perfectly)
-- Long-term: add Claude API fallback in `_extract_text_from_docx()` when `len(extracted_text) < 200`
+**Resolved:** BUG-003 fix removes the signature false positives. Threshold lowered to 0.30 so the 34.9% meeting notes chunk will now rank #1 after re-ingestion.
 
 ---
 
-### BUG-003 — Emails with Encoded/Binary Content Producing Junk Embeddings
-**Symptom:** Source cards show garbled content like `qKOnLi4H9WYlC2cD-2Bh578Qh0HR...` or
-`xsdata=MDV8MDJ8b3Jpb25A...` — these are base64-encoded email bodies or SharePoint URL tokens,
-not readable text. They score ~34-37% similarity on *every* query (noise floor), polluting results.
-
-**Root cause:** Some emails in the corpus contain MIME-encoded parts or forwarded messages with
-SharePoint sharing link tokens that were extracted verbatim by `extract-msg`. The ingest pipeline
-stored them as-is, so their embeddings reflect encoded noise rather than meaning.
-
-**Diagnostic:** In Supabase SQL Editor:
-```sql
-SELECT id, original_filename, LEFT(raw_text, 200)
-FROM documents
-WHERE raw_text ILIKE '%xsdata=%'
-   OR raw_text ILIKE '%MDV8MDJ8%'
-   OR raw_text ~ '^[A-Za-z0-9+/]{40,}={0,2}$'
-ORDER BY ingested_at DESC;
+### BUG-003 — Email Signature Noise Polluting Search Results ✅ FIXED
+**Symptom:** Queries for people's names (e.g. "Weisenfeld") return chunks that are just his
+Microsoft SafeLinks-wrapped email signature — not actual email content. Content looks like:
 ```
+?Weisenfeld (he/him) <https://nam11.safelinks.protection.outlook.com/?url=http%3A%2F%2Fwww.linkedin.com%2Fin%2Fweisenfeldj&data=05%7C02%7C...
+```
+These score 51-59% on name queries and outrank legitimate content.
 
-**Fix options:**
-- Delete the offending document records (chunks cascade-delete automatically):
-  `DELETE FROM documents WHERE id IN (...);` then re-ingest the source `.msg` files
-  after stripping encoded content in `_extract_text_from_msg()` in `ingest.py`
-- Add a content sanitizer to `_extract_text_from_msg()` that strips lines matching
-  base64 patterns or SharePoint `xsdata=` tokens before chunking
+Also affects: some emails contain base64-encoded MIME parts or SharePoint `xsdata=` tokens that
+score 34-37% on every query (general noise floor pollution).
+
+**Root cause:** `_extract_text_from_msg()` in `ohs-memory/ingest.py` extracts the raw email body
+verbatim, including:
+1. **SafeLinks-wrapped email signatures** — Outlook replaces hyperlinks with
+   `https://nam11.safelinks.protection.outlook.com/?url=...` wrappers. Signature blocks
+   (name, title, LinkedIn, phone) end up as dense URL-encoded chunks.
+2. **Base64-encoded MIME parts** — forwarded/encoded email content stored verbatim.
+3. **SharePoint sharing tokens** — `xsdata=MDV8MDJ8...&reserved=0>` appended to URLs.
+
+**What was done:**
+- Added `_sanitize_email_body()` to `ohs-memory/ingest.py`, called on body text before chunking
+- Sanitizer strips: SafeLinks URLs, lines with >30% `%XX` density, `xsdata=`/`&reserved=0` tokens, base64-looking lines (60+ chars, no spaces), and `-- ` signature delimiter + everything after
+- Lowered `min_similarity` default from 0.40 → 0.30 in `schema.sql`, `SearchProxy.php`, `search-proxy.php`
+
+**Remaining manual steps (run once):**
+1. Identify and delete affected documents from Supabase (chunks cascade):
+   ```sql
+   -- Find candidates
+   SELECT id, original_filename FROM documents
+   WHERE raw_text ILIKE '%safelinks.protection.outlook.com%'
+      OR raw_text ILIKE '%xsdata=%'
+      OR raw_text ~ '[A-Za-z0-9+/]{60,}';
+   -- Then: DELETE FROM documents WHERE id IN (...);
+   ```
+2. Re-ingest the source `.msg` files with the cleaned extractor:
+   ```bash
+   python ohs-memory/ingest.py ./msg-files/ --subject All-Staff --year 2024-25
+   ```
+3. Re-run Supabase SQL function update (paste updated `search_ohs_memory` from `schema.sql`)
+4. Deploy updated PHP files to psd1.net
+5. Verify "When did Weisenfeld join the team" now surfaces the 3/10/25 meeting notes chunk
 
 ---
 

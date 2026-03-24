@@ -49,7 +49,7 @@ $year           = trim($input['year']       ?? '') ?: null;
 $doc_type       = trim($input['doc_type']   ?? '') ?: null;
 $chunk_size     = trim($input['chunk_size'] ?? '') ?: null;
 $limit          = min((int)($input['limit'] ?? 8), 20);
-$min_similarity = isset($input['min_similarity']) ? (float)$input['min_similarity'] : 0.40;
+$min_similarity = isset($input['min_similarity']) ? (float)$input['min_similarity'] : 0.30;
 $synthesize     = !empty($input['synthesize']);
 
 if (empty($query)) {
@@ -68,11 +68,11 @@ try {
     // Search with automatic retry on timeout
     $warning = null;
     try {
-        $results = $proxy->searchSupabase($embedding, $subject, $year, $doc_type, $chunk_size, $limit, $min_similarity);
+        $results = $proxy->searchSupabase($embedding, $subject, $year, $doc_type, $chunk_size, $limit, $min_similarity, $query);
     } catch (SupabaseTimeoutException $e) {
         $retryLimit = 4;
         error_log("OHS search timeout (limit=$limit); retrying with limit=$retryLimit. " . $e->getMessage());
-        $results = $proxy->searchSupabase($embedding, $subject, $year, $doc_type, $chunk_size, $retryLimit, $min_similarity);
+        $results = $proxy->searchSupabase($embedding, $subject, $year, $doc_type, $chunk_size, $retryLimit, $min_similarity, $query);
         $warning = "Search took longer than expected — showing top $retryLimit results instead of $limit. "
                  . "Try a more specific query if you need more.";
     }

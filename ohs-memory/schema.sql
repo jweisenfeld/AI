@@ -118,7 +118,7 @@ create or replace function search_ohs_memory(
     filter_year       text    default null,
     filter_doc_type   text    default null,
     filter_chunk_size text    default null,
-    min_similarity    float   default 0.25
+    min_similarity    float   default 0.40
 )
 returns table (
     id                uuid,

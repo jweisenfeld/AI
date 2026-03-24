@@ -114,7 +114,7 @@ class SearchProxy
         ?string $docType,
         ?string $chunkSize,
         int     $limit,
-        float   $minSimilarity = 0.25
+        float   $minSimilarity = 0.40
     ): array {
         $params = [
             'query_embedding' => $embedding,

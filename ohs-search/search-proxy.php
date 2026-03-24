@@ -49,7 +49,7 @@ $year           = trim($input['year']       ?? '') ?: null;
 $doc_type       = trim($input['doc_type']   ?? '') ?: null;
 $chunk_size     = trim($input['chunk_size'] ?? '') ?: null;
 $limit          = min((int)($input['limit'] ?? 8), 20);
-$min_similarity = isset($input['min_similarity']) ? (float)$input['min_similarity'] : 0.25;
+$min_similarity = isset($input['min_similarity']) ? (float)$input['min_similarity'] : 0.40;
 $synthesize     = !empty($input['synthesize']);
 
 if (empty($query)) {

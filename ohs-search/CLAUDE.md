@@ -171,15 +171,16 @@ SEARCH (PHP, server)
 **Root cause:** `index.html` hardcodes `limit: 8` in `doSearch()`. `search-proxy.php` passes this as `match_count` to the SQL RPC. The SQL function has no similarity threshold — it returns exactly `match_count` rows regardless of relevance. With thousands of chunks in the corpus, all 8 slots are always filled.
 
 **Fix:**
-Option A (SQL) — Add `min_similarity float default 0.25` parameter to `search_ohs_memory()` in `schema.sql`:
+Option A (SQL) — Add `min_similarity float default 0.35` parameter to `search_ohs_memory()` in `schema.sql`:
 ```sql
 and (1 - (c.embedding <=> query_embedding)) >= min_similarity
 ```
 Option B (PHP) — Filter in `SearchProxy::searchSupabase()` after retrieval:
 ```php
-return array_values(array_filter($results, fn($r) => $r['similarity'] >= 0.25));
+return array_values(array_filter($results, fn($r) => $r['similarity'] >= 0.35));
 ```
 Option A is cleaner. Apply by updating `schema.sql` and running in Supabase SQL Editor.
+**Note:** 0.25 was tried and was too permissive — domain-specific corpora share vocabulary so scores cluster high. 0.35 is the current deployed default. Tune up toward 0.40 if weak answers persist; tune down toward 0.30 if valid results go missing.
 
 Side benefit: `query_log.result_count` becomes meaningful — queries with no good matches will return 0-3 instead of always 8, making the dashboard "Knowledge Gaps" report accurate.
 
@@ -212,6 +213,34 @@ python ohs-memory/search.py "When did Weisenfeld join the team" --compare
 **Fix:**
 - If doc missing/empty: re-ingest as PDF (print to PDF from OneNote — Claude API extraction handles it perfectly)
 - Long-term: add Claude API fallback in `_extract_text_from_docx()` when `len(extracted_text) < 200`
+
+---
+
+### BUG-003 — Emails with Encoded/Binary Content Producing Junk Embeddings
+**Symptom:** Source cards show garbled content like `qKOnLi4H9WYlC2cD-2Bh578Qh0HR...` or
+`xsdata=MDV8MDJ8b3Jpb25A...` — these are base64-encoded email bodies or SharePoint URL tokens,
+not readable text. They score ~34-37% similarity on *every* query (noise floor), polluting results.
+
+**Root cause:** Some emails in the corpus contain MIME-encoded parts or forwarded messages with
+SharePoint sharing link tokens that were extracted verbatim by `extract-msg`. The ingest pipeline
+stored them as-is, so their embeddings reflect encoded noise rather than meaning.
+
+**Diagnostic:** In Supabase SQL Editor:
+```sql
+SELECT id, original_filename, LEFT(raw_text, 200)
+FROM documents
+WHERE raw_text ILIKE '%xsdata=%'
+   OR raw_text ILIKE '%MDV8MDJ8%'
+   OR raw_text ~ '^[A-Za-z0-9+/]{40,}={0,2}$'
+ORDER BY ingested_at DESC;
+```
+
+**Fix options:**
+- Delete the offending document records (chunks cascade-delete automatically):
+  `DELETE FROM documents WHERE id IN (...);` then re-ingest the source `.msg` files
+  after stripping encoded content in `_extract_text_from_msg()` in `ingest.py`
+- Add a content sanitizer to `_extract_text_from_msg()` that strips lines matching
+  base64 patterns or SharePoint `xsdata=` tokens before chunking
 
 ---
 

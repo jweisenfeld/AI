@@ -322,6 +322,34 @@
                 <option value="spontaneous">no work required (moves on its own)</option>
             </select>
         </div>
+
+        <hr class="divider">
+        <p style="font-size:12px;font-weight:bold;color:#7f8c8d;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px 0;">Kinetic Energy &amp; Energy Conservation</p>
+        <p style="font-size:12px;color:#95a5a6;font-style:italic;margin:-4px 0 9px 0;">Enter 0 for speed if particle is released from rest or just barely escapes. |ΔKE| = |ΔPE| is applied automatically.</p>
+
+        <div class="input-row">
+            <span class="input-label wide">Mass of moving particle (m):</span>
+            <input type="text" id="mass-val" placeholder="e.g. 5.92e-25">
+            <span class="unit-label">kg</span>
+        </div>
+
+        <div class="input-row">
+            <span class="input-label wide">Initial speed (v<sub>i</sub>):</span>
+            <input type="text" id="vi-val" placeholder="e.g. 2050  (0 = from rest)">
+            <span class="unit-label">m/s</span>
+        </div>
+
+        <div class="input-row">
+            <span class="input-label wide">Final speed (v<sub>f</sub>):</span>
+            <input type="text" id="vf-val" placeholder="e.g. 13200  (0 = just escapes)">
+            <span class="unit-label">m/s</span>
+        </div>
+
+        <div class="input-row">
+            <span class="input-label wide">Magnitude of change in KE |ΔKE|:</span>
+            <input type="text" id="dke-val" placeholder="e.g. 1.94e-18">
+            <span class="unit-label">J</span>
+        </div>
     </div>
 
     <div class="button-container">
@@ -352,6 +380,14 @@ function parseSignedVal(id) {
     if (!s) return null;
     const n = parseFloat(s);
     return isNaN(n) ? null : n;
+}
+
+// Accepts 0 as valid (for speeds: "released from rest" = 0, "just barely escapes" = 0)
+function parseNonNeg(id) {
+    const s = document.getElementById(id).value.trim();
+    if (!s) return null;
+    const n = parseFloat(s);
+    return (isNaN(n) || n < 0) ? null : n;
 }
 
 function sel(id) { return document.getElementById(id).value; }
@@ -400,12 +436,22 @@ function calculate() {
     let absDeltaPE = parseVal('deltape-val');
     let workDir    = sel('work-dir');   // 'required','spontaneous',''
 
+    // ── Kinetic energy inputs ─────────────────────────────────────────
+    let mass    = parseVal('mass-val');
+    let vi      = parseNonNeg('vi-val');   // can be 0 (released from rest)
+    let vf      = parseNonNeg('vf-val');   // can be 0 (just barely escapes)
+    let absDelKE = parseVal('dke-val');
+    // Derived KE values (updated inside loop)
+    let KEi = null, KEf = null;
+
     // Count knowns
     const allNums = [q1Mag, qtMag, r, E, F,
         (Vclose !== null ? 1 : null),
         (VA_p !== null ? 1 : null),
         (VB_p !== null ? 1 : null),
-        d_p, absDeltaV, absDeltaPE].filter(v => v !== null).length;
+        d_p, absDeltaV, absDeltaPE, mass,
+        (vi !== null ? 1 : null), (vf !== null ? 1 : null), absDelKE
+    ].filter(v => v !== null).length;
     const allQual = [q1Sign, qtSign, Edir, Fdir, moveDir, workDir,
         plateEdir, plateFdir].filter(v => v !== '').length;
     if (allNums + allQual < 2) {
@@ -592,13 +638,50 @@ function calculate() {
             if (!qtSign) qtSign = qtSigned >= 0 ? '+' : '-';
             if (qtMag == null) qtMag = Math.abs(qtSigned);
         }
+
+        // ── KINETIC ENERGY & ENERGY CONSERVATION ─────────────────────
+        // KE = ½mv²  (vi/vf can be 0; KEi/KEf of 0 is valid)
+        if (KEi == null && mass != null && vi !== null) KEi = 0.5 * mass * vi * vi;
+        if (KEf == null && mass != null && vf !== null) KEf = 0.5 * mass * vf * vf;
+
+        // |ΔKE| = |KEf - KEi|
+        if (absDelKE == null && KEi !== null && KEf !== null) absDelKE = Math.abs(KEf - KEi);
+
+        // Energy conservation: |ΔKE| = |ΔPE|
+        if (absDelKE == null && absDeltaPE != null) absDelKE = absDeltaPE;
+        if (absDeltaPE == null && absDelKE != null) absDeltaPE = absDelKE;
+
+        // workDir from speed boundary conditions
+        // vi = 0 → particle starts at rest → must gain KE → PE decreases → spontaneous
+        // vf = 0 → particle just barely escapes / stops → KE decreased → PE increased → required
+        if (!workDir && vi === 0) workDir = 'spontaneous';
+        if (!workDir && vf === 0) workDir = 'required';
+
+        // KEf from KEi + |ΔKE| (sign from workDir)
+        if (KEf == null && KEi !== null && absDelKE != null && workDir) {
+            KEf = (workDir === 'spontaneous') ? KEi + absDelKE : Math.max(0, KEi - absDelKE);
+        }
+        // KEi from KEf + |ΔKE|
+        if (KEi == null && KEf !== null && absDelKE != null && workDir) {
+            KEi = (workDir === 'required') ? KEf + absDelKE : Math.max(0, KEf - absDelKE);
+        }
+
+        // Speeds from KE and mass
+        if (vf === null && KEf !== null && mass != null && mass > 0) vf = Math.sqrt(2 * KEf / mass);
+        if (vi === null && KEi !== null && mass != null && mass > 0) vi = Math.sqrt(2 * KEi / mass);
+
+        // mass from KE and speed
+        if (mass == null && KEi !== null && vi != null && vi > 0) mass = 2 * KEi / (vi * vi);
+        if (mass == null && KEf !== null && vf != null && vf > 0) mass = 2 * KEf / (vf * vf);
+
     } // end iteration loop
 
     displayResults({ q1Sign, q1Mag, qtSign, qtMag,
                      r, E, Edir, F, Fdir,
                      moveDir, Vclose,
                      VA_p, VB_p, d_p, plateEdir, plateFdir,
-                     absDeltaV, absDeltaPE, workDir });
+                     absDeltaV, absDeltaPE, workDir,
+                     mass, vi, vf, KEi, KEf, absDelKE });
 }
 
 function displayResults(v) {
@@ -686,7 +769,28 @@ function displayResults(v) {
     else
         workHTML = dash();
 
-    html += row('Work required to move test particle?' + moveSuffix, workHTML, '');
+    html += row('Work required / PE increases?' + moveSuffix, workHTML, '');
+
+    // ── Kinetic Energy results ────────────────────────────────────────
+    const hasKE = (v.mass != null || v.vi !== null || v.vf !== null || v.KEi !== null || v.KEf !== null || v.absDelKE != null);
+    if (hasKE) {
+        html += grp('Kinetic Energy &amp; Energy Conservation');
+        html += row('Mass (m):', v.mass != null ? formatSci(v.mass) + ' kg' : dash(), '');
+
+        // Helper: format a speed (0 is valid)
+        const fmtSpd = s => (s === null) ? dash()
+                          : (s === 0)    ? '0 m/s'
+                          :               formatSci(s) + ' m/s';
+        const fmtKE  = e => (e === null) ? dash()
+                          : (e === 0)    ? '0 J'
+                          :               formatSci(e) + ' J';
+
+        html += row('Initial speed (v<sub>i</sub>):', fmtSpd(v.vi), '');
+        html += row('Final speed (v<sub>f</sub>):', fmtSpd(v.vf), '');
+        html += row('Initial kinetic energy (KE<sub>i</sub>):', fmtKE(v.KEi), '');
+        html += row('Final kinetic energy (KE<sub>f</sub>):', fmtKE(v.KEf), '');
+        html += row('|Change in kinetic energy| |&Delta;KE|:', v.absDelKE != null ? formatSci(v.absDelKE) + ' J' : dash(), '');
+    }
 
     content.innerHTML = html;
     section.classList.add('show');
@@ -696,7 +800,8 @@ function clearAll() {
     ['q1-sign','q1-mag','qt-sign','qt-mag',
      'r-val','e-val','e-dir','f-val','f-dir','move-dir','vclose-val',
      'va-plate','vb-plate','d-plate','plate-e-dir','plate-f-dir',
-     'deltav-val','deltape-val','work-dir'
+     'deltav-val','deltape-val','work-dir',
+     'mass-val','vi-val','vf-val','dke-val'
     ].forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('results-section').classList.remove('show');
     clearError();

@@ -509,9 +509,11 @@ function calculate() {
             plateEdir = (signDV < 0) ? 'a-to-b' : 'b-to-a';
         }
 
-        // Plate F direction from plateEdir + qtSign
+        // Plate direction triangle: any two of {plateEdir, plateFdir, qtSign} → third
         if (!plateFdir && plateEdir && qtSign)
             plateFdir = (qtSign === '+') ? plateEdir : (plateEdir === 'a-to-b' ? 'b-to-a' : 'a-to-b');
+        if (!plateEdir && plateFdir && qtSign)                                          // ← was missing
+            plateEdir = (qtSign === '+') ? plateFdir : (plateFdir === 'a-to-b' ? 'b-to-a' : 'a-to-b');
         if (!qtSign && plateFdir && plateEdir)
             qtSign = (plateFdir === plateEdir) ? '+' : '-';
 
@@ -566,6 +568,15 @@ function calculate() {
         if (deltaV_pl != null) {
             if (VA_p != null && VB_p == null) VB_p = VA_p + deltaV_pl;
             if (VB_p != null && VA_p == null) VA_p = VB_p - deltaV_pl;
+        }
+
+        // Recover a plate voltage from deltaPE + qtSigned when deltaV_pl not yet known
+        // ΔPE = q_test × (VB − VA)  →  VA = VB − ΔPE/q_test  (or VB = VA + ΔPE/q_test)
+        if (deltaPE != null && qtSigned != null && Math.abs(qtSigned) > 1e-40) {
+            if (VA_p == null && VB_p != null)
+                VA_p = VB_p - deltaPE / qtSigned;
+            if (VB_p == null && VA_p != null)
+                VB_p = VA_p + deltaPE / qtSigned;
         }
 
         // — point charge: use moveDir

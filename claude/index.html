@@ -907,6 +907,7 @@
                 <label for="student-id">Logged in as:</label>
                 <input type="text" id="student-id" readonly style="background:#fff8e1; cursor:default;">
                 <span class="student-hint" id="student-name-display"></span>
+                <button onclick="clearSession()" style="margin-left:auto; padding:4px 12px; font-size:0.8rem; background:#b45309; color:white; border:none; border-radius:6px; cursor:pointer;">Sign Out</button>
             </div>
 
             <!-- Feature Info Banner -->
@@ -1039,8 +1040,25 @@
         let showSystemPrompt = false;
 
         // ── Login state ──────────────────────────────────────────────────────────
-        let STUDENT_ID   = null;
-        let STUDENT_NAME = null;
+        let STUDENT_ID    = null;
+        let STUDENT_NAME  = null;
+        let SESSION_TOKEN = null;
+
+        function applySession(id, name, token) {
+            STUDENT_ID    = id;
+            STUDENT_NAME  = name;
+            SESSION_TOKEN = token;
+            document.getElementById('login-modal').style.display = 'none';
+            document.getElementById('student-id').value = id;
+            document.getElementById('student-name-display').textContent = name;
+            document.getElementById('student-id-bar').style.display = 'flex';
+        }
+
+        function clearSession() {
+            STUDENT_ID = STUDENT_NAME = SESSION_TOKEN = null;
+            localStorage.removeItem('claude_session');
+            document.getElementById('login-modal').style.display = 'flex';
+        }
 
         async function handleLogin() {
             const id  = document.getElementById('login-uid').value.trim();
@@ -1062,13 +1080,10 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    STUDENT_ID   = id;
-                    STUDENT_NAME = data.student_name;
-                    document.getElementById('login-modal').style.display = 'none';
-                    // Show logged-in identity in the student bar
-                    document.getElementById('student-id').value = id;
-                    document.getElementById('student-name-display').textContent = data.student_name;
-                    document.getElementById('student-id-bar').style.display = 'flex';
+                    localStorage.setItem('claude_session', JSON.stringify({
+                        student_id: id, student_name: data.student_name, token: data.token
+                    }));
+                    applySession(id, data.student_name, data.token);
                 } else {
                     err.textContent = 'Invalid credentials. Please try again.';
                 }
@@ -1079,6 +1094,24 @@
                 btn.textContent = 'Sign In';
             }
         }
+
+        // Restore session from localStorage on page load (validates against server)
+        (async function restoreSession() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('claude_session') || 'null');
+                if (!saved || !saved.token) return;
+                const res = await fetch('api-proxy.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'validate_session', student_id: saved.student_id, session_token: saved.token })
+                });
+                if (res.ok) {
+                    applySession(saved.student_id, saved.student_name, saved.token);
+                } else {
+                    localStorage.removeItem('claude_session'); // password changed or expired
+                }
+            } catch (e) { /* network error — login modal stays up */ }
+        })();
 
         // Enter key on login fields
         ['login-uid', 'login-pwd'].forEach(id =>
@@ -1304,7 +1337,8 @@
                     max_tokens: 4096,
                     messages: messages,
                     temperature: temperature,
-                    student_id: studentId
+                    student_id: studentId,
+                    session_token: SESSION_TOKEN
                 };
 
                 if (systemPrompt) {
@@ -1330,8 +1364,10 @@
                         showTip('conv-limit', 'You\'ve reached the conversation limit. Click <strong>Clear Chat</strong> to start fresh.');
                     } else if (data.error.type === 'rate_limit_error') {
                         showTip('rate-limit', 'You\'ve sent too many messages. Take a short break and try again soon.');
+                    } else if (data.error.type === 'auth_error') {
+                        clearSession();
                     }
-                    const knownTypes = ['input_too_large', 'conversation_too_long', 'rate_limit_error'];
+                    const knownTypes = ['input_too_large', 'conversation_too_long', 'rate_limit_error', 'auth_error'];
                     throw Object.assign(new Error(data.error.message || JSON.stringify(data.error)), { known: knownTypes.includes(data.error.type) });
                 }
 

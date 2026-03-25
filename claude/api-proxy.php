@@ -51,6 +51,9 @@ if (!is_readable($secretsFile)) {
 $secrets = require $secretsFile;
 $ANTHROPIC_API_KEY = $secrets['ANTHROPIC_API_KEY'] ?? null;
 
+// Sessions directory (outside public_html, not web-accessible)
+$sessionsDir = $accountRoot . '/.claude_sessions';
+
 if (!$ANTHROPIC_API_KEY) {
     http_response_code(500);
     error_log("ANTHROPIC_API_KEY missing in secrets file: $secretsFile");
@@ -91,10 +94,38 @@ if (isset($requestData['action']) && $requestData['action'] === 'verify_login') 
     }
     fclose($handle);
     if ($found) {
-        echo json_encode(['success' => true, 'student_name' => $studentName]);
+        // Create a server-side session token
+        $token        = bin2hex(random_bytes(32));
+        $passwordHash = hash('sha256', trim($requestData['password'] ?? ''));
+        if (!is_dir($sessionsDir)) {
+            @mkdir($sessionsDir, 0700, true);
+        }
+        $sessionFile = $sessionsDir . '/' . $token . '.json';
+        file_put_contents($sessionFile, json_encode([
+            'student_id'    => trim($requestData['student_id']),
+            'password_hash' => $passwordHash,
+            'created_at'    => time(),
+            'last_used'     => time(),
+        ]), LOCK_EX);
+        echo json_encode(['success' => true, 'student_name' => $studentName, 'token' => $token]);
     } else {
         http_response_code(401);
         echo json_encode(['error' => 'Invalid credentials.']);
+    }
+    exit;
+}
+
+// ============================================
+// VALIDATE SESSION ROUTE
+// ============================================
+if (isset($requestData['action']) && $requestData['action'] === 'validate_session') {
+    $sid   = trim($requestData['student_id'] ?? '');
+    $token = $requestData['session_token'] ?? '';
+    if (validateSession($sessionsDir, $token, $sid, $studentFile)) {
+        echo json_encode(['success' => true]);
+    } else {
+        http_response_code(401);
+        echo json_encode(['error' => 'Session invalid or expired.']);
     }
     exit;
 }
@@ -116,6 +147,17 @@ if (!is_array($requestData['messages']) || empty($requestData['messages'])) {
 $studentId = isset($requestData['student_id']) && is_string($requestData['student_id'])
     ? substr(trim($requestData['student_id']), 0, 50)
     : 'unknown';
+
+// ============================================
+// SESSION VALIDATION (every chat request)
+// ============================================
+$sessionToken = isset($requestData['session_token']) && is_string($requestData['session_token'])
+    ? $requestData['session_token'] : '';
+if (!validateSession($sessionsDir, $sessionToken, $studentId, $studentFile)) {
+    http_response_code(401);
+    echo json_encode(['error' => ['type' => 'auth_error', 'message' => 'Session expired or invalid. Please sign in again.']]);
+    exit;
+}
 
 // ============================================
 // RATE LIMITING (per-student, file-based)
@@ -424,6 +466,58 @@ echo $response;
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
+
+/**
+ * Validate a session token against the stored session and current roster.
+ * Returns true only if the token is valid, not expired, and the student's
+ * password has not changed since the session was created.
+ */
+function validateSession(string $sessionsDir, string $token, string $studentId, string $studentFile): bool
+{
+    // Token must be exactly 64 lowercase hex chars (32 random bytes)
+    if (!preg_match('/^[a-f0-9]{64}$/', $token)) return false;
+    if ($studentId === '') return false;
+
+    $sessionFile = $sessionsDir . '/' . $token . '.json';
+    if (!is_readable($sessionFile)) return false;
+
+    $sessionData = json_decode(file_get_contents($sessionFile), true);
+    if (!is_array($sessionData)) return false;
+
+    // Student ID must match what was recorded at login
+    if (($sessionData['student_id'] ?? '') !== $studentId) return false;
+
+    // Sessions expire after 8 hours (one school day)
+    if ((time() - ($sessionData['created_at'] ?? 0)) > 28800) {
+        @unlink($sessionFile);
+        return false;
+    }
+
+    // Re-check the student's current password against what was hashed at login.
+    // If the teacher changed the password, the hashes won't match and the
+    // session is immediately invalidated — even if the tab is still open.
+    if (!is_readable($studentFile)) return false;
+    $handle = fopen($studentFile, 'r');
+    fgetcsv($handle); // skip header row
+    $currentHash = null;
+    while (($row = fgetcsv($handle, 1000, ',')) !== false) {
+        if (isset($row[2]) && trim($row[2]) === $studentId) {
+            $currentHash = hash('sha256', trim($row[6] ?? ''));
+            break;
+        }
+    }
+    fclose($handle);
+
+    if ($currentHash === null || $currentHash !== ($sessionData['password_hash'] ?? '')) {
+        @unlink($sessionFile); // Wipe the now-invalid session
+        return false;
+    }
+
+    // Bump last_used so we can track idle sessions later if needed
+    $sessionData['last_used'] = time();
+    file_put_contents($sessionFile, json_encode($sessionData), LOCK_EX);
+    return true;
+}
 
 /**
  * Load model configuration from JSON file.

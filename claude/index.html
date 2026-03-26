@@ -840,7 +840,7 @@
     <div id="login-modal" class="login-overlay">
         <div class="login-card">
             <h2>Claude AI Chat</h2>
-            <input type="text" id="login-uid" class="login-input" placeholder="Student ID" autocomplete="username" spellcheck="false">
+            <input type="text" id="login-uid" class="login-input" placeholder="Student ID Number" autocomplete="username" spellcheck="false">
             <input type="password" id="login-pwd" class="login-input" placeholder="Password" autocomplete="current-password">
             <button class="btn" style="width:100%; padding:12px;" id="login-btn" onclick="handleLogin()">Sign In</button>
             <p class="login-error" id="login-error"></p>
@@ -1066,7 +1066,7 @@
             const err = document.getElementById('login-error');
             const btn = document.getElementById('login-btn');
 
-            if (!id || !pw) { err.textContent = 'Please enter your Student ID and password.'; return; }
+            if (!id || !pw) { err.textContent = 'Please enter your Student ID Number and Password.'; return; }
 
             btn.disabled = true;
             btn.textContent = 'Signing in…';

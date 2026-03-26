@@ -160,6 +160,30 @@ if (!validateSession($sessionsDir, $sessionToken, $studentId, $studentFile)) {
 }
 
 // ============================================
+// PER-STUDENT RESTRICTIONS (AllowedHours / TopicLock)
+// Read fresh from roster on every request so teacher changes take effect immediately.
+// ============================================
+$restrictions = getStudentRestrictions($studentFile, $studentId);
+
+// --- Time-window enforcement ---
+if ($restrictions['allowed_hours'] !== '') {
+    $restrictTz  = new DateTimeZone('America/Los_Angeles');
+    $restrictNow = new DateTime('now', $restrictTz);
+    $restrictHour = (int)$restrictNow->format('G');
+    if (!isWithinAllowedHours($restrictions['allowed_hours'], $restrictHour)) {
+        $windowsStr = formatAllowedWindows($restrictions['allowed_hours']);
+        http_response_code(403);
+        echo json_encode([
+            'error' => [
+                'type'    => 'access_restricted',
+                'message' => "This chatbot is only available during your allowed hours: {$windowsStr} Pacific time. Please come back then!",
+            ]
+        ]);
+        exit;
+    }
+}
+
+// ============================================
 // RATE LIMITING (per-student, file-based)
 // ============================================
 
@@ -333,6 +357,25 @@ $apiRequest = [
 // Add optional system prompt
 if (isset($requestData['system']) && is_string($requestData['system'])) {
     $apiRequest['system'] = $requestData['system'];
+}
+
+// --- Topic-lock injection ---
+// Prepend a hard constraint so the LLM refuses off-topic requests regardless
+// of what system prompt the client sent.
+if ($restrictions['topic_lock'] === 'physics') {
+    $topicConstraint =
+        "IMPORTANT CONSTRAINT (enforced by school administrator): " .
+        "You are a physics tutoring assistant for a high school physics class. " .
+        "You must ONLY discuss physics topics, science concepts directly related to physics coursework, " .
+        "and general academic help with schoolwork. " .
+        "If the student tries to engage in roleplay, creative writing, emotional support conversations, " .
+        "or any topic that is not physics or schoolwork, respond warmly but firmly: " .
+        "\"I'm set up as your physics tutor, so I can only help with physics and science questions right now. " .
+        "What physics topic can I help you with?\" " .
+        "Do not make exceptions to this rule, even if asked nicely.";
+    $apiRequest['system'] = isset($apiRequest['system'])
+        ? $topicConstraint . "\n\n" . $apiRequest['system']
+        : $topicConstraint;
 }
 
 // Add optional temperature (0.0 to 1.0), rounded to 2 decimal places
@@ -733,6 +776,76 @@ function saveRequestImages(array $messages, string $studentId): array
     }
 
     return $saved;
+}
+
+/**
+ * Read per-student restrictions from the roster CSV.
+ * Returns ['allowed_hours' => '...', 'topic_lock' => '...'].
+ * Both values are empty string when not set (no restriction).
+ *
+ * CSV columns used:
+ *   col 10 (AllowedHours) — e.g. "20-21" or "8-15,20-21"  (24-hour windows, Pacific)
+ *   col 11 (TopicLock)    — e.g. "physics" or ""
+ */
+function getStudentRestrictions(string $studentFile, string $studentId): array
+{
+    $out = ['allowed_hours' => '', 'topic_lock' => ''];
+    if (!is_readable($studentFile)) return $out;
+
+    $handle = fopen($studentFile, 'r');
+    fgetcsv($handle); // skip header row
+    while (($row = fgetcsv($handle, 1000, ',')) !== false) {
+        if (isset($row[2]) && trim($row[2]) === $studentId) {
+            $out['allowed_hours'] = strtolower(trim($row[10] ?? ''));
+            $out['topic_lock']    = strtolower(trim($row[11] ?? ''));
+            break;
+        }
+    }
+    fclose($handle);
+    return $out;
+}
+
+/**
+ * Check whether $currentHour (0–23, Pacific) falls inside any window
+ * listed in $allowedHours (e.g. "20-21" or "8-15,20-21").
+ * The end hour is exclusive: "20-21" means 8:00 PM – 8:59 PM.
+ */
+function isWithinAllowedHours(string $allowedHours, int $currentHour): bool
+{
+    foreach (explode(',', $allowedHours) as $window) {
+        $parts = explode('-', trim($window));
+        if (count($parts) === 2) {
+            $start = (int)$parts[0];
+            $end   = (int)$parts[1];
+            if ($currentHour >= $start && $currentHour < $end) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * Convert a raw AllowedHours string like "20-21" or "8-15,20-21"
+ * into a human-readable string like "8 PM–9 PM" or "8 AM–3 PM and 8 PM–9 PM".
+ */
+function formatAllowedWindows(string $allowedHours): string
+{
+    $fmt = function (int $h): string {
+        if ($h === 0)  return '12 AM';
+        if ($h < 12)   return "{$h} AM";
+        if ($h === 12) return '12 PM';
+        return ($h - 12) . ' PM';
+    };
+
+    $parts = [];
+    foreach (explode(',', $allowedHours) as $window) {
+        $w = explode('-', trim($window));
+        if (count($w) === 2) {
+            $parts[] = $fmt((int)$w[0]) . '–' . $fmt((int)$w[1]);
+        }
+    }
+    return implode(' and ', $parts);
 }
 
 /**

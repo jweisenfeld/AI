@@ -40,6 +40,7 @@ $accountRoot  = dirname($_SERVER['DOCUMENT_ROOT']);   // e.g. /home2/fikrttmy
 $secretsDir   = $accountRoot . '/.secrets';
 $secretsFile  = $secretsDir . '/claudekey.php';
 $studentFile  = $secretsDir . '/student_roster.csv';
+$smtpFile     = $secretsDir . '/smtp_credentials.php';  // shared with wheel3/coach6
 
 if (!is_readable($secretsFile)) {
     http_response_code(500);
@@ -160,27 +161,25 @@ if (!validateSession($sessionsDir, $sessionToken, $studentId, $studentFile)) {
 }
 
 // ============================================
-// PER-STUDENT RESTRICTIONS (AllowedHours / TopicLock)
+// PER-STUDENT RESTRICTIONS (FreeHours / TopicLock)
 // Read fresh from roster on every request so teacher changes take effect immediately.
+//
+// Behavior:
+//   No columns set          → any topic, any time (default)
+//   TopicLock only          → topic restricted 24/7
+//   FreeHours + TopicLock   → topic restricted all day EXCEPT inside the free window
+//   FreeHours only          → no-op (nothing to lift)
 // ============================================
 $restrictions = getStudentRestrictions($studentFile, $studentId);
 
-// --- Time-window enforcement ---
-if ($restrictions['allowed_hours'] !== '') {
-    $restrictTz  = new DateTimeZone('America/Los_Angeles');
-    $restrictNow = new DateTime('now', $restrictTz);
-    $restrictHour = (int)$restrictNow->format('G');
-    if (!isWithinAllowedHours($restrictions['allowed_hours'], $restrictHour)) {
-        $windowsStr = formatAllowedWindows($restrictions['allowed_hours']);
-        http_response_code(403);
-        echo json_encode([
-            'error' => [
-                'type'    => 'access_restricted',
-                'message' => "This chatbot is only available during your allowed hours: {$windowsStr} Pacific time. Please come back then!",
-            ]
-        ]);
-        exit;
-    }
+// Determine whether we are currently inside a free-topic window.
+// When true, the TopicLock (if any) is lifted for this request.
+$inFreeHours = false;
+if ($restrictions['free_hours'] !== '') {
+    $restrictTz   = new DateTimeZone('America/Los_Angeles');
+    $restrictNow  = new DateTime('now', $restrictTz);
+    $restrictMins = (int)$restrictNow->format('G') * 60 + (int)$restrictNow->format('i');
+    $inFreeHours  = isWithinAllowedHours($restrictions['free_hours'], $restrictMins);
 }
 
 // ============================================
@@ -360,9 +359,8 @@ if (isset($requestData['system']) && is_string($requestData['system'])) {
 }
 
 // --- Topic-lock injection ---
-// Prepend a hard constraint so the LLM refuses off-topic requests regardless
-// of what system prompt the client sent.
-if ($restrictions['topic_lock'] === 'physics') {
+// Applied 24/7 UNLESS the student is currently inside their free-topic window.
+if ($restrictions['topic_lock'] === 'physics' && !$inFreeHours) {
     $topicConstraint =
         "IMPORTANT CONSTRAINT (enforced by school administrator): " .
         "You are a physics tutoring assistant for a high school physics class. " .
@@ -491,6 +489,39 @@ if (is_array($responseData) && isset($responseData['content'])) {
     }
 }
 writeStudentLog($studentId, $lastUserText, $responseText, $logEntry);
+
+// ============================================
+// SAFETY ALERT EMAIL
+// ============================================
+// Scan student message + AI reply for safety concerns and jailbreak attempts.
+// Fires an email (same SMTP as wheel3) when anything concerning is detected.
+$concerns = detectConcerns($lastUserText, $responseText);
+if ($concerns['triggered'] && is_readable($smtpFile)) {
+    require_once $smtpFile;
+    // smtp_credentials.php defines: $SMTP_HOST, $SMTP_PORT, $SMTP_USER, $SMTP_PASS,
+    //                                $SMTP_FROM, $SMTP_FROM_NAME, and constant ALERT_TO
+    $alertSubject = (in_array('TEST', $concerns['categories']) ? '🧪' : '🚨')
+        . ' Claude Chatbot Alert — ' . implode(', ', $concerns['categories'])
+        . ' — ' . ($restrictions['student_name'] ?: $studentId);
+    $alertBody = buildClaudeAlertEmail(
+        $studentId, $restrictions['student_name'],
+        $requestData['messages'], $responseText,
+        $concerns
+    );
+    $alertSent = sendClaudeSmtpEmail(
+        $SMTP_HOST, $SMTP_PORT, $SMTP_USER, $SMTP_PASS,
+        $SMTP_FROM, $SMTP_FROM_NAME,
+        ALERT_TO, $alertSubject, $alertBody
+    );
+    file_put_contents($logFile, json_encode([
+        'timestamp'    => date('Y-m-d H:i:s'),
+        'event'        => $alertSent ? 'ALERT_SENT' : 'ALERT_FAILED',
+        'student_id'   => $studentId,
+        'student_name' => $restrictions['student_name'],
+        'categories'   => $concerns['categories'],
+        'matched'      => $concerns['matched'],
+    ]) . "\n", FILE_APPEND | LOCK_EX);
+}
 
 // If model was downgraded, inject a note into the response
 if (isset($modelDowngraded) && $modelDowngraded && is_array($responseData)) {
@@ -780,24 +811,29 @@ function saveRequestImages(array $messages, string $studentId): array
 
 /**
  * Read per-student restrictions from the roster CSV.
- * Returns ['allowed_hours' => '...', 'topic_lock' => '...'].
- * Both values are empty string when not set (no restriction).
+ * Returns ['free_hours' => '...', 'topic_lock' => '...', 'student_name' => '...'].
+ * free_hours and topic_lock are empty string when not set (no restriction).
  *
  * CSV columns used:
- *   col 10 (AllowedHours) — e.g. "20-21" or "8-15,20-21"  (24-hour windows, Pacific)
- *   col 11 (TopicLock)    — e.g. "physics" or ""
+ *   col  9 (Full_Name)  — student display name (used in alert emails)
+ *   col 10 (FreeHours)  — e.g. "20-21" or "8-15,20-21"  (24-hour windows, Pacific)
+ *                         Window(s) when TopicLock is lifted (free-range allowed).
+ *                         Quote the value in the CSV when using multiple windows.
+ *   col 11 (TopicLock)  — e.g. "physics" or ""
+ *                         Topic restriction enforced 24/7 except during FreeHours.
  */
 function getStudentRestrictions(string $studentFile, string $studentId): array
 {
-    $out = ['allowed_hours' => '', 'topic_lock' => ''];
+    $out = ['free_hours' => '', 'topic_lock' => '', 'student_name' => ''];
     if (!is_readable($studentFile)) return $out;
 
     $handle = fopen($studentFile, 'r');
     fgetcsv($handle); // skip header row
     while (($row = fgetcsv($handle, 1000, ',')) !== false) {
         if (isset($row[2]) && trim($row[2]) === $studentId) {
-            $out['allowed_hours'] = strtolower(trim($row[10] ?? ''));
-            $out['topic_lock']    = strtolower(trim($row[11] ?? ''));
+            $out['student_name'] = trim($row[9] ?? '');
+            $out['free_hours']   = strtolower(trim($row[10] ?? ''));
+            $out['topic_lock']   = strtolower(trim($row[11] ?? ''));
             break;
         }
     }
@@ -806,18 +842,39 @@ function getStudentRestrictions(string $studentFile, string $studentId): array
 }
 
 /**
- * Check whether $currentHour (0–23, Pacific) falls inside any window
- * listed in $allowedHours (e.g. "20-21" or "8-15,20-21").
- * The end hour is exclusive: "20-21" means 8:00 PM – 8:59 PM.
+ * Parse a time string into minutes since midnight.
+ * Accepts "HH" (whole hour) or "HH:MM" (hour and minute), both 24-hour.
+ * Examples: "20" → 1200, "22:30" → 1350, "8:05" → 485
  */
-function isWithinAllowedHours(string $allowedHours, int $currentHour): bool
+function parseTimeMins(string $t): int
+{
+    $t = trim($t);
+    if (strpos($t, ':') !== false) {
+        [$h, $m] = explode(':', $t, 2);
+        return (int)$h * 60 + (int)$m;
+    }
+    return (int)$t * 60;
+}
+
+/**
+ * Check whether $currentMins (minutes since midnight, Pacific) falls inside
+ * any window listed in $allowedHours.
+ *
+ * Format: "HH-HH" or "HH:MM-HH:MM", comma-separated for multiple windows.
+ * The end time is exclusive: "20-21" = 8:00 PM up to (not including) 9:00 PM.
+ * Examples:
+ *   "20-21"          → 8:00 PM – 8:59 PM
+ *   "22:30-22:45"    → 10:30 PM – 10:44 PM
+ *   "8-15,20-21"     → 8:00 AM – 2:59 PM  OR  8:00 PM – 8:59 PM
+ */
+function isWithinAllowedHours(string $allowedHours, int $currentMins): bool
 {
     foreach (explode(',', $allowedHours) as $window) {
-        $parts = explode('-', trim($window));
+        $parts = explode('-', trim($window), 2);
         if (count($parts) === 2) {
-            $start = (int)$parts[0];
-            $end   = (int)$parts[1];
-            if ($currentHour >= $start && $currentHour < $end) {
+            $start = parseTimeMins($parts[0]);
+            $end   = parseTimeMins($parts[1]);
+            if ($currentMins >= $start && $currentMins < $end) {
                 return true;
             }
         }
@@ -826,23 +883,29 @@ function isWithinAllowedHours(string $allowedHours, int $currentHour): bool
 }
 
 /**
- * Convert a raw AllowedHours string like "20-21" or "8-15,20-21"
- * into a human-readable string like "8 PM–9 PM" or "8 AM–3 PM and 8 PM–9 PM".
+ * Convert a raw AllowedHours string into a human-readable string.
+ * Examples:
+ *   "20-21"       → "8 PM–9 PM"
+ *   "22:30-22:45" → "10:30 PM–10:45 PM"
+ *   "8-15,20-21"  → "8 AM–3 PM and 8 PM–9 PM"
  */
 function formatAllowedWindows(string $allowedHours): string
 {
-    $fmt = function (int $h): string {
-        if ($h === 0)  return '12 AM';
-        if ($h < 12)   return "{$h} AM";
-        if ($h === 12) return '12 PM';
-        return ($h - 12) . ' PM';
+    $fmtMins = function (int $mins): string {
+        $h      = intdiv($mins, 60);
+        $m      = $mins % 60;
+        $period = $h < 12 ? 'AM' : 'PM';
+        $h12    = $h % 12 ?: 12;
+        return $m > 0
+            ? sprintf('%d:%02d %s', $h12, $m, $period)
+            : "{$h12} {$period}";
     };
 
     $parts = [];
     foreach (explode(',', $allowedHours) as $window) {
-        $w = explode('-', trim($window));
+        $w = explode('-', trim($window), 2);
         if (count($w) === 2) {
-            $parts[] = $fmt((int)$w[0]) . '–' . $fmt((int)$w[1]);
+            $parts[] = $fmtMins(parseTimeMins($w[0])) . '–' . $fmtMins(parseTimeMins($w[1]));
         }
     }
     return implode(' and ', $parts);
@@ -880,6 +943,219 @@ function writeStudentLog(string $studentId, string $userText, string $responseTe
     $entry .= str_repeat('-', 60) . "\n\n";
 
     file_put_contents($logFile, $entry, FILE_APPEND | LOCK_EX);
+}
+
+/**
+ * Scan student message and AI response for safety concerns.
+ * Ported from wheel3/api-proxy.php.
+ * Returns ['triggered' => bool, 'categories' => [], 'matched' => []]
+ */
+function detectConcerns(string $studentText, string $aiText): array
+{
+    $categories = [];
+    $matched    = [];
+
+    // SAFETY — self-harm or harm to others
+    $safetyPatterns = [
+        '/\b(hurt|harm|kill|cut)\s+(my)?self\b/i'                                      => 'self-harm',
+        '/\bsuicid(e|al)\b/i'                                                           => 'suicide',
+        '/\bwant\s+to\s+die\b/i'                                                        => 'want-to-die',
+        '/\bend\s+my\s+life\b/i'                                                        => 'end-life',
+        '/\bno\s+reason\s+to\s+live\b/i'                                               => 'no-reason-to-live',
+        "/\bdon'?t\s+want\s+to\s+(live|be\s+alive|exist)\b/i"                          => 'dont-want-to-live',
+        '/\b(kill|shoot|stab|murder)\s+(him|her|them|someone|everyone|people|my)\b/i'  => 'harm-to-others',
+    ];
+    foreach ($safetyPatterns as $pattern => $label) {
+        if (preg_match($pattern, $studentText, $m)) {
+            $categories[] = 'SAFETY';
+            $matched[]    = $label . ': "' . mb_substr(trim($m[0]), 0, 60) . '"';
+        }
+    }
+
+    // GUARDRAIL — jailbreak / prompt injection attempts
+    $guardrailPatterns = [
+        '/\bignore\s+(your\s+)?(instructions|rules|training|system\s*prompt|guidelines|constraints)\b/i' => 'ignore-instructions',
+        '/\bpretend\s+you\s*(\'re|are)\b/i'                                              => 'pretend-you-are',
+        '/\byou\s+are\s+now\b/i'                                                         => 'you-are-now',
+        '/\bjailbreak\b/i'                                                               => 'jailbreak',
+        '/\bforget\s+(your\s+)?(instructions?|training|rules|system)\b/i'               => 'forget-instructions',
+        '/\bdisregard\s+(your\s+)?(instructions?|rules|training)\b/i'                   => 'disregard-instructions',
+        '/\bact\s+as\s+if\s+you\s+(have\s+no|don\'?t\s+have)\b/i'                      => 'act-as-if',
+        '/\bdo\s+anything\s+now\b/i'                                                    => 'DAN',
+        '/\byour\s+new\s+(instructions?|persona|role|rules)\s+(are|is)\b/i'             => 'new-instructions',
+        '/\bno\s+longer\s+an?\s*(AI|assistant|bot|chatbot)\b/i'                         => 'no-longer-AI',
+    ];
+    foreach ($guardrailPatterns as $pattern => $label) {
+        if (preg_match($pattern, $studentText, $m)) {
+            $categories[] = 'GUARDRAIL';
+            $matched[]    = $label . ': "' . mb_substr(trim($m[0]), 0, 60) . '"';
+        }
+    }
+
+    // TEST — secret word triggers a test alert (type "syzygy" to verify email works)
+    if (preg_match('/\bsyzygy\b/i', $studentText)) {
+        $categories[] = 'TEST';
+        $matched[]    = 'test-trigger: "syzygy"';
+    }
+
+    // AI_FLAGGED — Claude itself flagged a crisis in its reply
+    $aiAlertPatterns = [
+        '/\btrusted\s+adult\b/i'                => 'AI-referred-to-trusted-adult',
+        '/\bschool\s+counselor\b/i'             => 'AI-referred-to-counselor',
+        '/\bcrisis\s+(line|center|hotline)\b/i' => 'AI-mentioned-crisis-line',
+        '/\b988\b/'                             => 'AI-mentioned-988-hotline',
+        '/\bemergency\s+services?\b/i'          => 'AI-mentioned-emergency-services',
+    ];
+    foreach ($aiAlertPatterns as $pattern => $label) {
+        if (preg_match($pattern, $aiText, $m)) {
+            $categories[] = 'AI_FLAGGED';
+            $matched[]    = $label . ': "' . mb_substr(trim($m[0]), 0, 60) . '"';
+        }
+    }
+
+    $categories = array_unique($categories);
+    return [
+        'triggered'  => !empty($categories),
+        'categories' => array_values($categories),
+        'matched'    => $matched,
+    ];
+}
+
+/**
+ * Build the HTML alert email body for the Claude chatbot.
+ * Adapted from wheel3/api-proxy.php (removed bilingual $lang param).
+ */
+function buildClaudeAlertEmail(
+    string $studentId, string $studentName,
+    array $messages, string $aiReply, array $concerns
+): string {
+    $ts          = date('Y-m-d H:i:s T');
+    $safeId      = htmlspecialchars($studentId);
+    $safeName    = htmlspecialchars($studentName ?: '(unknown)');
+    $safeAiReply = nl2br(htmlspecialchars($aiReply));
+    $catList     = implode(', ', array_map('htmlspecialchars', $concerns['categories']));
+    $matchList   = implode('<br>', array_map('htmlspecialchars', $concerns['matched']));
+
+    $transcript = '';
+    foreach ($messages as $msg) {
+        $role    = strtoupper($msg['role'] ?? 'USER');
+        $content = is_string($msg['content']) ? $msg['content'] : '';
+        $bg      = ($role === 'USER') ? '#f0f4ff' : '#f0fff4';
+        $transcript .= "<div style='background:{$bg};border-radius:6px;padding:10px 14px;margin-bottom:8px;'>"
+                     . "<strong style='font-size:11px;text-transform:uppercase;color:#666;'>{$role}</strong><br>"
+                     . "<span style='white-space:pre-wrap;font-size:14px;'>" . htmlspecialchars($content) . "</span></div>";
+    }
+    $transcript .= "<div style='background:#f0fff4;border-radius:6px;padding:10px 14px;margin-bottom:8px;border-left:3px solid #22c55e;'>"
+                 . "<strong style='font-size:11px;text-transform:uppercase;color:#666;'>CLAUDE (latest reply)</strong><br>"
+                 . "<span style='white-space:pre-wrap;font-size:14px;'>{$safeAiReply}</span></div>";
+
+    return <<<HTML
+<html><body style="font-family:sans-serif;max-width:700px;margin:0 auto;padding:20px;color:#1e293b;">
+<div style="background:#fef2f2;border:2px solid #ef4444;border-radius:12px;padding:20px 24px;margin-bottom:24px;">
+    <h2 style="margin:0 0 8px;color:#b91c1c;font-size:20px;">🚨 Claude Chatbot Safety Alert</h2>
+    <p style="margin:0;color:#7f1d1d;font-size:14px;">{$ts}</p>
+</div>
+<table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+    <tr><td style="padding:6px 12px;background:#f8fafc;font-weight:bold;width:140px;">Student</td>
+        <td style="padding:6px 12px;">{$safeName} &nbsp;<span style="color:#64748b;font-size:13px;">({$safeId})</span></td></tr>
+    <tr><td style="padding:6px 12px;background:#f8fafc;font-weight:bold;">Alert type(s)</td>
+        <td style="padding:6px 12px;color:#b91c1c;font-weight:bold;">{$catList}</td></tr>
+    <tr><td style="padding:6px 12px;background:#f8fafc;font-weight:bold;vertical-align:top;">Triggered by</td>
+        <td style="padding:6px 12px;font-size:13px;color:#475569;">{$matchList}</td></tr>
+</table>
+<h3 style="font-size:15px;margin-bottom:10px;color:#334155;">Full Conversation</h3>
+{$transcript}
+<hr style="margin:24px 0;border:none;border-top:1px solid #e2e8f0;">
+<p style="font-size:12px;color:#94a3b8;">
+    Generated automatically by the Claude chatbot at psd1.net/claude.<br>
+    Full log: <code>claude/student_logs/{$safeId}.txt</code>
+</p>
+</body></html>
+HTML;
+}
+
+/**
+ * Send an email via SMTP using raw PHP sockets (no PHPMailer dependency).
+ * Adapted from wheel3/api-proxy.php — supports STARTTLS (port 587) and SSL (port 465).
+ */
+function sendClaudeSmtpEmail(
+    string $host, int $port,
+    string $user, string $pass,
+    string $from, string $fromName,
+    string $to, string $subject, string $htmlBody
+): bool {
+    $logFile = __DIR__ . '/claude_usage.log';
+    try {
+        $socket = ($port === 465)
+            ? stream_socket_client("ssl://{$host}:{$port}", $errno, $errstr, 30)
+            : stream_socket_client("tcp://{$host}:{$port}", $errno, $errstr, 30);
+        if (!$socket) {
+            file_put_contents($logFile,
+                date('Y-m-d H:i:s') . " | SMTP_CONNECT_FAIL | {$errno} {$errstr}\n", FILE_APPEND);
+            return false;
+        }
+        stream_set_timeout($socket, 30);
+        $read  = fn() => fgets($socket, 512);
+        $write = fn(string $cmd) => fwrite($socket, $cmd . "\r\n");
+
+        $read();
+        $write("EHLO {$host}");
+        while (($line = $read()) && substr($line, 3, 1) === '-');
+
+        if ($port === 587) {
+            $write('STARTTLS'); $read();
+            stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
+            $write("EHLO {$host}");
+            while (($line = $read()) && substr($line, 3, 1) === '-');
+        }
+
+        $write('AUTH LOGIN');   $read();
+        $write(base64_encode($user)); $read();
+        $write(base64_encode($pass));
+        $authResp = $read();
+        if (strpos($authResp, '235') === false) {
+            file_put_contents($logFile,
+                date('Y-m-d H:i:s') . " | SMTP_AUTH_FAIL | " . trim($authResp) . "\n", FILE_APPEND);
+            fclose($socket);
+            return false;
+        }
+
+        $write("MAIL FROM:<{$from}>"); $read();
+        $write("RCPT TO:<{$to}>");     $read();
+        $write('DATA');                $read();
+
+        $boundary    = bin2hex(random_bytes(8));
+        $encodedFrom = '=?UTF-8?B?' . base64_encode($fromName) . '?=';
+        $plainText   = strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $htmlBody));
+        $message     = "From: {$encodedFrom} <{$from}>\r\n"
+                     . "To: {$to}\r\n"
+                     . "Subject: {$subject}\r\n"
+                     . "MIME-Version: 1.0\r\n"
+                     . "Content-Type: multipart/alternative; boundary=\"{$boundary}\"\r\n"
+                     . "Date: " . date('r') . "\r\n\r\n"
+                     . "--{$boundary}\r\n"
+                     . "Content-Type: text/plain; charset=UTF-8\r\n\r\n"
+                     . $plainText . "\r\n"
+                     . "--{$boundary}\r\n"
+                     . "Content-Type: text/html; charset=UTF-8\r\n\r\n"
+                     . $htmlBody . "\r\n"
+                     . "--{$boundary}--\r\n";
+
+        $write($message . '.');
+        $dataResp = $read();
+        fclose($socket);
+
+        $success = strpos($dataResp, '250') !== false;
+        file_put_contents($logFile,
+            date('Y-m-d H:i:s') . " | SMTP | to:{$to} | " . ($success ? 'OK' : 'FAIL:' . trim($dataResp)) . "\n",
+            FILE_APPEND);
+        return $success;
+
+    } catch (\Throwable $e) {
+        file_put_contents($logFile,
+            date('Y-m-d H:i:s') . " | SMTP_EXCEPTION | " . $e->getMessage() . "\n", FILE_APPEND);
+        return false;
+    }
 }
 
 // (No closing PHP tag is recommended)

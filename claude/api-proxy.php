@@ -297,12 +297,22 @@ if ($messageCount > $MAX_MESSAGES) {
 // ============================================
 // INPUT SIZE CAP (prevents copy-paste exploit)
 // ============================================
-// Estimate input size from the raw JSON body. A single physics screenshot
-// with a question is typically under 10K tokens. 30K is very generous.
+// Estimate input size from the raw JSON body. Skip the check when images
+// are present — base64 images are inherently large and Anthropic enforces
+// their own limits server-side. Flagging image requests as "too large" just
+// confuses students who are doing exactly the right thing.
 $inputBytes = strlen($input);
-$MAX_INPUT_BYTES = 200000;  // ~30K tokens worth of JSON (generous for images)
+$MAX_INPUT_BYTES = 200000;  // ~30K tokens worth of JSON (text only)
 
-if ($inputBytes > $MAX_INPUT_BYTES) {
+$requestHasImages = false;
+foreach ($requestData['messages'] as $msg) {
+    if (!is_array($msg['content'] ?? null)) continue;
+    foreach ($msg['content'] as $block) {
+        if (($block['type'] ?? '') === 'image') { $requestHasImages = true; break 2; }
+    }
+}
+
+if (!$requestHasImages && $inputBytes > $MAX_INPUT_BYTES) {
     http_response_code(400);
     echo json_encode([
         'error' => [
@@ -360,17 +370,41 @@ if (isset($requestData['system']) && is_string($requestData['system'])) {
 
 // --- Topic-lock injection ---
 // Applied 24/7 UNLESS the student is currently inside their free-topic window.
-if ($restrictions['topic_lock'] === 'physics' && !$inFreeHours) {
-    $topicConstraint =
-        "IMPORTANT CONSTRAINT (enforced by school administrator): " .
-        "You are a physics tutoring assistant for a high school physics class. " .
-        "You must ONLY discuss physics topics, science concepts directly related to physics coursework, " .
-        "and general academic help with schoolwork. " .
-        "If the student tries to engage in roleplay, creative writing, emotional support conversations, " .
-        "or any topic that is not physics or schoolwork, respond warmly but firmly: " .
-        "\"I'm set up as your physics tutor, so I can only help with physics and science questions right now. " .
-        "What physics topic can I help you with?\" " .
-        "Do not make exceptions to this rule, even if asked nicely.";
+//
+// TopicLock format:
+//   "subject"        e.g. "physics", "economics"   → answer mode  (direct, helpful)
+//   "subject-tutor"  e.g. "physics-tutor"           → Socratic mode (guide, don't give away)
+//
+// Any subject word works — the constraint is built dynamically.
+if ($restrictions['topic_lock'] !== '' && !$inFreeHours) {
+    $rawLock     = $restrictions['topic_lock'];
+    $isTutor     = (substr($rawLock, -6) === '-tutor');
+    $subject     = $isTutor ? substr($rawLock, 0, -6) : $rawLock;
+    $subjectName = ucfirst($subject);   // e.g. "Physics", "Economics"
+
+    if ($isTutor) {
+        $topicConstraint =
+            "IMPORTANT CONSTRAINT (enforced by school administrator): " .
+            "You are a Socratic {$subjectName} tutor for a high school class. " .
+            "Your job is to GUIDE students to discover answers themselves — never give the answer directly. " .
+            "Instead, ask focused questions, surface the key concept, and let the student do the reasoning. " .
+            "Confirm when they get it right, then ask what comes next. " .
+            "Only discuss {$subjectName} topics and related schoolwork. " .
+            "If the student tries to engage in roleplay, creative writing, emotional support, " .
+            "or any topic unrelated to {$subjectName}, redirect them warmly: " .
+            "\"I'm here as your {$subjectName} tutor — what {$subjectName} question can we work through together?\" " .
+            "Do not make exceptions to this rule, even if asked nicely.";
+    } else {
+        $topicConstraint =
+            "IMPORTANT CONSTRAINT (enforced by school administrator): " .
+            "You are a {$subjectName} assistant for a high school class. " .
+            "You must ONLY discuss {$subjectName} topics and related schoolwork. " .
+            "If the student tries to engage in roleplay, creative writing, emotional support conversations, " .
+            "or any topic that is not {$subjectName} or schoolwork, respond warmly but firmly: " .
+            "\"I'm set up as your {$subjectName} assistant, so I can only help with {$subjectName} questions right now. " .
+            "What {$subjectName} topic can I help you with?\" " .
+            "Do not make exceptions to this rule, even if asked nicely.";
+    }
     $apiRequest['system'] = isset($apiRequest['system'])
         ? $topicConstraint . "\n\n" . $apiRequest['system']
         : $topicConstraint;
@@ -511,7 +545,7 @@ if ($concerns['triggered'] && is_readable($smtpFile)) {
     $alertSent = sendClaudeSmtpEmail(
         $SMTP_HOST, $SMTP_PORT, $SMTP_USER, $SMTP_PASS,
         $SMTP_FROM, $SMTP_FROM_NAME,
-        ALERT_TO, $alertSubject, $alertBody
+        ALERT_TO, $restrictions['alert_email'], $alertSubject, $alertBody
     );
     file_put_contents($logFile, json_encode([
         'timestamp'    => date('Y-m-d H:i:s'),
@@ -816,15 +850,19 @@ function saveRequestImages(array $messages, string $studentId): array
  *
  * CSV columns used:
  *   col  9 (Full_Name)  — student display name (used in alert emails)
- *   col 10 (FreeHours)  — e.g. "20-21" or "8-15,20-21"  (24-hour windows, Pacific)
- *                         Window(s) when TopicLock is lifted (free-range allowed).
- *                         Quote the value in the CSV when using multiple windows.
- *   col 11 (TopicLock)  — e.g. "physics" or ""
- *                         Topic restriction enforced 24/7 except during FreeHours.
+ *   col 10 (FreeHours)   — e.g. "20-21" or "8-15,20-21"  (24-hour windows, Pacific)
+ *                          Window(s) when TopicLock is lifted (free-range allowed).
+ *                          Quote the value in the CSV when using multiple windows.
+ *   col 11 (TopicLock)   — e.g. "physics", "physics-tutor", "economics-tutor", or ""
+ *                          Topic restriction enforced 24/7 except during FreeHours.
+ *                          Append "-tutor" for Socratic mode instead of answer mode.
+ *   col 12 (AlertEmail)  — extra CC address(es) for safety alert emails, comma-separated.
+ *                          Leave blank to send alerts to ALERT_TO only.
+ *                          Example: "parent@example.com" or "parent@x.com,counselor@y.com"
  */
 function getStudentRestrictions(string $studentFile, string $studentId): array
 {
-    $out = ['free_hours' => '', 'topic_lock' => '', 'student_name' => ''];
+    $out = ['free_hours' => '', 'topic_lock' => '', 'student_name' => '', 'alert_email' => ''];
     if (!is_readable($studentFile)) return $out;
 
     $handle = fopen($studentFile, 'r');
@@ -834,6 +872,7 @@ function getStudentRestrictions(string $studentFile, string $studentId): array
             $out['student_name'] = trim($row[9] ?? '');
             $out['free_hours']   = strtolower(trim($row[10] ?? ''));
             $out['topic_lock']   = strtolower(trim($row[11] ?? ''));
+            $out['alert_email']  = trim($row[12] ?? '');
             break;
         }
     }
@@ -1082,7 +1121,8 @@ function sendClaudeSmtpEmail(
     string $host, int $port,
     string $user, string $pass,
     string $from, string $fromName,
-    string $to, string $subject, string $htmlBody
+    string $to, string $cc,        // extra CC recipients (comma-separated, or empty)
+    string $subject, string $htmlBody
 ): bool {
     $logFile = __DIR__ . '/claude_usage.log';
     try {
@@ -1122,6 +1162,11 @@ function sendClaudeSmtpEmail(
 
         $write("MAIL FROM:<{$from}>"); $read();
         $write("RCPT TO:<{$to}>");     $read();
+        // CC: send RCPT TO for each extra address (comma-separated)
+        $ccAddresses = array_filter(array_map('trim', explode(',', $cc)));
+        foreach ($ccAddresses as $ccAddr) {
+            $write("RCPT TO:<{$ccAddr}>"); $read();
+        }
         $write('DATA');                $read();
 
         $boundary    = bin2hex(random_bytes(8));
@@ -1129,6 +1174,7 @@ function sendClaudeSmtpEmail(
         $plainText   = strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $htmlBody));
         $message     = "From: {$encodedFrom} <{$from}>\r\n"
                      . "To: {$to}\r\n"
+                     . (!empty($ccAddresses) ? "Cc: " . implode(', ', $ccAddresses) . "\r\n" : '')
                      . "Subject: {$subject}\r\n"
                      . "MIME-Version: 1.0\r\n"
                      . "Content-Type: multipart/alternative; boundary=\"{$boundary}\"\r\n"

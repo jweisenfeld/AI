@@ -552,6 +552,12 @@ if (function_exists('fastcgi_finish_request')) {
 // ============================================
 // SAFETY ALERT EMAIL  (runs after response is sent)
 // ============================================
+// Give this section its own time budget and keep running even if the browser
+// has already closed the connection.  Without these, mod_php can hit
+// max_execution_time during the SMTP socket call and silently die.
+ignore_user_abort(true);
+set_time_limit(30);
+
 // Scan student message + AI reply for safety concerns and jailbreak attempts.
 // Fires an email (same SMTP as wheel3) when anything concerning is detected.
 $concerns = detectConcerns($lastUserText, $responseText);

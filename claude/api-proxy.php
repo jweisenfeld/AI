@@ -561,7 +561,12 @@ set_time_limit(30);
 
 // Scan student message + AI reply for safety concerns and jailbreak attempts.
 // Fires an email (same SMTP as wheel3) when anything concerning is detected.
-$concerns = detectConcerns($lastUserText, $responseText);
+// Also scan the client-supplied system prompt — students can abuse it
+// to inject personas (e.g. white supremacist, sexual content) even if
+// their actual message looks innocent.
+$clientSystem = isset($requestData['system']) && is_string($requestData['system'])
+    ? $requestData['system'] : '';
+$concerns = detectConcerns($lastUserText, $responseText, $clientSystem);
 // Diagnostic: always log concern detection result so missing emails can be traced.
 if ($concerns['triggered']) {
     file_put_contents($logFile, json_encode([
@@ -585,7 +590,7 @@ if ($concerns['triggered'] && is_readable($smtpFile)) {
         $alertBody = buildClaudeAlertEmail(
             $studentId, $restrictions['student_name'],
             $requestData['messages'], $responseText,
-            $concerns
+            $concerns, $clientSystem
         );
         $alertSent = sendClaudeSmtpEmail(
             $SMTP_HOST, (int)$SMTP_PORT, $SMTP_USER, $SMTP_PASS,
@@ -1025,11 +1030,11 @@ function writeStudentLog(string $studentId, string $userText, string $responseTe
 }
 
 /**
- * Scan student message and AI response for safety concerns.
- * Ported from wheel3/api-proxy.php.
+ * Scan student message, AI response, and client-supplied system prompt for concerns.
+ * Ported from wheel3/api-proxy.php; extended with HATE_SPEECH category.
  * Returns ['triggered' => bool, 'categories' => [], 'matched' => []]
  */
-function detectConcerns(string $studentText, string $aiText): array
+function detectConcerns(string $studentText, string $aiText, string $systemPrompt = ''): array
 {
     $categories = [];
     $matched    = [];
@@ -1077,6 +1082,34 @@ function detectConcerns(string $studentText, string $aiText): array
         $matched[]    = 'test-trigger: "syzygy"';
     }
 
+    // HATE_SPEECH — student-supplied system prompt or message contains hateful/inappropriate content.
+    // We scan both $studentText and $systemPrompt so persona injection via the system prompt
+    // is caught even when the message itself looks innocent.
+    $hateTargets = $systemPrompt . ' ' . $studentText;
+    $hatePatterns = [
+        '/\bwhite\s+supremac/i'                                      => 'white-supremacist',
+        '/\bracial\s+(superior|purity|segregat|separat)/i'           => 'racial-hate',
+        '/keep.{0,25}races?\s+separat/i'                             => 'racial-separation',
+        '/\b(neo.?nazi|white.?nationalist|white.?power)\b/i'         => 'extremist-ideology',
+        '/\bnazi\b/i'                                                 => 'nazi-reference',
+        '/\bhate\s+(crime|group|speech)\b/i'                         => 'hate-content',
+        '/\b(ethnic\s+cleansing|genocide)\b/i'                       => 'genocide',
+        '/\bterroris(t|m|ts)\b/i'                                    => 'terrorism',
+        '/\bpedophil/i'                                              => 'pedophilia',
+        '/\bchild\s+(porn|sex|abuse|exploit)/i'                      => 'CSAM',
+        '/\b(porn|pornograph)\b/i'                                   => 'sexual-content',
+        '/\bexplicit\s+sexual\b/i'                                   => 'explicit-sexual',
+        '/\b(rape|molest)\b/i'                                       => 'sexual-violence',
+    ];
+    foreach ($hatePatterns as $pattern => $label) {
+        if (preg_match($pattern, $hateTargets, $m)) {
+            $categories[] = 'HATE_SPEECH';
+            $src = ($systemPrompt !== '' && preg_match($pattern, $systemPrompt))
+                ? 'system prompt' : 'message';
+            $matched[] = $label . ' (' . $src . '): "' . mb_substr(trim($m[0]), 0, 60) . '"';
+        }
+    }
+
     // AI_FLAGGED — Claude itself flagged a crisis in its reply
     $aiAlertPatterns = [
         '/\btrusted\s+adult\b/i'                => 'AI-referred-to-trusted-adult',
@@ -1106,7 +1139,8 @@ function detectConcerns(string $studentText, string $aiText): array
  */
 function buildClaudeAlertEmail(
     string $studentId, string $studentName,
-    array $messages, string $aiReply, array $concerns
+    array $messages, string $aiReply, array $concerns,
+    string $clientSystem = ''
 ): string {
     $ts          = date('Y-m-d H:i:s T');
     $safeId      = htmlspecialchars($studentId);
@@ -1114,6 +1148,14 @@ function buildClaudeAlertEmail(
     $safeAiReply = nl2br(htmlspecialchars($aiReply));
     $catList     = implode(', ', array_map('htmlspecialchars', $concerns['categories']));
     $matchList   = implode('<br>', array_map('htmlspecialchars', $concerns['matched']));
+    $systemBlock = '';
+    if ($clientSystem !== '') {
+        $safeSystem  = nl2br(htmlspecialchars($clientSystem));
+        $systemBlock = "<h3 style='font-size:15px;margin-bottom:6px;color:#b91c1c;'>⚠️ Student-Supplied System Prompt</h3>"
+                     . "<div style='background:#fef2f2;border-left:3px solid #ef4444;border-radius:6px;"
+                     . "padding:10px 14px;margin-bottom:20px;white-space:pre-wrap;font-size:14px;'>"
+                     . "{$safeSystem}</div>";
+    }
 
     $transcript = '';
     foreach ($messages as $msg) {
@@ -1142,7 +1184,7 @@ function buildClaudeAlertEmail(
     <tr><td style="padding:6px 12px;background:#f8fafc;font-weight:bold;vertical-align:top;">Triggered by</td>
         <td style="padding:6px 12px;font-size:13px;color:#475569;">{$matchList}</td></tr>
 </table>
-<h3 style="font-size:15px;margin-bottom:10px;color:#334155;">Full Conversation</h3>
+{$systemBlock}<h3 style="font-size:15px;margin-bottom:10px;color:#334155;">Full Conversation</h3>
 {$transcript}
 <hr style="margin:24px 0;border:none;border-top:1px solid #e2e8f0;">
 <p style="font-size:12px;color:#94a3b8;">

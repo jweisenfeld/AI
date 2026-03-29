@@ -524,8 +524,33 @@ if (is_array($responseData) && isset($responseData['content'])) {
 }
 writeStudentLog($studentId, $lastUserText, $responseText, $logEntry);
 
+// If model was downgraded, inject a note into the response
+if (isset($modelDowngraded) && $modelDowngraded && is_array($responseData)) {
+    $responseData['_notice'] = 'Outside school hours: model downgraded to Haiku. Full model access Mon-Fri 7AM-5PM Pacific.';
+    $response = json_encode($responseData);
+}
+if ($opusDowngraded && is_array($responseData)) {
+    $responseData['_opus_limited'] = true;
+    $responseData['_notice'] = 'Opus is available for your first message only. Switched to Sonnet for follow-ups. Clear chat to use Opus again.';
+    $response = json_encode($responseData);
+}
+
+// Send the response to the client before doing any email work.
+// The SMTP call can block for up to 30 s on a slow/unreachable server; if it
+// runs before echo the browser receives an empty body and throws
+// "Unexpected end of JSON input".  Closing the connection first lets the
+// student's page load instantly while PHP finishes the alert in the background.
+http_response_code($httpCode);
+header('Content-Length: ' . strlen($response));
+header('Connection: close');
+echo $response;
+flush();
+if (function_exists('fastcgi_finish_request')) {
+    fastcgi_finish_request();
+}
+
 // ============================================
-// SAFETY ALERT EMAIL
+// SAFETY ALERT EMAIL  (runs after response is sent)
 // ============================================
 // Scan student message + AI reply for safety concerns and jailbreak attempts.
 // Fires an email (same SMTP as wheel3) when anything concerning is detected.
@@ -556,20 +581,6 @@ if ($concerns['triggered'] && is_readable($smtpFile)) {
         'matched'      => $concerns['matched'],
     ]) . "\n", FILE_APPEND | LOCK_EX);
 }
-
-// If model was downgraded, inject a note into the response
-if (isset($modelDowngraded) && $modelDowngraded && is_array($responseData)) {
-    $responseData['_notice'] = 'Outside school hours: model downgraded to Haiku. Full model access Mon-Fri 7AM-5PM Pacific.';
-    $response = json_encode($responseData);
-}
-if ($opusDowngraded && is_array($responseData)) {
-    $responseData['_opus_limited'] = true;
-    $responseData['_notice'] = 'Opus is available for your first message only. Switched to Sonnet for follow-ups. Clear chat to use Opus again.';
-    $response = json_encode($responseData);
-}
-
-http_response_code($httpCode);
-echo $response;
 
 // ============================================
 // HELPER FUNCTIONS

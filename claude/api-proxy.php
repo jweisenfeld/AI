@@ -41,6 +41,7 @@ $secretsDir   = $accountRoot . '/.secrets';
 $secretsFile  = $secretsDir . '/claudekey.php';
 $studentFile  = $secretsDir . '/student_roster.csv';
 $smtpFile     = $secretsDir . '/smtp_credentials.php';  // shared with wheel3/coach6
+define('ALERT_TO', 'jweisenfeld@psd1.org');
 
 if (!is_readable($secretsFile)) {
     http_response_code(500);

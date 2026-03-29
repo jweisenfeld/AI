@@ -574,30 +574,40 @@ if ($concerns['triggered']) {
     ]) . "\n", FILE_APPEND | LOCK_EX);
 }
 if ($concerns['triggered'] && is_readable($smtpFile)) {
-    require_once $smtpFile;
-    // smtp_credentials.php defines: $SMTP_HOST, $SMTP_PORT, $SMTP_USER, $SMTP_PASS,
-    //                                $SMTP_FROM, $SMTP_FROM_NAME, and constant ALERT_TO
-    $alertSubject = (in_array('TEST', $concerns['categories']) ? '🧪' : '🚨')
-        . ' Claude Chatbot Alert — ' . implode(', ', $concerns['categories'])
-        . ' — ' . ($restrictions['student_name'] ?: $studentId);
-    $alertBody = buildClaudeAlertEmail(
-        $studentId, $restrictions['student_name'],
-        $requestData['messages'], $responseText,
-        $concerns
-    );
-    $alertSent = sendClaudeSmtpEmail(
-        $SMTP_HOST, $SMTP_PORT, $SMTP_USER, $SMTP_PASS,
-        $SMTP_FROM, $SMTP_FROM_NAME,
-        ALERT_TO, $restrictions['alert_email'], $alertSubject, $alertBody
-    );
-    file_put_contents($logFile, json_encode([
-        'timestamp'    => date('Y-m-d H:i:s'),
-        'event'        => $alertSent ? 'ALERT_SENT' : 'ALERT_FAILED',
-        'student_id'   => $studentId,
-        'student_name' => $restrictions['student_name'],
-        'categories'   => $concerns['categories'],
-        'matched'      => $concerns['matched'],
-    ]) . "\n", FILE_APPEND | LOCK_EX);
+    try {
+        require_once $smtpFile;
+        // smtp_credentials.php defines: $SMTP_HOST, $SMTP_PORT, $SMTP_USER, $SMTP_PASS,
+        //                                $SMTP_FROM, $SMTP_FROM_NAME, and constant ALERT_TO
+        $alertSubject = (in_array('TEST', $concerns['categories']) ? '🧪' : '🚨')
+            . ' Claude Chatbot Alert — ' . implode(', ', $concerns['categories'])
+            . ' — ' . ($restrictions['student_name'] ?: $studentId);
+        $alertBody = buildClaudeAlertEmail(
+            $studentId, $restrictions['student_name'],
+            $requestData['messages'], $responseText,
+            $concerns
+        );
+        $alertSent = sendClaudeSmtpEmail(
+            $SMTP_HOST, (int)$SMTP_PORT, $SMTP_USER, $SMTP_PASS,
+            $SMTP_FROM, $SMTP_FROM_NAME,
+            ALERT_TO, $restrictions['alert_email'], $alertSubject, $alertBody
+        );
+        file_put_contents($logFile, json_encode([
+            'timestamp'    => date('Y-m-d H:i:s'),
+            'event'        => $alertSent ? 'ALERT_SENT' : 'ALERT_FAILED',
+            'student_id'   => $studentId,
+            'student_name' => $restrictions['student_name'],
+            'categories'   => $concerns['categories'],
+            'matched'      => $concerns['matched'],
+        ]) . "\n", FILE_APPEND | LOCK_EX);
+    } catch (\Throwable $e) {
+        file_put_contents($logFile, json_encode([
+            'timestamp' => date('Y-m-d H:i:s'),
+            'event'     => 'ALERT_EXCEPTION',
+            'message'   => $e->getMessage(),
+            'file'      => $e->getFile(),
+            'line'      => $e->getLine(),
+        ]) . "\n", FILE_APPEND | LOCK_EX);
+    }
 }
 
 // ============================================

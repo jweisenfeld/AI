@@ -555,6 +555,18 @@ if (function_exists('fastcgi_finish_request')) {
 // Scan student message + AI reply for safety concerns and jailbreak attempts.
 // Fires an email (same SMTP as wheel3) when anything concerning is detected.
 $concerns = detectConcerns($lastUserText, $responseText);
+// Diagnostic: always log concern detection result so missing emails can be traced.
+if ($concerns['triggered']) {
+    file_put_contents($logFile, json_encode([
+        'timestamp'     => date('Y-m-d H:i:s'),
+        'event'         => 'ALERT_CHECK',
+        'student_id'    => $studentId,
+        'categories'    => $concerns['categories'],
+        'smtp_file'     => $smtpFile,
+        'smtp_readable' => is_readable($smtpFile),
+        'post_fcgi'     => function_exists('fastcgi_finish_request'),
+    ]) . "\n", FILE_APPEND | LOCK_EX);
+}
 if ($concerns['triggered'] && is_readable($smtpFile)) {
     require_once $smtpFile;
     // smtp_credentials.php defines: $SMTP_HOST, $SMTP_PORT, $SMTP_USER, $SMTP_PASS,

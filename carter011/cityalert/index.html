@@ -16,7 +16,6 @@ body{
   align-items:center;
 }
 
-/* CHAT WRAPPER */
 .chat-container{
   width:100%;
   height:100vh;
@@ -24,7 +23,6 @@ body{
   flex-direction:column;
 }
 
-/* HEADER */
 .header{
   padding:15px;
   background:#001a66;
@@ -33,8 +31,24 @@ body{
   position:relative;
 }
 
-/* LINK BUTTON */
-.link-bubble{
+.link-bubble-left{
+  position:absolute;
+  left:15px;
+  top:15px;
+  background:#0084ff;
+  padding:8px 14px;
+  border-radius:20px;
+  font-size:13px;
+  cursor:pointer;
+  text-decoration:none;
+  color:white;
+}
+
+.link-bubble-left:hover{
+  background:#006fd6;
+}
+
+.link-bubble-right{
   position:absolute;
   right:15px;
   top:15px;
@@ -43,9 +57,14 @@ body{
   border-radius:20px;
   font-size:13px;
   cursor:pointer;
+  text-decoration:none;
+  color:white;
 }
 
-/* CHAT BOX */
+.link-bubble-right:hover{
+  background:#006fd6;
+}
+
 .chat-box{
   flex:1;
   padding:20px;
@@ -55,29 +74,23 @@ body{
   gap:12px;
 }
 
-/* MESSAGES (WHITE BUBBLES) */
 .message{
   max-width:75%;
   padding:12px 16px;
   border-radius:18px;
   font-size:14px;
   animation:fadeIn .2s ease;
-  background:white;
-  color:black;
-  white-space:pre-line;
+  white-space:pre-wrap;
 }
 
-/* ALIGNMENT */
-.bot{align-self:flex-start;}
-.user{align-self:flex-end;}
+.bot{background:#0033cc;color:white;}
+.user{background:#0084ff;color:white;align-self:flex-end;}
 
-/* ANIMATION */
 @keyframes fadeIn{
   from{opacity:0;transform:translateY(5px);}
   to{opacity:1;}
 }
 
-/* INPUT AREA */
 .input-area{
   display:flex;
   padding:12px;
@@ -89,7 +102,6 @@ input{
   padding:12px;
   border-radius:20px;
   border:none;
-  outline:none;
 }
 
 button{
@@ -110,9 +122,12 @@ button{
 
   <div class="header">
     🚨 Pasco Alert Bot
-    <div class="link-bubble" onclick="window.open('https://forms.office.com')">
-      Submit Report
-    </div>
+    <a class="link-bubble-left" href="https://forms.office.com/Pages/ResponsePage.aspx?id=CnGXhcFG7kylEJpMNl4IHU7Cb32-FZVBslwkeKoEwEpURE1XUVhLWkVWT1M2N05KUk03Rk5IMEdZUi4u" target="_blank">
+      📝 Submit Report
+    </a>
+    <a class="link-bubble-right" href="https://forms.office.com/Pages/ResponsePage.aspx?id=CnGXhcFG7kylEJpMNl4IHU7Cb32-FZVBslwkeKoEwEpUNllHNzRZV0FPUE9SNlY0MEdKNkVaNElDWi4u" target="_blank">
+      📋 MS Survey
+    </a>
   </div>
 
   <div id="chatBox" class="chat-box"></div>
@@ -126,14 +141,57 @@ button{
 
 <script>
 
-let state = {waiting:false, issue:null, step:0, answers:[]};
+let state={waiting:false,issue:null,step:0,answers:[]};
 
-const issues = [
+const issues=[
 "Potholes","Noise","Streetlights","Flooding","Trash","Graffiti","Pests","Parking","Sidewalk","Trees",
 "Power","Water Quality","Snow/Ice","Abandoned Car","Dumping","Signs","Traffic Lights","Bus Issues","School Issues","Parks",
 "Fire Hazard","Building Damage","Animal Control","Suspicious Activity","Construction","Broken Fence","Road Damage","Water Leak","Safety Hazard","Package Theft",
 "Trespassing","Loitering","Bike Issues","Taxi Complaint","Utility Lines","Broken Windows","Housing Complaint","Sanitation","Air Quality","Other"
 ];
+
+const issueDetails={
+  "Potholes":{priority:"Medium",department:"Public Works / Road Maintenance",contacts:["Pasco County Public Works: (727) 847-8126","State Roads (FDOT): 1-800-749-7433","Non-Emergency: 311"],urgency:"Non-urgent unless causing accidents",steps:["Document exact location (street name/intersection)","Take photos if possible","Note the size and depth","Report to Public Works or 311","Follow up in 7–14 business days"],tips:"Potholes larger than 6 inches wide or 2 inches deep are considered high priority."},
+  "Noise":{priority:"Low–Medium",department:"Code Enforcement / Sheriff's Office",contacts:["Pasco County Code Enforcement: (727) 847-2411","Sheriff Non-Emergency: (727) 847-8102","311"],urgency:"Urgent if ongoing late at night (after 10 PM)",steps:["Note the time and duration of the noise","Identify the source if possible","Call non-emergency if it's loud music or parties","File a code enforcement complaint for recurring issues","Keep a log of incidents with dates/times"],tips:"Noise ordinance in Pasco County prohibits loud noise between 11 PM and 7 AM."},
+  "Streetlights":{priority:"Low",department:"Duke Energy / Utilities",contacts:["Duke Energy Outage Line: 1-800-700-8744","Pasco County Utilities: (727) 847-8131","311"],urgency:"Low unless creating a safety hazard in a dark area",steps:["Note the pole number (found on the pole)","Record exact location","Report to Duke Energy online or by phone","Note if it's flickering, out, or damaged","Follow up in 5–10 business days"],tips:"You can report outages directly on the Duke Energy website for faster processing."},
+  "Flooding":{priority:"High",department:"Stormwater Management / Emergency Management",contacts:["Pasco County Stormwater: (727) 847-8126","Emergency Management: (727) 847-8137","Emergency: 911 if life-threatening"],urgency:"HIGH — especially during or after heavy rain",steps:["Do NOT drive through flooded roads","Call 911 if anyone is in danger","Report to Stormwater Management","Document water levels with photos","Avoid contact with floodwater (may be contaminated)"],tips:"Turn Around, Don't Drown — just 6 inches of fast-moving water can knock a person down."},
+  "Trash":{priority:"Low–Medium",department:"Solid Waste / Code Enforcement",contacts:["Pasco County Solid Waste: (727) 847-8116","Code Enforcement: (727) 847-2411","311"],urgency:"Low unless posing a health risk",steps:["Identify the location of illegal dumping or overflow","Take photos as evidence","Report to Code Enforcement or Solid Waste","Note if it's on public or private property","Follow up in 5–7 business days"],tips:"Illegal dumping can result in fines up to $5,000 in Pasco County."},
+  "Graffiti":{priority:"Low–Medium",department:"Code Enforcement / Sheriff's Office",contacts:["Pasco County Code Enforcement: (727) 847-2411","Sheriff Non-Emergency: (727) 847-8102","311"],urgency:"Low unless gang-related or threatening",steps:["Photograph the graffiti with a timestamp","Report to Code Enforcement","If on private property, notify the owner","If threatening or gang-related, call non-emergency police","Request cleanup through the county"],tips:"Hate speech or threatening graffiti should be reported to police immediately."},
+  "Pests":{priority:"Medium",department:"Pasco County Mosquito Control / Health Dept",contacts:["Mosquito Control: (727) 847-8190","Pasco County Health Dept: (727) 861-5220","Animal Control (wildlife): (727) 847-8102"],urgency:"Medium — can escalate to health risk",steps:["Identify the type of pest (rodents, mosquitoes, roaches, etc.)","Remove standing water if mosquito-related","Report to Mosquito Control or Health Dept","Do not handle wildlife — call Animal Control","Seal entry points in your home"],tips:"Standing water as small as a bottle cap can breed mosquitoes."},
+  "Parking":{priority:"Low",department:"Sheriff's Office / Code Enforcement",contacts:["Pasco Sheriff Non-Emergency: (727) 847-8102","Code Enforcement: (727) 847-2411","311"],urgency:"Low unless blocking fire hydrants or driveways",steps:["Note the vehicle description, plate, and location","Photograph the violation","Call non-emergency if blocking a driveway or hydrant","File a code complaint for repeated violations","Check HOA rules if applicable"],tips:"Blocking a fire hydrant is a $100+ fine and vehicle may be towed."},
+  "Sidewalk":{priority:"Medium",department:"Public Works",contacts:["Pasco County Public Works: (727) 847-8126","311"],urgency:"Medium — higher priority if near schools or crosswalks",steps:["Document the exact location","Photograph the damage (cracks, heaving, missing sections)","Report to Public Works or 311","Note if it is a tripping hazard","Follow up in 14–21 business days"],tips:"Damaged sidewalks near schools and bus stops are typically prioritized."},
+  "Trees":{priority:"Low–Medium",department:"Public Works / Urban Forestry",contacts:["Pasco County Public Works: (727) 847-8126","Emergency: 911 if tree is blocking road or on power lines","Duke Energy (if on power lines): 1-800-700-8744"],urgency:"HIGH if leaning over road, power lines, or structures",steps:["Determine if the tree is on public or private property","Photograph the tree and any visible damage","If blocking road or on power lines, call 911 or Duke Energy","Report dead/hazardous trees to Public Works","Do not attempt to remove large trees yourself"],tips:"Trees on private property are the owner's responsibility unless they pose a public danger."},
+  "Power":{priority:"High",department:"Duke Energy",contacts:["Duke Energy Outage: 1-800-700-8744","Duke Energy Text: Text OUT to 57801","Emergency: 911 if wires are down"],urgency:"HIGH — especially if wires are down",steps:["Report the outage to Duke Energy immediately","Stay away from downed power lines (stay 30+ feet back)","Call 911 if lines are down or sparking","Use flashlights — do not use candles","Unplug sensitive electronics during outage"],tips:"Never touch a downed power line — assume it is live and deadly."},
+  "Water Quality":{priority:"High",department:"Pasco County Utilities / Florida DEP",contacts:["Pasco County Utilities: (727) 847-8131","FL Dept of Environmental Protection: (850) 245-2118","EPA Safe Drinking Water Hotline: 1-800-426-4791"],urgency:"HIGH — especially if water is discolored, smells, or tastes unusual",steps:["Stop using the water immediately if concerned","Document color, smell, or taste issues","Run cold water tap and take a sample if possible","Call Pasco County Utilities right away","Request a water quality report"],tips:"Utilities are required by law to notify you of any contamination within 24 hours."},
+  "Snow/Ice":{priority:"Medium",department:"Public Works / Road Maintenance",contacts:["Pasco County Public Works: (727) 847-8126","511 Florida Traffic Info: 511","Emergency: 911 if accidents occur"],urgency:"High during active conditions",steps:["Avoid driving unless necessary","Report icy roads to Public Works or 511","Apply sand or salt to walkways","Check on elderly or vulnerable neighbors","Monitor local alerts"],tips:"Ice on bridges and overpasses forms faster — avoid them when temperatures drop below 32°F."},
+  "Abandoned Car":{priority:"Low–Medium",department:"Sheriff's Office / Code Enforcement",contacts:["Pasco Sheriff Non-Emergency: (727) 847-8102","Code Enforcement: (727) 847-2411","311"],urgency:"Low unless blocking traffic or leaking fluids",steps:["Note the vehicle's make, model, color, and plate","Check if it has a notice/tag already","Report to non-emergency police or Code Enforcement","If blocking traffic, call 911","Vehicle may be tagged and towed after 72 hours"],tips:"A vehicle parked on a public street for more than 72 hours can be reported as abandoned."},
+  "Dumping":{priority:"High",department:"Code Enforcement / Solid Waste",contacts:["Code Enforcement: (727) 847-2411","Pasco County Solid Waste: (727) 847-8116","Sheriff Non-Emergency: (727) 847-8102"],urgency:"Medium–High if hazardous materials are involved",steps:["Do NOT touch or move the dumped materials","Photograph the dump site","Note any identifying information (vehicles, containers)","Report to Code Enforcement or Solid Waste","Report to Sheriff if you witnessed the dumping"],tips:"Illegal dumping of hazardous materials (paint, chemicals, tires) carries severe fines."},
+  "Signs":{priority:"Low–Medium",department:"Public Works / Traffic Engineering",contacts:["Pasco County Public Works: (727) 847-8126","FDOT (state roads): 1-800-749-7433","911 if a stop sign is missing"],urgency:"HIGH if a stop sign, yield sign, or warning sign is missing",steps:["Note the exact sign location and type","Photograph the damaged or missing sign","Report to Public Works immediately if safety-critical","For state roads, report to FDOT","Follow up in 3–7 business days for replacements"],tips:"A missing stop sign should be reported to 911 as it is an immediate traffic safety hazard."},
+  "Traffic Lights":{priority:"High",department:"Pasco County Traffic Engineering / FDOT",contacts:["Pasco Traffic Engineering: (727) 847-2411","FDOT: 1-800-749-7433","Emergency: 911 if signal is completely out"],urgency:"HIGH — treat a dark signal as a 4-way stop",steps:["Treat a non-functioning light as a 4-way stop","Call 911 if the intersection is dangerous","Report to Traffic Engineering or FDOT","Note the intersection name and direction of malfunction","Avoid the intersection if possible until repaired"],tips:"Florida law requires all drivers to treat a dark traffic light as a 4-way stop."},
+  "Bus Issues":{priority:"Medium",department:"Pasco County Public Transportation (PCPT)",contacts:["PCPT Customer Service: (727) 847-8151","ADA Complaints: (727) 847-8151","311"],urgency:"Low unless safety-related",steps:["Note the bus route number and time of incident","Document the issue (late, overcrowded, driver behavior)","Call PCPT Customer Service","File a formal complaint if needed","Request a follow-up or incident number"],tips:"ADA accessibility issues on transit are federally protected and must be addressed promptly."},
+  "School Issues":{priority:"High",department:"Pasco County Schools / School Board",contacts:["Pasco County Schools: (813) 996-2402","Safe Schools Hotline: 1-800-4-FL-SAFE","Emergency: 911"],urgency:"HIGH if involving student safety or threats",steps:["Document the issue clearly (date, school, incident)","Contact the school principal directly","Escalate to the School Board if unresolved","Report safety threats to 911 immediately","Use the Safe Schools Hotline for anonymous tips"],tips:"All threats made against schools, even jokes, are taken seriously and investigated."},
+  "Parks":{priority:"Low",department:"Pasco County Parks & Recreation",contacts:["Parks & Recreation: (727) 847-8032","311"],urgency:"Low unless involving safety hazards",steps:["Note the specific park and location of the issue","Photograph the problem (broken equipment, vandalism)","Report to Parks & Recreation","Note if children are at risk from the hazard","Follow up in 7–14 business days"],tips:"Broken playground equipment should be reported immediately as it poses an injury risk to children."},
+  "Fire Hazard":{priority:"CRITICAL",department:"Pasco County Fire Rescue",contacts:["Emergency: 911","Pasco Fire Rescue Non-Emergency: (727) 847-2411","Fire Marshal: (727) 847-2411"],urgency:"CRITICAL — call 911 immediately",steps:["Call 911 immediately if there is an active fire or smoke","Evacuate the area","Do not re-enter a burning building","Alert neighbors if necessary","Report code violations (blocked exits, no sprinklers) to Fire Marshal"],tips:"Never use an elevator during a fire emergency — always use the stairs."},
+  "Building Damage":{priority:"High",department:"Pasco County Building Services",contacts:["Building Services: (727) 847-2411","Emergency Management: (727) 847-8137","Emergency: 911 if structural collapse risk"],urgency:"HIGH if structure appears unstable",steps:["Do not enter a structurally damaged building","Call 911 if collapse is imminent","Report to Building Services for inspection","Document damage with photos","Contact your insurance company"],tips:"A building inspector must certify a storm-damaged structure as safe before re-entry."},
+  "Animal Control":{priority:"Medium",department:"Pasco County Animal Services",contacts:["Animal Services: (727) 521-5000","Sheriff Non-Emergency: (727) 847-8102","Emergency: 911 if animal is attacking someone"],urgency:"HIGH if animal is aggressive or injured",steps:["Do not approach an aggressive or unknown animal","Call Animal Services or Sheriff","Note the animal's location and description","If bitten, seek medical attention immediately","Report stray animals to Animal Services"],tips:"Any animal bite must be reported — even from pets. Rabies quarantine may be required."},
+  "Suspicious Activity":{priority:"High",department:"Pasco County Sheriff's Office",contacts:["Sheriff Non-Emergency: (727) 847-8102","Anonymous Tip Line: 1-800-706-2488","Emergency: 911 if in progress"],urgency:"HIGH if activity appears criminal or dangerous",steps:["Do not confront the individual(s)","Call 911 if crime is in progress","Call non-emergency for suspicious but non-urgent activity","Note descriptions: clothing, vehicles, plate numbers","Submit an anonymous tip if preferred"],tips:"Trust your instincts — if something feels wrong, report it. You don't need proof to report suspicion."},
+  "Construction":{priority:"Low",department:"Code Enforcement / Building Services",contacts:["Code Enforcement: (727) 847-2411","Building Services: (727) 847-2411","311"],urgency:"Low unless posing safety hazards",steps:["Note if construction lacks proper signage or barriers","Check if permits are posted (required by law)","Report unpermitted construction to Building Services","Report safety violations to Code Enforcement","Document with photos"],tips:"All construction projects require a visible permit posted on-site in Pasco County."},
+  "Broken Fence":{priority:"Low",department:"Code Enforcement",contacts:["Code Enforcement: (727) 847-2411","311"],urgency:"Medium if the fence is a pool barrier (required by law)",steps:["Determine if fence is on public or private property","Photograph the damage and location","Report to Code Enforcement if on public property","Notify property owner if private","Pool fences must be repaired immediately — report to Code Enforcement"],tips:"Florida law requires pool barriers to be maintained at all times to prevent child drowning."},
+  "Road Damage":{priority:"Medium–High",department:"Public Works / FDOT",contacts:["Pasco County Public Works: (727) 847-8126","FDOT: 1-800-749-7433","311"],urgency:"HIGH if causing accidents or impassable",steps:["Document the exact location","Photograph the damage","Note if it is a county or state road","Report to Public Works or FDOT accordingly","Follow up in 7–14 business days"],tips:"If the damage is on a state highway (US-19, SR-54, etc.), contact FDOT — Pasco County does not maintain state roads."},
+  "Water Leak":{priority:"High",department:"Pasco County Utilities",contacts:["Pasco Utilities Emergency: (727) 847-8131","After Hours Emergency: (727) 847-8131","911 if flooding a road or building"],urgency:"HIGH — report immediately to prevent water loss and damage",steps:["Do not attempt to repair a main line break yourself","Report to Pasco County Utilities immediately","Turn off your home water shutoff if it is your line","Photograph the leak location","Keep children and pets away from the area"],tips:"A main water line break can lose thousands of gallons per hour — immediate reporting is critical."},
+  "Safety Hazard":{priority:"High",department:"Code Enforcement / Public Works",contacts:["Code Enforcement: (727) 847-2411","Public Works: (727) 847-8126","Emergency: 911 if immediate danger"],urgency:"HIGH if posing immediate risk of injury",steps:["Assess if immediate evacuation is needed","Call 911 if someone is in immediate danger","Document the hazard with photos","Report to appropriate department based on location","Keep others away from the hazard"],tips:"When in doubt, call 911. It is always better to report a hazard than to ignore it."},
+  "Package Theft":{priority:"Medium",department:"Pasco County Sheriff's Office",contacts:["Sheriff Non-Emergency: (727) 847-8102","Anonymous Tip Line: 1-800-706-2488","Emergency: 911 if suspect is present"],urgency:"Medium — file a report promptly for insurance",steps:["Check your doorbell/security camera footage","Report to the Sheriff's Office and file a police report","Notify the shipper (Amazon, UPS, FedEx, etc.) for reshipment","Get a police report number for insurance claims","Consider a package lockbox or require signatures"],tips:"A police report is required for most insurance claims and carrier reshipment requests."},
+  "Trespassing":{priority:"Medium",department:"Pasco County Sheriff's Office",contacts:["Sheriff Non-Emergency: (727) 847-8102","Emergency: 911 if trespasser is still present"],urgency:"HIGH if trespasser is still on the property",steps:["Call 911 if trespasser is present and refusing to leave","Do not physically confront the individual","File a trespassing report with the Sheriff's Office","Post 'No Trespassing' signs on your property","Consider a restraining order for repeat offenders"],tips:"In Florida, property owners can request that repeat trespassers be formally banned — violations carry criminal penalties."},
+  "Loitering":{priority:"Low",department:"Pasco County Sheriff's Office",contacts:["Sheriff Non-Emergency: (727) 847-8102","Code Enforcement: (727) 847-2411"],urgency:"Low unless threatening or blocking access",steps:["Call non-emergency if individuals are blocking access or being disruptive","Notify the business owner if on private commercial property","Report to Code Enforcement for persistent issues","Document with photos or video if possible","Do not engage or confront the individuals"],tips:"Florida's loitering laws require that the behavior be suspicious or disruptive — mere presence is not illegal."},
+  "Bike Issues":{priority:"Low",department:"Public Works / Sheriff's Office",contacts:["Public Works: (727) 847-8126","Sheriff Non-Emergency: (727) 847-8102","311"],urgency:"Low unless involving an accident",steps:["Report stolen bikes to the Sheriff's Office","Report damaged bike lanes or paths to Public Works","File an incident report if involved in an accident","Document any damage with photos","Check if your bike is registered"],tips:"Registering your bike with the Sheriff's Office increases recovery chances if stolen."},
+  "Taxi Complaint":{priority:"Low",department:"Pasco County Consumer Protection",contacts:["Consumer Services: (727) 847-2411","FL Dept of Agriculture Consumer Hotline: 1-800-435-7352","311"],urgency:"Low",steps:["Note the taxi company name and vehicle number","Document the complaint (overcharge, unsafe driving, rudeness)","Request a receipt if you were overcharged","File a complaint with Consumer Services or the company","Contact your credit card company if overcharged"],tips:"All taxis must provide a receipt upon request — keep it for any disputes."},
+  "Utility Lines":{priority:"High",department:"Duke Energy / Pasco Utilities / TECO",contacts:["Duke Energy: 1-800-700-8744","Pasco Utilities: (727) 847-8131","Emergency: 911 if lines are down"],urgency:"HIGH if lines are down or sparking",steps:["Stay at least 30 feet away from downed lines","Call 911 immediately if lines are down","Report to the appropriate utility company","Do not drive over downed lines","Warn others to stay away"],tips:"Assume every downed line is energized. Do not touch it under any circumstances."},
+  "Broken Windows":{priority:"Low–Medium",department:"Code Enforcement / Building Services",contacts:["Code Enforcement: (727) 847-2411","Building Services: (727) 847-2411","Sheriff Non-Emergency: (727) 847-8102 (if vandalism)"],urgency:"Medium if posing a safety or security risk",steps:["Board up broken windows immediately to prevent entry","Report vandalism to the Sheriff's Office","Report code violations to Code Enforcement","File an insurance claim if applicable","Document the damage with photos"],tips:"Unboarded broken windows are a code violation in Pasco County and can result in fines."},
+  "Housing Complaint":{priority:"Medium",department:"Code Enforcement / Housing Authority",contacts:["Code Enforcement: (727) 847-2411","Pasco Housing Authority: (727) 847-8943","FL Dept of Health (mold/habitability): (727) 861-5220"],urgency:"High if involving no heat, no water, or mold",steps:["Document the conditions with photos and dates","Notify your landlord in writing (text/email creates a record)","Report to Code Enforcement if unresolved in 7 days","Contact the Housing Authority if in subsidized housing","Contact an attorney if rights are being violated"],tips:"Florida law requires landlords to maintain habitable conditions — mold, no heat, or no water are serious violations."},
+  "Sanitation":{priority:"Medium",department:"Pasco County Solid Waste / Health Dept",contacts:["Solid Waste: (727) 847-8116","Health Dept: (727) 861-5220","311"],urgency:"Medium–High if posing a health hazard",steps:["Document the sanitation issue with photos","Report to Solid Waste or Health Dept","Note if it involves a food establishment (higher priority)","Avoid contact with potentially contaminated materials","Follow up in 5–7 business days"],tips:"Food establishment sanitation violations can be reported to the Florida Dept of Business & Professional Regulation."},
+  "Air Quality":{priority:"Medium–High",department:"Hillsborough/Pasco Air Quality / FL DEP",contacts:["FL Dept of Environmental Protection: (850) 245-2118","EPA Air Quality Hotline: 1-800-424-4372","Emergency: 911 if smoke/fumes are causing illness"],urgency:"HIGH if causing health symptoms (dizziness, trouble breathing)",steps:["Leave the area if experiencing symptoms","Call 911 if symptoms are severe","Report to FL DEP for ongoing industrial or environmental concerns","Document the source, time, and smell/appearance","Check AirNow.gov for current air quality readings"],tips:"Check AirNow.gov daily for air quality index — people with asthma should avoid outdoor activity on 'Orange' or worse days."},
+  "Other":{priority:"Varies",department:"Pasco County General Services",contacts:["Pasco County Main Line: (727) 847-2411","311","Emergency: 911"],urgency:"Varies based on situation",steps:["Describe the issue in as much detail as possible","Call 311 for general county assistance","Contact the relevant department directly if known","Document with photos and notes","Follow up within 5–10 business days"],tips:"If you are unsure who to contact, 311 is always a safe starting point and will direct you to the right department."}
+};
 
 function addMessage(text,type){
   let msg=document.createElement("div");
@@ -143,13 +201,12 @@ function addMessage(text,type){
   chatBox.scrollTop=chatBox.scrollHeight;
 }
 
-/* WELCOME */
 function welcome(){
   addMessage(
 `👋 Welcome to Pasco Alert Bot!
 
 I help you figure out:
-• What’s wrong
+• What's wrong
 • What you should do
 • Who to contact
 
@@ -157,40 +214,107 @@ I help you figure out:
 Type "menu" to see all 40 issues
 or just type a number
 
-I’ll guide you step-by-step.`,
+I'll ask a few questions and guide you step-by-step.`,
 "bot");
 }
 
-/* MENU */
 function showMenu(){
-  let text = "📋 ALL ISSUES:\n\n";
+  let text="📋 ALL ISSUES:\n\n";
   issues.forEach((i,index)=>{
-    text += (index+1) + ". " + i + "\n";
+    text+=(index+1)+". "+i+"\n";
   });
   addMessage(text,"bot");
 }
 
-function getQuestions(){
-  return [
-    "Where is it happening?",
-    "How serious is it?",
-    "When did it start?"
-  ];
+function getQuestions(issue){
+  const q={
+    "Potholes":["📍 What is the exact street address or intersection?","📏 How large is the pothole (small/medium/large) and is it dangerous to drive over?","📅 When did you first notice it?"],
+    "Noise":["📍 Where is the noise coming from (address or area)?","🔊 What type of noise is it (music, construction, animals, other)?","🕐 What time does it occur and how long has it been going on?"],
+    "Streetlights":["📍 What is the street address or intersection where the light is out?","🔢 Is there a pole number visible on the light pole?","💡 Is the light completely out, flickering, or damaged?"],
+    "Flooding":["📍 What is the exact location of the flooding?","💧 How deep is the water (ankle, knee, road-level)?","⏱️ When did the flooding start and is it still rising?"],
+    "Trash":["📍 Where is the trash or illegal dumping located?","🗑️ What type of trash is it (household, furniture, chemicals, tires)?","⚠️ Are there any hazardous materials or strong odors?"],
+    "Graffiti":["📍 Where is the graffiti located (address or description)?","🏢 Is it on public property (city building, wall) or private property?","⚠️ Is the graffiti threatening, hateful, or gang-related?"],
+    "Pests":["📍 Where are you seeing the pests (address)?","🐀 What type of pest is it (rodents, mosquitoes, roaches, wildlife, other)?","📅 How long has this been an issue?"],
+    "Parking":["📍 What is the exact location of the parking violation?","🚗 What is the vehicle description (make, color, license plate if visible)?","🚧 Is it blocking a driveway, fire hydrant, or handicap space?"],
+    "Sidewalk":["📍 What is the address or nearest intersection where the sidewalk is damaged?","🔨 What type of damage is it (cracked, missing section, raised/uneven, overgrown)?","🚶 Is it a tripping hazard or near a school or bus stop?"],
+    "Trees":["📍 Where is the tree located (address or intersection)?","🌳 Is the tree on public or private property?","⚠️ Is it leaning, damaged, blocking the road, or touching power lines?"],
+    "Power":["📍 What is your address and how widespread is the outage?","⚡ Are there any downed power lines or visible damage?","🕐 When did the power go out?"],
+    "Water Quality":["📍 What is your address and what utility provider supplies your water?","💧 What is wrong with the water (color, smell, taste, cloudiness)?","🕐 When did you first notice the problem?"],
+    "Snow/Ice":["📍 What road or location has the snow or ice?","🌡️ How severe are the conditions — is the road passable?","🕐 When did conditions become hazardous?"],
+    "Abandoned Car":["📍 What is the exact location of the vehicle?","🚗 What is the vehicle description (make, model, color, plate if visible)?","📅 How long has the vehicle been there?"],
+    "Dumping":["📍 What is the exact location of the illegal dump site?","🗑️ What types of materials were dumped (furniture, chemicals, tires, etc.)?","👀 Did you see who did it, or is there any identifying information?"],
+    "Signs":["📍 What is the exact location of the missing or damaged sign?","🚦 What type of sign is it (stop, speed limit, street name, warning)?","⚠️ Is the missing sign creating an immediate safety hazard?"],
+    "Traffic Lights":["📍 What intersection is the traffic light located at?","🚦 What is the problem (completely out, stuck on one color, flashing)?","🕐 When did you first notice the issue?"],
+    "Bus Issues":["🚌 What is the bus route number and approximate time of the issue?","❓ What happened (late arrival, overcrowding, driver behavior, accessibility)?","📅 Was this a one-time issue or has it happened before?"],
+    "School Issues":["🏫 Which school and what is the nature of the issue?","👤 Who is involved (student, teacher, staff, facility)?","⚠️ Is this a safety concern or threat?"],
+    "Parks":["📍 Which park and what specific area has the issue?","🛝 What is the problem (broken equipment, vandalism, unsafe conditions)?","⚠️ Is it an immediate safety hazard to children or visitors?"],
+    "Fire Hazard":["📍 What is the exact address of the fire hazard?","🔥 What type of hazard is it (blocked exit, flammable materials, no smoke detectors, electrical)?","⚠️ Is there currently smoke, fire, or immediate danger?"],
+    "Building Damage":["📍 What is the address of the damaged building?","🏚️ What type of damage is present (structural, roof, foundation, fire/water damage)?","⚠️ Does the building appear unsafe or at risk of collapse?"],
+    "Animal Control":["📍 Where is the animal located?","🐕 What type of animal is it and what is it doing (stray, injured, aggressive)?","⚠️ Has anyone been bitten or threatened?"],
+    "Suspicious Activity":["📍 Where is the activity taking place?","👤 Can you describe the individuals or vehicles involved?","🕐 Is the activity currently happening or did it recently occur?"],
+    "Construction":["📍 Where is the construction taking place?","🏗️ What is the concern (noise, safety, no permit, road blockage)?","🕐 What time does the construction occur?"],
+    "Broken Fence":["📍 Where is the broken fence located?","🏡 Is it on public or private property?","🏊 Is the fence a pool enclosure or safety barrier?"],
+    "Road Damage":["📍 What is the exact road and location of the damage?","🚧 What type of damage (potholes, cracking, washout, sinkholes)?","⚠️ Is it blocking traffic or causing accidents?"],
+    "Water Leak":["📍 What is the address or location of the water leak?","💧 Is it a main line break, a meter leak, or inside a home?","🌊 Is the water flooding the road or nearby structures?"],
+    "Safety Hazard":["📍 What is the exact location of the safety hazard?","⚠️ What is the specific hazard (exposed wires, open hole, unstable structure, chemical spill)?","🚨 Is anyone currently in danger?"],
+    "Package Theft":["📍 What is your address where the theft occurred?","📦 What was stolen and from where (front door, mailbox, porch)?","📹 Do you have any camera footage or witnesses?"],
+    "Trespassing":["📍 What is the address where the trespassing is occurring?","👤 Can you describe the individual(s)?","🚨 Is the trespasser currently on the property?"],
+    "Loitering":["📍 Where is the loitering occurring?","👤 How many people are involved and how are they behaving?","🕐 How long have they been there?"],
+    "Bike Issues":["📍 Where did the bike issue occur?","🚲 What is the issue (stolen bike, accident, damaged bike lane)?","🕐 When did it happen?"],
+    "Taxi Complaint":["🚕 What is the taxi company name and vehicle/medallion number?","❓ What is the complaint (overcharge, unsafe driving, rudeness, refused ride)?","🕐 When did this happen?"],
+    "Utility Lines":["📍 Where are the utility lines located?","⚡ Are the lines downed, sparking, or sagging?","🚨 Are people or vehicles near the lines?"],
+    "Broken Windows":["📍 What is the address of the broken window?","🏠 Is this a residential, commercial, or public building?","🔨 Was this caused by vandalism or weather?"],
+    "Housing Complaint":["📍 What is the address of the housing issue?","🏠 What is the problem (mold, no heat, no water, pest infestation, structural damage)?","📅 How long have you or others been experiencing this issue?"],
+    "Sanitation":["📍 What is the location of the sanitation issue?","🧹 What is the problem (missed trash pickup, overflowing bin, unsanitary conditions)?","⚠️ Is it near a food establishment or posing a health risk?"],
+    "Air Quality":["📍 Where are you located and where is the source of the air quality issue?","💨 What do you notice (smoke, unusual smell, haze, chemical odor)?","🤒 Are you or others experiencing any health symptoms?"],
+    "Other":["📍 What is the location of the issue?","❓ Can you describe what is happening in detail?","📅 When did this start and how often does it occur?"]
+  };
+  return q[issue] || ["📍 Where is it happening?","❓ How serious is it?","📅 When did it start?"];
 }
 
-function getAdvice(){
-  return `📍 WHAT TO DO:
-• Report to city services (311)
-• Contact non-emergency police if needed
-• Monitor the issue
+function getSummary(issue, answers){
+  const d = issueDetails[issue] || issueDetails["Other"];
+  const questions = getQuestions(issue);
 
-📞 CONTACT:
-• City Services: 311
-• Emergency: 911 (if dangerous)`;
+  let detailsBlock = "";
+  questions.forEach((q,i)=>{
+    if(answers[i]){
+      detailsBlock += `${q}\n  → ${answers[i]}\n\n`;
+    }
+  });
+
+  return `━━━━━━━━━━━━━━━━━━━━━━
+📋 INCIDENT REPORT SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━
+
+🔴 ISSUE TYPE: ${issue}
+⚡ PRIORITY: ${d.priority}
+🏢 DEPARTMENT: ${d.department}
+⏰ URGENCY: ${d.urgency}
+
+━━━━━━━━━━━━━━━━━━━━━━
+📝 YOUR REPORT DETAILS:
+━━━━━━━━━━━━━━━━━━━━━━
+
+${detailsBlock}
+━━━━━━━━━━━━━━━━━━━━━━
+✅ RECOMMENDED STEPS:
+━━━━━━━━━━━━━━━━━━━━━━
+${d.steps.map((s,i)=>`${i+1}. ${s}`).join("\n")}
+
+━━━━━━━━━━━━━━━━━━━━━━
+📞 WHO TO CONTACT:
+━━━━━━━━━━━━━━━━━━━━━━
+${d.contacts.map(c=>`• ${c}`).join("\n")}
+
+━━━━━━━━━━━━━━━━━━━━━━
+💡 HELPFUL TIP:
+━━━━━━━━━━━━━━━━━━━━━━
+${d.tips}`;
 }
 
 function sendMessage(){
-  let input = document.getElementById("userInput").value.trim();
+  let input=document.getElementById("userInput").value.trim();
   if(!input) return;
 
   addMessage(input,"user");
@@ -202,39 +326,22 @@ function sendMessage(){
   }
 
   if(!state.waiting && !isNaN(input) && input>=1 && input<=40){
-    state = {
-      waiting:true,
-      issue:issues[input-1],
-      step:0,
-      answers:[]
-    };
-
-    addMessage("✅ " + state.issue,"bot");
-    addMessage(getQuestions()[0],"bot");
+    state={waiting:true,issue:issues[input-1],step:0,answers:[]};
+    addMessage("✅ Issue selected: "+state.issue+"\n\nI'll ask you a few questions to build your report.","bot");
+    let q=getQuestions(state.issue);
+    addMessage(q[0],"bot");
     return;
   }
 
   if(state.waiting){
     state.answers.push(input);
     state.step++;
-
-    let q = getQuestions();
-
-    if(state.step < q.length){
+    let q=getQuestions(state.issue);
+    if(state.step<q.length){
       addMessage(q[state.step],"bot");
-    } else {
-      addMessage(
-`📋 SUMMARY
-
-Issue: ${state.issue}
-
-Details:
-• ${state.answers.join("\n• ")}
-
-${getAdvice()}`,
-"bot");
-
-      state = {waiting:false,issue:null,step:0,answers:[]};
+    }else{
+      addMessage(getSummary(state.issue, state.answers),"bot");
+      state={waiting:false,issue:null,step:0,answers:[]};
     }
     return;
   }
@@ -242,17 +349,12 @@ ${getAdvice()}`,
   addMessage("Type 'menu' or pick a number (1–40).","bot");
 }
 
-document.addEventListener("DOMContentLoaded",welcome);
-document.addEventListener("DOMContentLoaded", function () {
-  const input = document.getElementById("userInput");
-
-  input.addEventListener("keydown", function (e) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      sendMessage();
-    }
-  });
+document.getElementById("userInput").addEventListener("keypress",e=>{
+  if(e.key==="Enter") sendMessage();
 });
+
+welcome();
+
 </script>
 
 </body>

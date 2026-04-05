@@ -128,6 +128,10 @@
         </div>
     </div>
 
+    <footer style="text-align:center; padding:4px 0 6px; font-size:0.7em; color:#aaa; border-top:1px solid var(--border); background:white;">
+        <span id="version-stamp">pmc1</span>
+    </footer>
+
     <script>
         let HISTORY = []; let PENDING_IMAGES = [];
         let SESSION_ID = 'session_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
@@ -662,12 +666,14 @@ The full text of the PMC is loaded and ready. You can ask questions like:
 Cite specific section numbers (§X.XX.XXX) in your questions for fastest lookup.`);
         });
 
-        // Build stamp (logged to console only)
+        // Build stamp — visible in footer and console
         (function() {
             const d = new Date(document.lastModified);
             const date = d.toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' });
             const time = d.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
-            console.log('pmc1 · v' + date + ' · ' + time);
+            const stamp = 'pmc1 · ' + date + ' · ' + time;
+            document.getElementById('version-stamp').textContent = stamp;
+            console.log(stamp);
         })();
     </script>
 </body>

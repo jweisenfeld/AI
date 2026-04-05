@@ -29,7 +29,11 @@
       "Bash(dir \"C:\\\\Users\\\\johnw\\\\Documents\\\\Emails\\\\orion-planning-team\" \" /O:N /B)",
       "Bash(powershell -Command \"Get-ChildItem ''C:\\\\Users\\\\johnw\\\\Documents\\\\Emails\\\\orion-planning-team\\\\'' | Sort-Object Name | Select-Object -First 10 -ExpandProperty Name\")",
       "Bash(powershell -Command \"$files = Get-ChildItem ''C:\\\\Users\\\\johnw\\\\Documents\\\\Emails\\\\orion-planning-team\\\\'' -Filter ''*.msg''; Write-Host ''Total:'' $files.Count; $f2024 = $files | Where-Object { $_Name.StartsWith\\(''2024''\\) }; Write-Host ''2024 files:'' $f2024.Count; $sorted = $files | Sort-Object Name; Write-Host ''Earliest:'' $sorted[0].Name; Write-Host ''Latest:'' $sorted[-1].Name\")",
-      "Bash(pandoc \"C:\\\\Users\\\\johnw\\\\Documents\\\\orion-planning-team-onenote\\\\Meetings \\(FlightLog 2026-03-22\\).docx\" -o \"C:\\\\Users\\\\johnw\\\\Documents\\\\orion-planning-team-onenote\\\\meetings_extracted.md\")"
+      "Bash(pandoc \"C:\\\\Users\\\\johnw\\\\Documents\\\\orion-planning-team-onenote\\\\Meetings \\(FlightLog 2026-03-22\\).docx\" -o \"C:\\\\Users\\\\johnw\\\\Documents\\\\orion-planning-team-onenote\\\\meetings_extracted.md\")",
+      "Bash(ls \"C:\\\\Users\\\\johnw\\\\Documents\\\\GitHub\\\\AI\\\\pmc1\"\" 2>/dev/null || echo \"Directory does not exist yet \")",
+      "Bash(md5sum C:/Users/johnw/Documents/GitHub/AI/coach4/Pasco-Municipal-Code*.html C:/Users/johnw/Documents/GitHub/AI/coach5/Pasco-Municipal-Code*.html C:/Users/johnw/Documents/GitHub/AI/pmc1/Pasco-Municipal-Code*.html)",
+      "Bash(ls -la C:/Users/johnw/Documents/GitHub/AI/pmc1/Pasco-Municipal-Code-clean*)",
+      "Bash(ls -la C:/Users/johnw/Documents/GitHub/AI/coach5/Pasco-Municipal-Code-clean*)"
     ]
   }
 }

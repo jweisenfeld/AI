@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- KaTeX for LaTeX/math rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+        onload="window.katexReady = true;"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pasco Municipal Code — AI Reference</title>
+    <style>
+        :root { --primary: #1e3a5f; --bg: #f5f6f8; --border: #dadce0; --text: #202124; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); height: 100vh; display: flex; flex-direction: column; margin: 0; color: var(--text); }
+        .header { background: white; padding: 10px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .main-container { flex: 1; display: flex; overflow: hidden; justify-content: center; }
+        .chat-area { width: 100%; max-width: 900px; background: white; display: flex; flex-direction: column; border-inline: 1px solid var(--border); }
+        .messages { flex: 1; overflow-y: auto; padding: 20px; }
+        .message { margin-bottom: 20px; display: flex; flex-direction: column; }
+        .bubble { padding: 12px 18px; border-radius: 18px; max-width: 85%; line-height: 1.5; font-size: 0.95rem; }
+        .user .bubble { background: var(--primary); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .assistant .bubble { background: #f1f3f4; align-self: flex-start; border-bottom-left-radius: 4px; }
+        .input-area { padding: 20px; border-top: 1px solid var(--border); }
+        .input-group { display: flex; gap: 10px; align-items: flex-start; }
+        textarea { flex: 1; height: 60px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; resize: none; font-family: inherit; }
+        .btn { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        #image-previews img { height: 50px; border-radius: 4px; border: 1px solid var(--border); margin-right: 5px; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        .thinking-bubble { font-style: italic; color: #888; animation: blink 1.2s ease-in-out infinite; }
+        .ttfb-tag { font-size: 0.7em; color: #999; margin-top: 4px; align-self: flex-start; padding: 0 4px; }
+        .meta-tags { display: flex; gap: 6px; margin-top: 4px; align-self: flex-start; flex-wrap: wrap; }
+        .cache-tag { font-size: 0.7em; padding: 1px 6px; border-radius: 10px; font-weight: 600; }
+        .cache-tag.hit  { background: #e6f4ea; color: #1e8e3e; border: 1px solid #a8d5b5; }
+        .cache-tag.miss { background: #f1f3f4; color: #80868b; border: 1px solid #dadce0; }
+        .convo-banner { display: none; margin: 0 20px 10px; padding: 9px 14px; border-radius: 8px; font-size: 0.85em; line-height: 1.4; }
+        .convo-banner.warn { background: #fef9e7; color: #7d5a00; border: 1px solid #f5c518; }
+        .convo-banner.stop { background: #fce8e6; color: #c0392b; border: 1px solid #f28b82; }
+        .convo-banner button.dismiss { float: right; background: none; border: none; cursor: pointer; font-size: 1em; line-height: 1; color: inherit; opacity: 0.6; margin-left: 8px; }
+        .convo-banner button.dismiss:hover { opacity: 1; }
+        .upload-btn { background: none; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; padding: 6px 8px; display: flex; align-items: center; justify-content: center; color: #5f6368; position: relative; }
+        .upload-btn:hover { background: #f1f3f4; border-color: #aaa; }
+        .upload-btn svg { width: 20px; height: 20px; }
+        .upload-btn::after { content: attr(data-tooltip); position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 0.75em; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.15s; }
+        .upload-btn:hover::after { opacity: 1; }
+        .copy-btn { background: none; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; padding: 6px 8px; display: flex; align-items: center; justify-content: center; color: #5f6368; font-size: 0.78em; gap: 4px; white-space: nowrap; position: relative; }
+        .copy-btn:hover { background: #f1f3f4; border-color: #aaa; }
+        .copy-btn svg { width: 16px; height: 16px; }
+        .copy-btn::after { content: attr(data-tooltip); position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 0.75em; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.15s; }
+        .copy-btn:hover::after { opacity: 1; }
+
+        /* ── Rich content inside assistant bubbles ── */
+        .bubble h1, .bubble h2, .bubble h3 { margin: 14px 0 6px 0; }
+        .bubble h1 { font-size: 1.25rem; }
+        .bubble h2 { font-size: 1.1rem; }
+        .bubble h3 { font-size: 1.0rem; }
+        .bubble p { margin: 6px 0; }
+        .bubble ul, .bubble ol { margin: 6px 0; padding-left: 22px; }
+        .bubble li { margin: 3px 0; }
+        .bubble ul.nested { margin: 3px 0 3px 18px; }
+        .bubble li.task-item { list-style: none; margin-left: -18px; }
+        .bubble li.task-item.checked { color: #888; text-decoration: line-through; }
+        .bubble a { color: var(--primary); text-decoration: underline; }
+        .bubble a:hover { opacity: 0.8; }
+        .bubble del { color: #888; text-decoration: line-through; }
+        .bubble hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+        .bubble blockquote { border-left: 4px solid var(--primary); margin: 8px 0; padding: 6px 14px; background: #e8f0fe; border-radius: 0 8px 8px 0; color: #1a56b0; font-style: italic; }
+        .bubble table { border-collapse: collapse; margin: 10px 0; width: 100%; font-size: 0.9rem; }
+        .bubble th, .bubble td { border: 1px solid var(--border); padding: 7px 11px; text-align: left; }
+        .bubble th { background: #e8f0fe; font-weight: 600; color: #1a56b0; }
+        .bubble tr:nth-child(even) td { background: #f8f9fa; }
+        .bubble pre { background: #1e1e1e; color: #d4d4d4; padding: 12px 14px; border-radius: 8px; overflow-x: auto; margin: 10px 0; font-size: 0.85rem; font-family: 'Fira Code', 'Consolas', monospace; }
+        .bubble code { background: rgba(0,0,0,0.08); padding: 2px 5px; border-radius: 4px; font-size: 0.88em; font-family: 'Fira Code', 'Consolas', monospace; }
+        .bubble pre code { background: none; padding: 0; color: inherit; }
+        .bubble sup { font-size: 0.75em; vertical-align: super; }
+        .bubble sub { font-size: 0.75em; vertical-align: sub; }
+        .bubble .katex-display { margin: 10px 0; overflow-x: auto; }
+        /* User bubble overrides — readable on blue background */
+        .user .bubble a { color: #cfe2ff; }
+        .user .bubble code { background: rgba(255,255,255,0.2); }
+        .user .bubble blockquote { background: rgba(255,255,255,0.15); border-left-color: white; color: white; }
+        .user .bubble th { background: rgba(255,255,255,0.2); color: white; }
+        .user .bubble pre { background: rgba(0,0,0,0.3); }
+    </style>
+</head>
+
+<body>
+    <header class="header">
+        <div style="font-weight:bold; color:var(--primary); font-size:1.05em;">
+            Pasco Municipal Code &nbsp;&middot;&nbsp; AI Reference
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <select id="model-select" title="Select AI model">
+                <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash</option>
+                <option value="gemini-2.5-pro">Gemini 2.5 Pro (Best Quality)</option>
+                <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite &#x26A1; (Fastest)</option>
+                <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
+                <option value="gemini-3-pro-preview">Gemini 3 Pro Preview</option>
+            </select>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="chat-area">
+            <div class="messages" id="messages"></div>
+            <div id="convo-banner" class="convo-banner"></div>
+            <div id="image-previews" style="padding: 0 20px; display: flex; gap: 8px;"></div>
+            <div class="input-area">
+                <div class="input-group">
+                    <button class="upload-btn" data-tooltip="Upload a site plan or document image" onclick="document.getElementById('file-input').click()" aria-label="Upload an image">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                    </button>
+                    <input type="file" id="file-input" multiple style="display:none" onchange="handleFiles(this)" accept="image/*">
+                    <textarea id="user-input" placeholder="Ask about the Pasco Municipal Code..."></textarea>
+                    <button class="copy-btn" data-tooltip="Copy last response" onclick="copyLastResponse()" aria-label="Copy last AI response">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                    </button>
+                    <button class="btn" onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let HISTORY = []; let PENDING_IMAGES = [];
+        let SESSION_ID = 'session_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+        let LAST_RESPONSE_TEXT = '';  // plain text of the most recent AI reply
+
+        // ── Conversation length guard ─────────────────────────────────────────────
+        // HISTORY stores alternating user/model turns; divide by 2 for exchange count.
+        const WARN_TURNS = 20;   // yellow banner appears, dismissible
+        const STOP_TURNS = 30;   // red banner, input locked (turn-based)
+
+        // ── TUNABLE COST CONTROL — keep in sync with api-proxy.php ──────────────
+        // MAX_HISTORY_CHARS: hard ceiling on JSON.stringify(HISTORY).
+        // Rule of thumb: ~4 chars per token for English text.
+        // Images are NOT stored in HISTORY (sent once, then dropped), so this
+        // only limits text conversation history.
+        //
+        //   40_000 chars ≈  10,000 tokens — default, short sessions
+        //   80_000 chars ≈  20,000 tokens — allows ~3-4 pages of document paste
+        //  160_000 chars ≈  40,000 tokens — large document dumps, higher cost
+        const MAX_HISTORY_CHARS = 80_000;
+
+        function checkConversationLength() {
+            const turns = Math.floor(HISTORY.length / 2);
+            const banner = document.getElementById('convo-banner');
+            const sendBtn = document.querySelector('.btn[onclick="sendMessage()"]');
+            const textarea = document.getElementById('user-input');
+
+            if (turns >= STOP_TURNS) {
+                banner.className = 'convo-banner stop';
+                banner.style.display = 'block';
+                banner.innerHTML = '&#x1F6D1; <strong>Conversation limit reached.</strong> This chat has grown very long. Please refresh the page to start a new session.';
+                sendBtn.disabled = true;
+                sendBtn.title = 'Refresh the page to start a new conversation';
+                textarea.disabled = true;
+                textarea.placeholder = 'Please refresh the page to start a new conversation.';
+            } else if (turns >= WARN_TURNS) {
+                // Only show warn banner if stop banner isn't already visible
+                if (!banner.classList.contains('stop')) {
+                    banner.className = 'convo-banner warn';
+                    banner.style.display = 'block';
+                    banner.innerHTML = '&#x26A0;&#xFE0F; <strong>Long conversation.</strong> This chat is getting lengthy. Consider refreshing the page for a fresh start. <button class="dismiss" onclick="this.parentElement.style.display=\'none\'" title="Dismiss">&#x2715;</button>';
+                }
+            }
+        }
+
+        // ── Rich message formatter: math (KaTeX) + full markdown, no external lib ──
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatMessage(text) {
+            if (!text) return '';
+            const rawPlaceholders = [];
+
+            // 1. Fenced code blocks (highest priority — protect from everything else)
+            text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, lang, code) => {
+                const escaped = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                const html = `<pre><code class="language-${lang}">${escaped}</code></pre>`;
+                rawPlaceholders.push(html);
+                return `\x01RAW${rawPlaceholders.length - 1}\x01`;
+            });
+
+            // 2. Block math $$...$$
+            text = text.replace(/\$\$([\s\S]+?)\$\$/g, (match, latex) => {
+                let html;
+                try {
+                    html = window.katex
+                        ? katex.renderToString(latex.trim(), { displayMode: true, throwOnError: false })
+                        : `<div>$$${latex}$$</div>`;
+                } catch(e) { html = match; }
+                rawPlaceholders.push(html);
+                return `\x01RAW${rawPlaceholders.length - 1}\x01`;
+            });
+
+            // 3. Inline math $...$
+            text = text.replace(/\$([^\$\n]+?)\$/g, (match, latex) => {
+                let html;
+                try {
+                    html = window.katex
+                        ? katex.renderToString(latex.trim(), { displayMode: false, throwOnError: false })
+                        : `<span>$${latex}$</span>`;
+                } catch(e) { html = match; }
+                rawPlaceholders.push(html);
+                return `\x01RAW${rawPlaceholders.length - 1}\x01`;
+            });
+
+            // 4. HTML-escape the rest
+            let f = escapeHtml(text);
+
+            // 5. Inline formatting
+            f = f.replace(/`([^`]+)`/g, '<code>$1</code>');
+            f = f.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+            f = f.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+            f = f.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+            f = f.replace(/\^\{([^}]+)\}/g, '<sup>$1</sup>');
+            f = f.replace(/\^(\S+)/g, '<sup>$1</sup>');
+            f = f.replace(/\_\{([^}]+)\}/g, '<sub>$1</sub>');
+            f = f.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+            // 6. Block-level pass
+            const lines = f.split('\n');
+            const out = [];
+            let i = 0;
+            while (i < lines.length) {
+                const line = lines[i];
+                if (/^### /.test(line)) { out.push(`<h3>${line.slice(4)}</h3>`); i++; continue; }
+                if (/^## /.test(line))  { out.push(`<h2>${line.slice(3)}</h2>`); i++; continue; }
+                if (/^# /.test(line))   { out.push(`<h1>${line.slice(2)}</h1>`); i++; continue; }
+                if (/^(\-{3,}|\*{3,}|_{3,})$/.test(line.trim())) { out.push('<hr>'); i++; continue; }
+                if (/^&gt; /.test(line)) {
+                    const bqLines = [];
+                    while (i < lines.length && /^&gt; /.test(lines[i])) { bqLines.push(lines[i].slice(5)); i++; }
+                    out.push(`<blockquote>${bqLines.join('<br>')}</blockquote>`);
+                    continue;
+                }
+                if (/^\|/.test(line)) {
+                    const tbl = [];
+                    while (i < lines.length && /^\|/.test(lines[i])) { tbl.push(lines[i]); i++; }
+                    if (tbl.length >= 3 && /^\|[\s\-:|]+\|$/.test(tbl[1].trim())) {
+                        const pr = (l) => l.trim().replace(/^\||\|$/g,'').split('|').map(c => c.trim());
+                        const hdr = pr(tbl[0]); const rows = tbl.slice(2).map(pr);
+                        const thead = '<thead><tr>' + hdr.map(h => `<th>${h}</th>`).join('') + '</tr></thead>';
+                        const tbody = '<tbody>' + rows.map(r => '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('') + '</tbody>';
+                        out.push(`<table>${thead}${tbody}</table>`);
+                    } else { out.push(...tbl); }
+                    continue;
+                }
+                if (/^\d+\. /.test(line)) {
+                    const items = [];
+                    while (i < lines.length && /^\d+\. /.test(lines[i])) { items.push(`<li>${lines[i].replace(/^\d+\. /, '')}</li>`); i++; }
+                    out.push(`<ol>${items.join('')}</ol>`); continue;
+                }
+                if (/^(\s{0,3})[*\-] /.test(line)) {
+                    const items = [];
+                    while (i < lines.length && /^(\s{0,3})[*\-] /.test(lines[i])) {
+                        const raw = lines[i].replace(/^(\s{0,3})[*\-] /, '');
+                        if (/^\[ \] /.test(raw))       items.push(`<li class="task-item">&#9744; ${raw.slice(4)}</li>`);
+                        else if (/^\[x\] /i.test(raw)) items.push(`<li class="task-item checked">&#9745; ${raw.slice(4)}</li>`);
+                        else                            items.push(`<li>${raw}</li>`);
+                        i++;
+                        const nested = [];
+                        while (i < lines.length && /^(\s{2,})[*\-] /.test(lines[i])) { nested.push(`<li>${lines[i].replace(/^(\s+)[*\-] /, '')}</li>`); i++; }
+                        if (nested.length) items.push(`<ul class="nested">${nested.join('')}</ul>`);
+                    }
+                    out.push(`<ul>${items.join('')}</ul>`); continue;
+                }
+                out.push(line); i++;
+            }
+
+            // 7. Wrap loose text in <p>
+            const blockTags = /^<(h[1-6]|ul|ol|li|table|blockquote|pre|hr|div)/;
+            f = out.join('\n').split(/\n{2,}/).map(block => {
+                const trimmed = block.trim();
+                if (!trimmed) return '';
+                if (blockTags.test(trimmed)) return trimmed;
+                return `<p>${trimmed.replace(/\n/g, '<br>')}</p>`;
+            }).filter(Boolean).join('\n');
+
+            // 8. Restore placeholders
+            rawPlaceholders.forEach((html, idx) => { f = f.split(`\x01RAW${idx}\x01`).join(html); });
+            return f;
+        }
+
+        const MASTER_RUBRIC = `
+### ROLE
+You are an expert AI reference assistant for the Pasco Municipal Code (PMC), the comprehensive body of ordinances governing the City of Pasco, Washington. You serve city engineers, planners, developers, attorneys, and municipal staff.
+
+### EXPERTISE
+The full text of the Pasco Municipal Code is available to you. You have deep familiarity with all titles and chapters, including but not limited to:
+- Title 3: Revenue and Finance
+- Title 9: Public Peace, Morals and Safety
+- Title 12: Streets, Sidewalks and Public Places
+- Title 13: Public Services (water, sewer, utilities)
+- Title 14: Building and Construction
+- Title 16: Environment
+- Title 17: Zoning
+- Title 25: Land Division
+- All other titles
+
+### CITATION STANDARD
+Always cite specific code sections using the format §X.XX.XXX (e.g., §17.24.020). When referencing multiple sections, list each citation. When quoting, use exact language from the code enclosed in quotation marks. If you cannot locate a specific section, say so clearly rather than paraphrasing from memory.
+
+### PROFESSIONAL CONDUCT
+- Respond at the level of a peer professional — precise, technical, complete.
+- Do not oversimplify. Your audience understands engineering, zoning, and municipal law.
+- If a question spans multiple sections, cite all relevant sections.
+- If sections appear to conflict or create ambiguity, identify the conflict explicitly with both section citations.
+- If information is absent from the PMC, say so clearly and suggest what process would apply (variance, council ordinance, administrative interpretation, etc.).
+- Cross-reference Washington State law (RCW, WAC) when relevant — note where state law preempts or supplements the PMC.
+- When a standard references an external document (IBC, IFC, AASHTO, WSDOT, etc.), name it explicitly.
+
+### ANALYSIS CAPABILITY
+You can:
+- Identify gaps — situations not addressed or incompletely addressed by the code
+- Flag internal inconsistencies between sections across different titles
+- Compare standards across zoning districts or use categories
+- Summarize amendment notes or historical context where present in the code
+- Identify what process would be needed to change a specific standard (administrative, council action, state-level)
+- Note practical engineering implications of code requirements
+
+### RESPONSE FORMAT
+- Use headers, tables, and numbered lists freely — this is a professional reference tool.
+- For complex multi-section answers: lead with a brief summary, then detail each relevant section.
+- For direct lookup queries: lead with the section text or key provision, then add context or cross-references.
+- No artificial response length cap — answer as completely as the question requires.
+- End responses with a brief "See also:" note citing related sections when relevant, not with generic follow-up questions.
+- Use bold for section numbers (e.g., **§17.24.020**) to make citations scannable.
+`;
+
+        function handleFiles(input) {
+            for (let file of input.files) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    PENDING_IMAGES.push({ inline_data: { mime_type: file.type, data: e.target.result.split(',')[1] } });
+                    const img = document.createElement('img'); img.src = e.target.result;
+                    document.getElementById('image-previews').appendChild(img);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const text = input.value.trim();
+            if (!text && PENDING_IMAGES.length === 0) return;
+
+            // Snapshot image count now — PENDING_IMAGES is cleared below
+            const imageCount = PENDING_IMAGES.length;
+
+            appendBubble('user', text || "(Image Uploaded)");
+
+            // ── API parts: include real image data for THIS call only ─────────────
+            const apiParts = [];
+            if (text) apiParts.push({ text: text });
+            PENDING_IMAGES.forEach(img => apiParts.push(img));
+
+            // ── HISTORY parts: text-only — images replaced by a readable placeholder.
+            // This keeps HISTORY lean (no base64 blobs). The model has already processed
+            // the image in the turn it was sent; re-sending on every future turn wastes tokens.
+            const historyParts = [];
+            if (text) historyParts.push({ text: text });
+            if (imageCount > 0) historyParts.push({ text: `[uploaded ${imageCount} image(s)]` });
+
+            HISTORY.push({ role: 'user', parts: historyParts });
+            input.value = '';
+            document.getElementById('image-previews').innerHTML = '';
+            PENDING_IMAGES = [];
+
+            // Build log-friendly user label (used later in logQuery)
+            const logUserText = imageCount > 0
+                ? (text ? `${text} [+ ${imageCount} image(s)]` : `[${imageCount} image(s) uploaded]`)
+                : text;
+
+            // Build the API payload: previous turns from HISTORY (text-only), but replace
+            // the current (last) turn with apiParts so the real image goes to the model.
+            const messagesForApi = [
+                ...HISTORY.slice(0, -1),          // prior turns — text only
+                { role: 'user', parts: apiParts }  // current turn — with image(s)
+            ];
+
+            // ── Hard payload size guard (catches paste-back exploits) ─────────────
+            // HISTORY is text-only, so this check is fast and accurate.
+            const historyChars = JSON.stringify(HISTORY).length;
+            if (historyChars > MAX_HISTORY_CHARS) {
+                // Roll back the push we just did — don't leave a dangling user turn
+                HISTORY.pop();
+                const approxTokens = Math.round(historyChars / 4).toLocaleString();
+                const banner = document.getElementById('convo-banner');
+                banner.className = 'convo-banner stop';
+                banner.style.display = 'block';
+                banner.innerHTML = `&#x1F6D1; <strong>Context limit reached (~${approxTokens} tokens).</strong> Your conversation history is too large to send. Please start a new session.`;
+                const sendBtn = document.querySelector('.btn[onclick="sendMessage()"]');
+                const textarea = document.getElementById('user-input');
+                sendBtn.disabled = true;
+                textarea.disabled = true;
+                textarea.placeholder = 'Please refresh the page to start a new conversation.';
+                return;
+            }
+
+            // Show "Thinking…" bubble immediately, before fetch starts
+            const messagesDiv = document.getElementById('messages');
+            const thinkingDiv = document.createElement('div');
+            thinkingDiv.className = 'message assistant';
+            thinkingDiv.innerHTML = '<div class="bubble thinking-bubble">Thinking\u2026</div>';
+            messagesDiv.appendChild(thinkingDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            const requestBody = JSON.stringify({
+                action: 'chat',
+                session_id: SESSION_ID,
+                model: document.getElementById('model-select').value,
+                system: MASTER_RUBRIC,
+                messages: messagesForApi
+            });
+
+            try {
+                const fetchStart = performance.now();
+                const res = await fetch('api-proxy.php?stream=1', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: requestBody
+                });
+
+                if (!res.ok || !res.body) throw new Error('Stream unavailable');
+
+                // Replace thinking bubble with an empty assistant bubble to fill in
+                thinkingDiv.remove();
+                const assistantDiv = document.createElement('div');
+                assistantDiv.className = 'message assistant';
+                assistantDiv.innerHTML = '<div class="bubble"></div>';
+                messagesDiv.appendChild(assistantDiv);
+                const bubbleEl = assistantDiv.querySelector('.bubble');
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let accumulated = '';
+                let partialLine = '';
+                let ttfbMs = null;       // time-to-first-byte (first text delta)
+                let cachedTokens = null; // populated from trailing meta event
+
+                let streamDone = false;
+                while (!streamDone) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    partialLine += decoder.decode(value, { stream: true });
+
+                    // Process all complete lines; keep any trailing incomplete line
+                    const lines = partialLine.split('\n');
+                    partialLine = lines.pop();
+
+                    for (const line of lines) {
+                        const trimmed = line.trimEnd();
+                        if (!trimmed.startsWith('data: ')) continue;
+
+                        const payload = trimmed.slice(6);
+                        if (payload === '[DONE]') { streamDone = true; break; }
+
+                        let parsed;
+                        try { parsed = JSON.parse(payload); } catch { continue; }
+
+                        if (parsed.error) throw new Error(JSON.stringify(parsed.error));
+
+                        // Capture trailing metadata event (cache hit info)
+                        if (parsed.meta) {
+                            cachedTokens = parsed.meta.cachedTokens ?? 0;
+                            continue;
+                        }
+
+                        // Handle both our simplified {"text":"..."} wrapper AND
+                        // Gemini's raw SSE format. For thinking models (Gemini 3 Pro),
+                        // parts may include thoughtSignature blobs with empty text —
+                        // find the first part that has a non-empty text string.
+                        let delta = parsed.text ?? null;
+                        if (delta === null && Array.isArray(parsed.candidates?.[0]?.content?.parts)) {
+                            for (const part of parsed.candidates[0].content.parts) {
+                                if (typeof part.text === 'string' && part.text.length > 0
+                                        && !part.thoughtSignature) {
+                                    delta = part.text;
+                                    break;
+                                }
+                            }
+                        }
+                        if (delta) {
+                            if (ttfbMs === null) {
+                                ttfbMs = Math.round(performance.now() - fetchStart);
+                            }
+                            accumulated += delta;
+                            bubbleEl.innerHTML = formatMessage(accumulated);
+                            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                        }
+                    }
+                }
+
+                // Show TTFB + cache badge beneath the bubble — only if we got a response
+                if (accumulated && (ttfbMs !== null || cachedTokens !== null)) {
+                    const metaRow = document.createElement('div');
+                    metaRow.className = 'meta-tags';
+
+                    if (ttfbMs !== null) {
+                        const ttfbTag = document.createElement('span');
+                        ttfbTag.className = 'ttfb-tag';
+                        ttfbTag.textContent = `⏱ ${ttfbMs < 1000 ? ttfbMs + 'ms' : (ttfbMs/1000).toFixed(1) + 's'}`;
+                        metaRow.appendChild(ttfbTag);
+                    }
+
+                    if (cachedTokens !== null) {
+                        const cacheTag = document.createElement('span');
+                        if (cachedTokens > 0) {
+                            const pct = Math.round(cachedTokens / 1000);
+                            cacheTag.className = 'cache-tag hit';
+                            cacheTag.title = `${cachedTokens.toLocaleString()} tokens served from cache`;
+                            cacheTag.textContent = `⚡ cached ${pct}k tok`;
+                        } else {
+                            cacheTag.className = 'cache-tag miss';
+                            cacheTag.title = 'No cached tokens — first request warms the cache';
+                            cacheTag.textContent = '○ no cache';
+                        }
+                        metaRow.appendChild(cacheTag);
+                    }
+
+                    assistantDiv.appendChild(metaRow);
+                }
+
+                if (accumulated) {
+                    LAST_RESPONSE_TEXT = accumulated;
+                    HISTORY.push({ role: 'model', parts: [{ text: accumulated }] });
+                    logQuery(logUserText, accumulated, ttfbMs);
+                    checkConversationLength();
+                }
+
+            } catch (err) {
+                // Streaming failed — fall back to non-streaming route
+                console.warn('SSE stream failed, falling back:', err);
+                // Remove both the thinking indicator and any partially-rendered
+                // assistant bubble (which would otherwise leave an orphaned badge)
+                thinkingDiv.remove();
+                assistantDiv?.remove();
+
+                try {
+                    const res = await fetch('api-proxy.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: requestBody
+                    });
+                    const data = await res.json();
+                    if (data.candidates) {
+                        const reply = data.candidates[0].content.parts[0].text;
+                        LAST_RESPONSE_TEXT = reply;
+                        appendBubble('assistant', reply);
+                        HISTORY.push({ role: 'model', parts: [{ text: reply }] });
+                        logQuery(logUserText, reply, null);
+                        checkConversationLength();
+                    } else {
+                        appendBubble('assistant', "⚠️ Error: " + (data.error?.message || "Connection failed."));
+                    }
+                } catch (fallbackErr) {
+                    appendBubble('assistant', "⚠️ Connection failed. Please try again.");
+                }
+            }
+        }
+
+        async function logQuery(userText, botReply, ttfbMs) {
+            fetch('api-proxy.php', {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'log_query',
+                    session_id: SESSION_ID,
+                    ttfb_ms: ttfbMs,
+                    log: `USER: ${userText}\nBOT: ${botReply}\n---\n`
+                })
+            });
+        }
+
+        async function copyLastResponse() {
+            if (!LAST_RESPONSE_TEXT) return;
+            try {
+                await navigator.clipboard.writeText(LAST_RESPONSE_TEXT);
+                const btn = document.querySelector('.copy-btn');
+                const orig = btn.getAttribute('data-tooltip');
+                btn.setAttribute('data-tooltip', 'Copied!');
+                setTimeout(() => btn.setAttribute('data-tooltip', orig), 1500);
+            } catch {
+                // Fallback for older browsers
+                const ta = document.createElement('textarea');
+                ta.value = LAST_RESPONSE_TEXT;
+                ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+        }
+
+        function appendBubble(role, text) {
+            const messagesDiv = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = `message ${role === 'model' ? 'assistant' : 'user'}`;
+            div.innerHTML = `<div class="bubble">${formatMessage(text)}</div>`;
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // Enter key support on the textarea (Shift+Enter for newline)
+        document.getElementById('user-input').addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+        });
+
+        // Show welcome message on load
+        window.addEventListener('DOMContentLoaded', () => {
+            appendBubble('model', `**Welcome to the Pasco Municipal Code AI Reference.**
+
+The full text of the PMC is loaded and ready. You can ask questions like:
+
+- *"What are the setback requirements for commercial development in the C-1 zone?"*
+- *"Summarize the stormwater management requirements in Title 13."*
+- *"Does the PMC address roundabout design standards, or would that default to WSDOT?"*
+- *"What approval process is required for a variance to lot coverage limits?"*
+- *"Are there any apparent conflicts between the utility easement language in Title 13 and Title 17 development standards?"*
+
+Cite specific section numbers (§X.XX.XXX) in your questions for fastest lookup.`);
+        });
+
+        // Build stamp (logged to console only)
+        (function() {
+            const d = new Date(document.lastModified);
+            const date = d.toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' });
+            const time = d.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
+            console.log('pmc1 · v' + date + ' · ' + time);
+        })();
+    </script>
+</body>
+</html>

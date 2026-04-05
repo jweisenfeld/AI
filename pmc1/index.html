@@ -49,10 +49,11 @@
         .copy-btn:hover::after { opacity: 1; }
 
         /* ── Rich content inside assistant bubbles ── */
-        .bubble h1, .bubble h2, .bubble h3 { margin: 14px 0 6px 0; }
+        .bubble h1, .bubble h2, .bubble h3, .bubble h4 { margin: 14px 0 6px 0; }
         .bubble h1 { font-size: 1.25rem; }
         .bubble h2 { font-size: 1.1rem; }
         .bubble h3 { font-size: 1.0rem; }
+        .bubble h4 { font-size: 0.95rem; font-weight: 600; color: #444; }
         .bubble p { margin: 6px 0; }
         .bubble ul, .bubble ol { margin: 6px 0; padding-left: 22px; }
         .bubble li { margin: 3px 0; }
@@ -234,9 +235,10 @@
             let i = 0;
             while (i < lines.length) {
                 const line = lines[i];
-                if (/^### /.test(line)) { out.push(`<h3>${line.slice(4)}</h3>`); i++; continue; }
-                if (/^## /.test(line))  { out.push(`<h2>${line.slice(3)}</h2>`); i++; continue; }
-                if (/^# /.test(line))   { out.push(`<h1>${line.slice(2)}</h1>`); i++; continue; }
+                if (/^#### /.test(line)) { out.push(`<h4>${line.slice(5)}</h4>`); i++; continue; }
+                if (/^### /.test(line))  { out.push(`<h3>${line.slice(4)}</h3>`); i++; continue; }
+                if (/^## /.test(line))   { out.push(`<h2>${line.slice(3)}</h2>`); i++; continue; }
+                if (/^# /.test(line))    { out.push(`<h1>${line.slice(2)}</h1>`); i++; continue; }
                 if (/^(\-{3,}|\*{3,}|_{3,})$/.test(line.trim())) { out.push('<hr>'); i++; continue; }
                 if (/^&gt; /.test(line)) {
                     const bqLines = [];
@@ -538,6 +540,10 @@ You can:
                     HISTORY.push({ role: 'model', parts: [{ text: accumulated }] });
                     logQuery(logUserText, accumulated, ttfbMs);
                     checkConversationLength();
+                } else {
+                    // Stream completed with no text — remove orphaned bubble
+                    assistantDiv.remove();
+                    appendBubble('assistant', '⚠️ No response received. The server may be unavailable.');
                 }
 
             } catch (err) {

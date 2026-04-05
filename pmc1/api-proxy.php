@@ -159,12 +159,14 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     require_once($secretsFile); // defines $GEMINI_API_KEY
 
     $modelMap = [
-        "gemini-2.5-flash-lite" => "gemini-2.5-flash-lite",
-        "gemini-2.5-flash"      => "gemini-2.5-flash",
-        "gemini-2.5-pro"        => "gemini-2.5-pro",
-        "gemini-3-flash-preview"=> "gemini-3-flash-preview",
-        "gemini-3-pro-preview"  => "gemini-3-pro-preview",
-        // gemini-2.0-flash and gemini-2.0-flash-lite removed — deprecated (404 on inference)
+        "gemini-2.5-flash-lite"        => "gemini-2.5-flash-lite",
+        "gemini-2.5-flash"             => "gemini-2.5-flash",
+        "gemini-2.5-pro"               => "gemini-2.5-pro",
+        "gemini-3-flash-preview"       => "gemini-3-flash-preview",
+        "gemini-3.1-flash-lite-preview"=> "gemini-3.1-flash-lite-preview",
+        "gemini-3.1-pro-preview"       => "gemini-3.1-pro-preview",
+        // removed: gemini-3-pro-preview (shut down Mar 9 2026 — returns 404)
+        // removed: gemini-2.0-flash / gemini-2.0-flash-lite (deprecated)
     ];
     $requested   = $data['model'] ?? 'gemini-2.5-flash-lite';
     $actualModel = $modelMap[$requested] ?? "gemini-2.5-flash-lite";
@@ -528,11 +530,13 @@ require_once($secretsFile);
 
 $modelMap = [
     "gemini-2.5-flash-lite" => "gemini-2.5-flash-lite",
-    "gemini-2.5-flash"      => "gemini-2.5-flash",
-    "gemini-2.5-pro"        => "gemini-2.5-pro",
-    "gemini-3-flash-preview"=> "gemini-3-flash-preview",
-    "gemini-3-pro-preview"  => "gemini-3-pro-preview",
-    // gemini-2.0-flash and gemini-2.0-flash-lite removed — deprecated (404 on inference)
+    "gemini-2.5-flash"             => "gemini-2.5-flash",
+    "gemini-2.5-pro"               => "gemini-2.5-pro",
+    "gemini-3-flash-preview"       => "gemini-3-flash-preview",
+    "gemini-3.1-flash-lite-preview"=> "gemini-3.1-flash-lite-preview",
+    "gemini-3.1-pro-preview"       => "gemini-3.1-pro-preview",
+    // removed: gemini-3-pro-preview (shut down Mar 9 2026 — returns 404)
+    // removed: gemini-2.0-flash / gemini-2.0-flash-lite (deprecated)
 ];
 
 $requested   = $data['model'] ?? 'gemini-2.5-flash-lite';

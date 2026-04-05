@@ -571,7 +571,7 @@ You can:
                 } else {
                     // Stream completed with no text — remove orphaned bubble
                     assistantDiv.remove();
-                    appendBubble('assistant', '⚠️ No response received. The server may be unavailable.');
+                    appendBubble('model', '⚠️ No response received. The server may be unavailable.');
                 }
 
             } catch (err) {
@@ -592,15 +592,15 @@ You can:
                     if (data.candidates) {
                         const reply = data.candidates[0].content.parts[0].text;
                         LAST_RESPONSE_TEXT = reply;
-                        appendBubble('assistant', reply);
+                        appendBubble('model', reply);
                         HISTORY.push({ role: 'model', parts: [{ text: reply }] });
                         logQuery(logUserText, reply, null);
                         checkConversationLength();
                     } else {
-                        appendBubble('assistant', "⚠️ Error: " + (data.error?.message || "Connection failed."));
+                        appendBubble('model', "⚠️ Error: " + (data.error?.message || "Connection failed."));
                     }
                 } catch (fallbackErr) {
-                    appendBubble('assistant', "⚠️ Connection failed. Please try again.");
+                    appendBubble('model', "⚠️ Connection failed. Please try again.");
                 }
             }
         }

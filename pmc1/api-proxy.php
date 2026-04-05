@@ -48,7 +48,7 @@ define('MAX_HISTORY_CHARS', 40_000);
 // Others fall back to Files API + implicit caching (random hit/miss).
 // Flash is added alongside Flash-Lite since it's the new default model for pmc1.
 define('EXPLICIT_CACHE_TTL', 12 * 3600);
-define('EXPLICIT_CACHE_MODELS_JSON', json_encode(['gemini-2.5-flash-lite', 'gemini-2.5-flash']));
+define('EXPLICIT_CACHE_MODELS_JSON', json_encode(['gemini-2.5-flash-lite']));
 
 /**
  * Returns a valid explicit cachedContent name for $model, creating one if needed.

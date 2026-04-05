@@ -34,7 +34,8 @@
       "Bash(md5sum C:/Users/johnw/Documents/GitHub/AI/coach4/Pasco-Municipal-Code*.html C:/Users/johnw/Documents/GitHub/AI/coach5/Pasco-Municipal-Code*.html C:/Users/johnw/Documents/GitHub/AI/pmc1/Pasco-Municipal-Code*.html)",
       "Bash(ls -la C:/Users/johnw/Documents/GitHub/AI/pmc1/Pasco-Municipal-Code-clean*)",
       "Bash(ls -la C:/Users/johnw/Documents/GitHub/AI/coach5/Pasco-Municipal-Code-clean*)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:ai.google.dev)"
     ]
   }
 }

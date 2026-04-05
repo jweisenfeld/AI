@@ -56,7 +56,7 @@ define('EXPLICIT_CACHE_MODELS_JSON', json_encode(['gemini-2.5-flash-lite', 'gemi
  * simultaneously on a cold start.  Returns null on failure — caller falls back
  * to Files API (implicit caching) with no disruption to the user.
  */
-function get_or_create_explicit_cache(string $model, string $fileUri, string $fileMime, string $apiKey, string $accountRoot): ?string {
+function get_or_create_explicit_cache(string $model, string $fileUri, string $fileMime, string $apiKey, string $accountRoot, string $systemText = ''): ?string {
     $safeModel  = preg_replace('/[^a-z0-9\-]/', '-', $model);
     $nameFile   = $accountRoot . '/.secrets/gemini_explicit_cache_' . $safeModel . '.txt';
     $expiryFile = $nameFile . '.expires';
@@ -91,6 +91,7 @@ function get_or_create_explicit_cache(string $model, string $fileUri, string $fi
     }
 
     // ── We hold the lock — create the cache ──────────────────────────────────
+    // Gemini requires systemInstruction to be in the cache, NOT in the generate request.
     $createUrl = "https://generativelanguage.googleapis.com/v1beta/cachedContents?key=$apiKey";
     $createPayload = [
         'model'    => "models/$model",
@@ -100,6 +101,9 @@ function get_or_create_explicit_cache(string $model, string $fileUri, string $fi
         ]],
         'ttl' => EXPLICIT_CACHE_TTL . 's',
     ];
+    if (!empty($systemText)) {
+        $createPayload['systemInstruction'] = ['parts' => [['text' => $systemText]]];
+    }
 
     $ch = curl_init($createUrl);
     curl_setopt($ch, CURLOPT_POST,           true);
@@ -210,7 +214,8 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     if ($fileUri !== null && in_array($actualModel, $explicitModels)) {
         $accountRootLocal  = dirname(dirname($cacheNameFile));  // derive: .secrets/../ = account root
         $explicitCacheName = get_or_create_explicit_cache(
-            $actualModel, $fileUri, $fileMimeType, trim($GEMINI_API_KEY), $accountRootLocal
+            $actualModel, $fileUri, $fileMimeType, trim($GEMINI_API_KEY), $accountRootLocal,
+            $data['system'] ?? ''
         );
     }
 
@@ -249,13 +254,13 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     $generationConfig  = ["maxOutputTokens" => 4000];
 
     if ($explicitCacheName !== null) {
-        // Explicit cache: send conversation only — the cache already holds the file.
-        // Do NOT prepend the file URI; 'cachedContent' replaces it.
+        // Explicit cache: send conversation only — the cache already holds the file
+        // AND the systemInstruction (baked in at creation time).
+        // Do NOT send systemInstruction here — Gemini 400s if you do.
         $payload = [
-            "cachedContent"     => $explicitCacheName,
-            "contents"          => $contents,
-            "systemInstruction" => $systemInstruction,
-            "generationConfig"  => $generationConfig,
+            "cachedContent"    => $explicitCacheName,
+            "contents"         => $contents,
+            "generationConfig" => $generationConfig,
         ];
     } else {
         // Files API fallback: prepend file as first user turn (implicit caching).
@@ -607,7 +612,8 @@ $explicitCacheName = null;
 $explicitModels    = json_decode(EXPLICIT_CACHE_MODELS_JSON, true);
 if ($fileUri !== null && in_array($actualModel, $explicitModels)) {
     $explicitCacheName = get_or_create_explicit_cache(
-        $actualModel, $fileUri, $fileMimeType, trim($GEMINI_API_KEY), $accountRoot
+        $actualModel, $fileUri, $fileMimeType, trim($GEMINI_API_KEY), $accountRoot,
+        $data['system'] ?? ''
     );
 }
 
@@ -616,12 +622,13 @@ $systemInstruction = ["parts" => [["text" => $data['system'] ?? "You are a munic
 $generationConfig  = ["maxOutputTokens" => 4000];
 
 if ($explicitCacheName !== null) {
-    // Explicit cache: send conversation only — the cache holds the file.
+    // Explicit cache: send conversation only — the cache holds the file
+    // AND the systemInstruction (baked in at creation time).
+    // Do NOT send systemInstruction here — Gemini 400s if you do.
     $payload = [
-        "cachedContent"     => $explicitCacheName,
-        "contents"          => $contents,
-        "systemInstruction" => $systemInstruction,
-        "generationConfig"  => $generationConfig,
+        "cachedContent"    => $explicitCacheName,
+        "contents"         => $contents,
+        "generationConfig" => $generationConfig,
     ];
 } else {
     // Files API fallback: prepend file as first user turn (implicit caching).

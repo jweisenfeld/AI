@@ -426,6 +426,25 @@ You can:
                 messages: messagesForApi
             });
 
+            // Capture model label before fetch — used in meta tags and user bubble
+            const modelLabel = document.getElementById('model-select').selectedOptions[0].text;
+
+            // Add model label beneath the user bubble
+            const userMsgDiv = messagesDiv.lastElementChild;
+            if (userMsgDiv) {
+                const userModelTag = document.createElement('div');
+                userModelTag.className = 'meta-tags';
+                userModelTag.style.justifyContent = 'flex-end';
+                const mt = document.createElement('span');
+                mt.className = 'ttfb-tag';
+                mt.textContent = modelLabel;
+                userModelTag.appendChild(mt);
+                userMsgDiv.appendChild(userModelTag);
+            }
+
+            // assistantDiv declared here so the catch block can reference it
+            let assistantDiv = null;
+
             try {
                 const fetchStart = performance.now();
                 const res = await fetch('api-proxy.php?stream=1', {
@@ -438,7 +457,7 @@ You can:
 
                 // Replace thinking bubble with an empty assistant bubble to fill in
                 thinkingDiv.remove();
-                const assistantDiv = document.createElement('div');
+                assistantDiv = document.createElement('div');
                 assistantDiv.className = 'message assistant';
                 assistantDiv.innerHTML = '<div class="bubble"></div>';
                 messagesDiv.appendChild(assistantDiv);
@@ -505,7 +524,7 @@ You can:
                     }
                 }
 
-                // Show TTFB + cache badge beneath the bubble — only if we got a response
+                // Show TTFB + cache + model badge beneath the bubble — only if we got a response
                 if (accumulated && (ttfbMs !== null || cachedTokens !== null)) {
                     const metaRow = document.createElement('div');
                     metaRow.className = 'meta-tags';
@@ -531,6 +550,11 @@ You can:
                         }
                         metaRow.appendChild(cacheTag);
                     }
+
+                    const modelTag = document.createElement('span');
+                    modelTag.className = 'ttfb-tag';
+                    modelTag.textContent = modelLabel;
+                    metaRow.appendChild(modelTag);
 
                     assistantDiv.appendChild(metaRow);
                 }

@@ -172,7 +172,7 @@
                 if (!banner.classList.contains('stop')) {
                     banner.className = 'convo-banner warn';
                     banner.style.display = 'block';
-                    banner.innerHTML = '&#x26A0;&#xFE0F; <strong>Long conversation.</strong> This chat is getting lengthy. Consider refreshing the page for a fresh start. <button class="dismiss" onclick="this.parentElement.style.display=\'none\'" title="Dismiss">&#x2715;</button>';
+                    banner.innerHTML = '&#x26A0;&#xFE0F; <strong>Long session.</strong> Conversation history is growing large — verbose models (Pro) fill the context buffer faster. Refresh the page to start a fresh session; your PMC access is unaffected. <button class="dismiss" onclick="this.parentElement.style.display=\'none\'" title="Dismiss">&#x2715;</button>';
                 }
             }
         }
@@ -602,7 +602,8 @@ You can:
                         logQuery(logUserText, reply, null);
                         checkConversationLength();
                     } else {
-                        appendBubble('model', "⚠️ Error: " + (data.error?.message || "Connection failed."));
+                        const errMsg = data.error?.message || (typeof data.error === 'string' ? data.error : "Connection failed.");
+                        appendBubble('model', "⚠️ " + errMsg);
                     }
                 } catch (fallbackErr) {
                     if (isSafetyBlock) {

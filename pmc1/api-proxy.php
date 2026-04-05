@@ -37,7 +37,7 @@ function send_error($msg, $details = null) {
 // 160,000 chars ≈  40,000 tokens  — large document dumps, higher cost
 //
 // JS client uses 80k; this server-side value is a backstop.
-define('MAX_HISTORY_CHARS', 40_000);
+define('MAX_HISTORY_CHARS', 80_000);
 
 // ── Explicit Context Cache ────────────────────────────────────────────────────
 // TTL for explicit cache entries. 12 hours covers a full business day so

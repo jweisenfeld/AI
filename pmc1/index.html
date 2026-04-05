@@ -208,8 +208,8 @@
                 return `\x01RAW${rawPlaceholders.length - 1}\x01`;
             });
 
-            // 3. Inline math $...$
-            text = text.replace(/\$([^\$\n]+?)\$/g, (match, latex) => {
+            // 3. Inline math $...$ — negative lookahead (?!\d) prevents currency like $100 from matching
+            text = text.replace(/\$(?!\d)([^\$\n]+?)\$(?!\d)/g, (match, latex) => {
                 let html;
                 try {
                     html = window.katex
@@ -495,7 +495,10 @@ You can:
                         let parsed;
                         try { parsed = JSON.parse(payload); } catch { continue; }
 
-                        if (parsed.error) throw new Error(JSON.stringify(parsed.error));
+                        if (parsed.error) {
+                            const geminiErr = parsed.error?.message || JSON.stringify(parsed.error);
+                            throw new Error(geminiErr);
+                        }
 
                         // Capture trailing metadata event (cache hit info)
                         if (parsed.meta) {
@@ -576,7 +579,9 @@ You can:
 
             } catch (err) {
                 // Streaming failed — fall back to non-streaming route
-                console.warn('SSE stream failed, falling back:', err);
+                const errText = err?.message || String(err);
+                const isSafetyBlock = /safety|blocked|SAFETY|recitation/i.test(errText);
+                console.warn('SSE stream failed, falling back:', errText);
                 // Remove both the thinking indicator and any partially-rendered
                 // assistant bubble (which would otherwise leave an orphaned badge)
                 thinkingDiv.remove();
@@ -600,7 +605,11 @@ You can:
                         appendBubble('model', "⚠️ Error: " + (data.error?.message || "Connection failed."));
                     }
                 } catch (fallbackErr) {
-                    appendBubble('model', "⚠️ Connection failed. Please try again.");
+                    if (isSafetyBlock) {
+                        appendBubble('model', "⚠️ Response blocked by content safety filter. Try rephrasing the question using neutral, technical language (e.g. \"public decency standards\" instead of descriptive terms).");
+                    } else {
+                        appendBubble('model', `⚠️ Connection failed. Try again, or refresh if this persists. (${errText})`);
+                    }
                 }
             }
         }

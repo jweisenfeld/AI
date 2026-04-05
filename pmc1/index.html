@@ -336,6 +336,12 @@ You can:
 - Identify what process would be needed to change a specific standard (administrative, council action, state-level)
 - Note practical engineering implications of code requirements
 
+### LANGUAGE
+Detect the language of the user's message and respond in that same language throughout.
+If the user writes in Spanish, respond entirely in Spanish — including section citations, headers, and analysis.
+Use accurate legal and municipal terminology for the target language (e.g., "derecho de vía" for right-of-way, "varianza" for variance, "retiro" for setback).
+The source document is in English; translate provisions accurately rather than literally when legal equivalents exist.
+
 ### RESPONSE FORMAT
 - Use headers, tables, and numbered lists freely — this is a professional reference tool.
 - For complex multi-section answers: lead with a brief summary, then detail each relevant section.
@@ -666,13 +672,17 @@ You can:
         window.addEventListener('DOMContentLoaded', () => {
             appendBubble('model', `**Welcome to the Pasco Municipal Code AI Reference.**
 
-The full text of the PMC is loaded and ready. You can ask questions like:
+The full text of the PMC is loaded and ready. Ask questions in **English or Spanish** — responses will match your language.
 
+#### English
 - *"What are the setback requirements for commercial development in the C-1 zone?"*
-- *"Summarize the stormwater management requirements in Title 13."*
 - *"Does the PMC address roundabout design standards, or would that default to WSDOT?"*
-- *"What approval process is required for a variance to lot coverage limits?"*
-- *"Are there any apparent conflicts between the utility easement language in Title 13 and Title 17 development standards?"*
+- *"Are there any apparent conflicts between the utility easement language in Title 13 and Title 17?"*
+
+#### Español
+- *"¿Cuáles son los requisitos de retiro para uso comercial en la zona C-1?"*
+- *"¿Qué permisos necesito para conectar una propiedad al sistema de alcantarillado público?"*
+- *"Resuma los requisitos de zonificación para subdivisiones residenciales."*
 
 Cite specific section numbers (§X.XX.XXX) in your questions for fastest lookup.`);
         });

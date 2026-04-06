@@ -529,6 +529,71 @@ if (isset($data['action']) && $data['action'] === 'log_query') {
     exit;
 }
 
+// --- QUERY REPORT ROUTE ---
+// Usage: POST {"action":"query_report","secret":"amentum2025","limit":25}
+if (isset($data['action']) && $data['action'] === 'query_report') {
+    if (($data['secret'] ?? '') !== 'amentum2025') { send_error('Forbidden'); }
+
+    $limit = (int)($data['limit'] ?? 25);
+    if ($limit < 1) $limit = 1;
+    if ($limit > 100) $limit = 100;
+
+    $logFilename = __DIR__ . '/query_logs/' . date('Y-m') . '.txt';
+    if (!file_exists($logFilename)) {
+        echo json_encode([
+            'success' => true,
+            'month' => date('Y-m'),
+            'file' => basename($logFilename),
+            'totals' => ['sessions' => 0, 'queries' => 0],
+            'recent' => [],
+        ]);
+        exit;
+    }
+
+    $raw = (string)file_get_contents($logFilename);
+    preg_match_all('/---\s+([0-9:\-\s]+)\s+\|\s+([a-z0-9_]+)\s+---\R(.*?)(?=\R---\s+[0-9:\-\s]+\s+\|\s+[a-z0-9_]+\s+---|\z)/is', $raw, $matches, PREG_SET_ORDER);
+
+    $entries = [];
+    $sessionMap = [];
+    foreach ($matches as $m) {
+        $timestamp = trim($m[1]);
+        $sessionId = trim($m[2]);
+        $body      = trim($m[3]);
+
+        $user = '';
+        $bot  = '';
+        if (preg_match('/USER:\s*(.*?)(?:\R+BOT:|\z)/is', $body, $um)) {
+            $user = trim($um[1]);
+        }
+        if (preg_match('/BOT:\s*(.*?)(?:\R+---|\z)/is', $body, $bm)) {
+            $bot = trim($bm[1]);
+        }
+
+        $sessionMap[$sessionId] = true;
+        $entries[] = [
+            'time' => $timestamp,
+            'session_id' => $sessionId,
+            'user_preview' => mb_substr(preg_replace('/\s+/', ' ', $user), 0, 180),
+            'bot_preview'  => mb_substr(preg_replace('/\s+/', ' ', $bot), 0, 180),
+            'user_chars'   => mb_strlen($user),
+            'bot_chars'    => mb_strlen($bot),
+        ];
+    }
+
+    $recent = array_slice(array_reverse($entries), 0, $limit);
+    echo json_encode([
+        'success' => true,
+        'month' => date('Y-m'),
+        'file' => basename($logFilename),
+        'totals' => [
+            'sessions' => count($sessionMap),
+            'queries'  => count($entries),
+        ],
+        'recent' => $recent,
+    ]);
+    exit;
+}
+
 // --- CHAT ROUTE (non-streaming fallback) ---
 if (!file_exists($secretsFile)) send_error("API Key file missing.");
 require_once($secretsFile);

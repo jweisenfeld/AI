@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lord of the Flies — Text Navigator</title>
+    <style>
+        :root { --primary: #2d4a1e; --bg: #f5f6f4; --border: #d0d4c8; --text: #202124; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); height: 100vh; display: flex; flex-direction: column; margin: 0; color: var(--text); }
+        .header { background: white; padding: 10px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .main-container { flex: 1; display: flex; overflow: hidden; justify-content: center; }
+        .chat-area { width: 100%; max-width: 900px; background: white; display: flex; flex-direction: column; border-inline: 1px solid var(--border); }
+        .messages { flex: 1; overflow-y: auto; padding: 20px; }
+        .message { margin-bottom: 20px; display: flex; flex-direction: column; }
+        .bubble { padding: 12px 18px; border-radius: 18px; max-width: 85%; line-height: 1.5; font-size: 0.95rem; }
+        .user .bubble { background: var(--primary); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .assistant .bubble { background: #f1f3f0; align-self: flex-start; border-bottom-left-radius: 4px; }
+        .input-area { padding: 20px; border-top: 1px solid var(--border); }
+        .input-group { display: flex; gap: 10px; align-items: flex-start; }
+        textarea { flex: 1; height: 60px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; resize: none; font-family: inherit; }
+        .btn { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        .thinking-bubble { font-style: italic; color: #888; animation: blink 1.2s ease-in-out infinite; }
+        .ttfb-tag { font-size: 0.7em; color: #999; margin-top: 4px; align-self: flex-start; padding: 0 4px; }
+        .meta-tags { display: flex; gap: 6px; margin-top: 4px; align-self: flex-start; flex-wrap: wrap; }
+        .cache-tag { font-size: 0.7em; padding: 1px 6px; border-radius: 10px; font-weight: 600; }
+        .cache-tag.hit  { background: #e6f4ea; color: #1e8e3e; border: 1px solid #a8d5b5; }
+        .cache-tag.miss { background: #f1f3f4; color: #80868b; border: 1px solid #dadce0; }
+        .convo-banner { display: none; margin: 0 20px 10px; padding: 9px 14px; border-radius: 8px; font-size: 0.85em; line-height: 1.4; }
+        .convo-banner.warn { background: #fef9e7; color: #7d5a00; border: 1px solid #f5c518; }
+        .convo-banner.stop { background: #fce8e6; color: #c0392b; border: 1px solid #f28b82; }
+        .convo-banner button.dismiss { float: right; background: none; border: none; cursor: pointer; font-size: 1em; line-height: 1; color: inherit; opacity: 0.6; margin-left: 8px; }
+        .convo-banner button.dismiss:hover { opacity: 1; }
+        .copy-btn { background: none; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; padding: 6px 8px; display: flex; align-items: center; justify-content: center; color: #5f6368; font-size: 0.78em; gap: 4px; white-space: nowrap; position: relative; }
+        .copy-btn:hover { background: #f1f3f4; border-color: #aaa; }
+        .copy-btn svg { width: 16px; height: 16px; }
+        .copy-btn::after { content: attr(data-tooltip); position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 0.75em; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.15s; }
+        .copy-btn:hover::after { opacity: 1; }
+        /* ── Rich content inside assistant bubbles ── */
+        .bubble h1, .bubble h2, .bubble h3, .bubble h4 { margin: 14px 0 6px 0; }
+        .bubble h1 { font-size: 1.25rem; }
+        .bubble h2 { font-size: 1.1rem; }
+        .bubble h3 { font-size: 1.0rem; }
+        .bubble h4 { font-size: 0.95rem; font-weight: 600; color: #444; }
+        .bubble p { margin: 6px 0; }
+        .bubble ul, .bubble ol { margin: 6px 0; padding-left: 22px; }
+        .bubble li { margin: 3px 0; }
+        .bubble a { color: var(--primary); text-decoration: underline; }
+        .bubble hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+        .bubble blockquote { border-left: 4px solid var(--primary); margin: 8px 0; padding: 6px 14px; background: #eef3eb; border-radius: 0 8px 8px 0; color: #2a3d1a; font-style: italic; }
+        .bubble table { border-collapse: collapse; margin: 10px 0; width: 100%; font-size: 0.9rem; }
+        .bubble th, .bubble td { border: 1px solid var(--border); padding: 7px 11px; text-align: left; }
+        .bubble th { background: #eef3eb; font-weight: 600; color: #2d4a1e; }
+        .bubble tr:nth-child(even) td { background: #f8f9fa; }
+        .bubble pre { background: #1e1e1e; color: #d4d4d4; padding: 12px 14px; border-radius: 8px; overflow-x: auto; margin: 10px 0; font-size: 0.85rem; font-family: 'Consolas', monospace; }
+        .bubble code { background: rgba(0,0,0,0.08); padding: 2px 5px; border-radius: 4px; font-size: 0.88em; font-family: 'Consolas', monospace; }
+        .bubble pre code { background: none; padding: 0; color: inherit; }
+        /* User bubble overrides */
+        .user .bubble a { color: #cfe2ff; }
+        .user .bubble code { background: rgba(255,255,255,0.2); }
+        .user .bubble blockquote { background: rgba(255,255,255,0.15); border-left-color: white; color: white; }
+    </style>
+</head>
+
+<body>
+    <header class="header">
+        <div style="font-weight:bold; color:var(--primary); font-size:1.05em;">
+            Lord of the Flies &nbsp;&middot;&nbsp; Text Navigator
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <select id="model-select" title="Select search mode">
+                <option value="gemini-2.5-flash-lite" selected>Quick Search &#x26A1;</option>
+                <option value="gemini-2.5-flash">Full Search</option>
+            </select>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="chat-area">
+            <div class="messages" id="messages"></div>
+            <div id="convo-banner" class="convo-banner"></div>
+            <div class="input-area">
+                <div class="input-group">
+                    <textarea id="user-input" placeholder="Where in the book is...?"></textarea>
+                    <button class="copy-btn" data-tooltip="Copy last response" onclick="copyLastResponse()" aria-label="Copy last response">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                    </button>
+                    <button class="btn" onclick="sendMessage()">Search</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer style="text-align:center; padding:4px 0 6px; font-size:0.7em; color:#aaa; border-top:1px solid var(--border); background:white;">
+        <span id="version-stamp">lotf1</span>
+    </footer>
+
+    <script>
+        let HISTORY = [];
+        let SESSION_ID = 'session_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+        let LAST_RESPONSE_TEXT = '';
+
+        const WARN_TURNS = 15;
+        const STOP_TURNS = 25;
+        const MAX_HISTORY_CHARS = 40_000;  // text retrieval sessions are short
+
+        function checkConversationLength() {
+            const turns = Math.floor(HISTORY.length / 2);
+            const banner = document.getElementById('convo-banner');
+            const sendBtn = document.querySelector('.btn[onclick="sendMessage()"]');
+            const textarea = document.getElementById('user-input');
+
+            if (turns >= STOP_TURNS) {
+                banner.className = 'convo-banner stop';
+                banner.style.display = 'block';
+                banner.innerHTML = '&#x1F6D1; <strong>Session limit reached.</strong> Please refresh the page to start a new search session.';
+                sendBtn.disabled = true;
+                textarea.disabled = true;
+                textarea.placeholder = 'Please refresh the page to start a new session.';
+            } else if (turns >= WARN_TURNS) {
+                if (!banner.classList.contains('stop')) {
+                    banner.className = 'convo-banner warn';
+                    banner.style.display = 'block';
+                    banner.innerHTML = '&#x26A0;&#xFE0F; <strong>Long session.</strong> Consider refreshing if searches slow down. <button class="dismiss" onclick="this.parentElement.style.display=\'none\'" title="Dismiss">&#x2715;</button>';
+                }
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatMessage(text) {
+            if (!text) return '';
+            const rawPlaceholders = [];
+
+            // Fenced code blocks
+            text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, lang, code) => {
+                const escaped = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                const html = `<pre><code class="language-${lang}">${escaped}</code></pre>`;
+                rawPlaceholders.push(html);
+                return `\x01RAW${rawPlaceholders.length - 1}\x01`;
+            });
+
+            // HTML-escape
+            let f = escapeHtml(text);
+
+            // Inline formatting
+            f = f.replace(/`([^`]+)`/g, '<code>$1</code>');
+            f = f.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+            f = f.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+            f = f.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+            // Block-level pass
+            const lines = f.split('\n');
+            const out = [];
+            let i = 0;
+            while (i < lines.length) {
+                const line = lines[i];
+                if (/^#### /.test(line)) { out.push(`<h4>${line.slice(5)}</h4>`); i++; continue; }
+                if (/^### /.test(line))  { out.push(`<h3>${line.slice(4)}</h3>`); i++; continue; }
+                if (/^## /.test(line))   { out.push(`<h2>${line.slice(3)}</h2>`); i++; continue; }
+                if (/^# /.test(line))    { out.push(`<h1>${line.slice(2)}</h1>`); i++; continue; }
+                if (/^(\-{3,}|\*{3,}|_{3,})$/.test(line.trim())) { out.push('<hr>'); i++; continue; }
+                if (/^&gt; /.test(line)) {
+                    const bqLines = [];
+                    while (i < lines.length && /^&gt; /.test(lines[i])) { bqLines.push(lines[i].slice(5)); i++; }
+                    out.push(`<blockquote>${bqLines.join('<br>')}</blockquote>`);
+                    continue;
+                }
+                if (/^\|/.test(line)) {
+                    const tbl = [];
+                    while (i < lines.length && /^\|/.test(lines[i])) { tbl.push(lines[i]); i++; }
+                    if (tbl.length >= 3 && /^\|[\s\-:|]+\|$/.test(tbl[1].trim())) {
+                        const pr = (l) => l.trim().replace(/^\||\|$/g,'').split('|').map(c => c.trim());
+                        const hdr = pr(tbl[0]); const rows = tbl.slice(2).map(pr);
+                        const thead = '<thead><tr>' + hdr.map(h => `<th>${h}</th>`).join('') + '</tr></thead>';
+                        const tbody = '<tbody>' + rows.map(r => '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('') + '</tbody>';
+                        out.push(`<table>${thead}${tbody}</table>`);
+                    } else { out.push(...tbl); }
+                    continue;
+                }
+                if (/^\d+\. /.test(line)) {
+                    const items = [];
+                    while (i < lines.length && /^\d+\. /.test(lines[i])) { items.push(`<li>${lines[i].replace(/^\d+\. /, '')}</li>`); i++; }
+                    out.push(`<ol>${items.join('')}</ol>`); continue;
+                }
+                if (/^(\s{0,3})[*\-] /.test(line)) {
+                    const items = [];
+                    while (i < lines.length && /^(\s{0,3})[*\-] /.test(lines[i])) {
+                        items.push(`<li>${lines[i].replace(/^(\s{0,3})[*\-] /, '')}</li>`);
+                        i++;
+                    }
+                    out.push(`<ul>${items.join('')}</ul>`); continue;
+                }
+                out.push(line); i++;
+            }
+
+            // Wrap loose text in <p>
+            const blockTags = /^<(h[1-6]|ul|ol|li|table|blockquote|pre|hr|div)/;
+            f = out.join('\n').split(/\n{2,}/).map(block => {
+                const trimmed = block.trim();
+                if (!trimmed) return '';
+                if (blockTags.test(trimmed)) return trimmed;
+                return `<p>${trimmed.replace(/\n/g, '<br>')}</p>`;
+            }).filter(Boolean).join('\n');
+
+            // Restore placeholders
+            rawPlaceholders.forEach((html, idx) => { f = f.split(`\x01RAW${idx}\x01`).join(html); });
+            return f;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            appendBubble('user', text);
+            HISTORY.push({ role: 'user', parts: [{ text }] });
+            input.value = '';
+
+            // Payload size guard
+            const historyChars = JSON.stringify(HISTORY).length;
+            if (historyChars > MAX_HISTORY_CHARS) {
+                HISTORY.pop();
+                const banner = document.getElementById('convo-banner');
+                banner.className = 'convo-banner stop';
+                banner.style.display = 'block';
+                banner.innerHTML = '&#x1F6D1; <strong>Session too long.</strong> Please refresh to start a new search session.';
+                document.querySelector('.btn[onclick="sendMessage()"]').disabled = true;
+                document.getElementById('user-input').disabled = true;
+                return;
+            }
+
+            const modelLabel = document.getElementById('model-select').selectedOptions[0].text;
+
+            // Add model label under user bubble
+            const messagesDiv = document.getElementById('messages');
+            const userMsgDiv = messagesDiv.lastElementChild;
+            if (userMsgDiv) {
+                const userModelTag = document.createElement('div');
+                userModelTag.className = 'meta-tags';
+                userModelTag.style.justifyContent = 'flex-end';
+                const mt = document.createElement('span');
+                mt.className = 'ttfb-tag';
+                mt.textContent = modelLabel;
+                userModelTag.appendChild(mt);
+                userMsgDiv.appendChild(userModelTag);
+            }
+
+            // Thinking bubble
+            const thinkingDiv = document.createElement('div');
+            thinkingDiv.className = 'message assistant';
+            thinkingDiv.innerHTML = '<div class="bubble thinking-bubble">Searching\u2026</div>';
+            messagesDiv.appendChild(thinkingDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            const requestBody = JSON.stringify({
+                action: 'chat',
+                session_id: SESSION_ID,
+                model: document.getElementById('model-select').value,
+                messages: HISTORY
+            });
+
+            let assistantDiv = null;
+
+            try {
+                const fetchStart = performance.now();
+                const res = await fetch('api-proxy.php?stream=1', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: requestBody
+                });
+
+                if (!res.ok || !res.body) throw new Error('Stream unavailable');
+
+                thinkingDiv.remove();
+                assistantDiv = document.createElement('div');
+                assistantDiv.className = 'message assistant';
+                assistantDiv.innerHTML = '<div class="bubble"></div>';
+                messagesDiv.appendChild(assistantDiv);
+                const bubbleEl = assistantDiv.querySelector('.bubble');
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let accumulated = '';
+                let partialLine = '';
+                let ttfbMs = null;
+                let cachedTokens = null;
+
+                let streamDone = false;
+                while (!streamDone) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    partialLine += decoder.decode(value, { stream: true });
+                    const lines = partialLine.split('\n');
+                    partialLine = lines.pop();
+
+                    for (const line of lines) {
+                        const trimmed = line.trimEnd();
+                        if (!trimmed.startsWith('data: ')) continue;
+
+                        const payload = trimmed.slice(6);
+                        if (payload === '[DONE]') { streamDone = true; break; }
+
+                        let parsed;
+                        try { parsed = JSON.parse(payload); } catch { continue; }
+
+                        if (parsed.error) throw new Error(parsed.error?.message || JSON.stringify(parsed.error));
+
+                        if (parsed.meta) {
+                            cachedTokens = parsed.meta.cachedTokens ?? 0;
+                            continue;
+                        }
+
+                        let delta = parsed.text ?? null;
+                        if (delta === null && Array.isArray(parsed.candidates?.[0]?.content?.parts)) {
+                            for (const part of parsed.candidates[0].content.parts) {
+                                if (typeof part.text === 'string' && part.text.length > 0 && !part.thoughtSignature) {
+                                    delta = part.text;
+                                    break;
+                                }
+                            }
+                        }
+                        if (delta) {
+                            if (ttfbMs === null) ttfbMs = Math.round(performance.now() - fetchStart);
+                            accumulated += delta;
+                            bubbleEl.innerHTML = formatMessage(accumulated);
+                            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                        }
+                    }
+                }
+
+                if (accumulated && (ttfbMs !== null || cachedTokens !== null)) {
+                    const metaRow = document.createElement('div');
+                    metaRow.className = 'meta-tags';
+
+                    if (ttfbMs !== null) {
+                        const ttfbTag = document.createElement('span');
+                        ttfbTag.className = 'ttfb-tag';
+                        ttfbTag.textContent = `⏱ ${ttfbMs < 1000 ? ttfbMs + 'ms' : (ttfbMs/1000).toFixed(1) + 's'}`;
+                        metaRow.appendChild(ttfbTag);
+                    }
+
+                    if (cachedTokens !== null) {
+                        const cacheTag = document.createElement('span');
+                        if (cachedTokens > 0) {
+                            const pct = Math.round(cachedTokens / 1000);
+                            cacheTag.className = 'cache-tag hit';
+                            cacheTag.title = `${cachedTokens.toLocaleString()} tokens served from cache`;
+                            cacheTag.textContent = `⚡ cached ${pct}k tok`;
+                        } else {
+                            cacheTag.className = 'cache-tag miss';
+                            cacheTag.title = 'No cached tokens — first request warms the cache';
+                            cacheTag.textContent = '○ no cache';
+                        }
+                        metaRow.appendChild(cacheTag);
+                    }
+
+                    const modelTag = document.createElement('span');
+                    modelTag.className = 'ttfb-tag';
+                    modelTag.textContent = modelLabel;
+                    metaRow.appendChild(modelTag);
+                    assistantDiv.appendChild(metaRow);
+                }
+
+                if (accumulated) {
+                    LAST_RESPONSE_TEXT = accumulated;
+                    HISTORY.push({ role: 'model', parts: [{ text: accumulated }] });
+                    logQuery(text, accumulated, ttfbMs);
+                    checkConversationLength();
+                } else {
+                    assistantDiv.remove();
+                    appendBubble('model', '⚠️ No response received. The server may be unavailable.');
+                }
+
+            } catch (err) {
+                const errText = err?.message || String(err);
+                console.warn('SSE stream failed, falling back:', errText);
+                thinkingDiv.remove();
+                assistantDiv?.remove();
+
+                try {
+                    const res = await fetch('api-proxy.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: requestBody
+                    });
+                    const data = await res.json();
+                    if (data.candidates) {
+                        const reply = data.candidates[0].content.parts[0].text;
+                        LAST_RESPONSE_TEXT = reply;
+                        appendBubble('model', reply);
+                        HISTORY.push({ role: 'model', parts: [{ text: reply }] });
+                        logQuery(text, reply, null);
+                        checkConversationLength();
+                    } else {
+                        const errMsg = data.error?.message || (typeof data.error === 'string' ? data.error : 'Connection failed.');
+                        appendBubble('model', '⚠️ ' + errMsg);
+                    }
+                } catch {
+                    appendBubble('model', `⚠️ Connection failed. Try again, or refresh if this persists. (${errText})`);
+                }
+            }
+        }
+
+        async function logQuery(userText, botReply, ttfbMs) {
+            fetch('api-proxy.php', {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'log_query',
+                    session_id: SESSION_ID,
+                    ttfb_ms: ttfbMs,
+                    log: `USER: ${userText}\nBOT: ${botReply}\n---\n`
+                })
+            });
+        }
+
+        async function copyLastResponse() {
+            if (!LAST_RESPONSE_TEXT) return;
+            try {
+                await navigator.clipboard.writeText(LAST_RESPONSE_TEXT);
+                const btn = document.querySelector('.copy-btn');
+                const orig = btn.getAttribute('data-tooltip');
+                btn.setAttribute('data-tooltip', 'Copied!');
+                setTimeout(() => btn.setAttribute('data-tooltip', orig), 1500);
+            } catch {
+                const ta = document.createElement('textarea');
+                ta.value = LAST_RESPONSE_TEXT;
+                ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+        }
+
+        function appendBubble(role, text) {
+            const messagesDiv = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = `message ${role === 'model' ? 'assistant' : 'user'}`;
+            div.innerHTML = `<div class="bubble">${formatMessage(text)}</div>`;
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        document.getElementById('user-input').addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            appendBubble('model', `**Lord of the Flies — Text Navigator**
+
+This tool helps you find passages in the book. Ask where something happens and you'll get the actual text and its chapter.
+
+**Questions that work:**
+- *"Where is the scene where they first make a fire?"*
+- *"Where do they use Piggy's glasses to start a fire?"*
+- *"Find the passage where the beast is first mentioned."*
+- *"Where does Ralph blow the conch for the first time?"*
+- *"Where is the swimming scene?"*
+
+**Questions this tool won't answer:**
+- "What does the conch symbolize?" — that's yours to figure out
+- "Why does Jack rebel against Ralph?" — interpretation
+- "Summarize Chapter 4" — read it
+
+Use **Quick Search ⚡** for fast, focused lookups. Use **Full Search** when you want more passages or context.`);
+        });
+
+        (function() {
+            const d = new Date(document.lastModified);
+            const date = d.toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' });
+            const time = d.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
+            const stamp = 'lotf1 · ' + date + ' · ' + time;
+            document.getElementById('version-stamp').textContent = stamp;
+            console.log(stamp);
+        })();
+    </script>
+</body>
+</html>

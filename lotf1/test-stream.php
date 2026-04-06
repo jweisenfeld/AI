@@ -597,24 +597,35 @@ if (empty($storedUri)) {
         }
     }
 
-    // Also check for stale lock files that might block cache creation
+    // Check for lock files that are stuck — meaning old AND the cache is missing/expired.
+    // A lock file that is old but the cache is healthy is just harmless litter:
+    // fopen/flock creates the file but never deletes it after successful creation.
     out('');
-    out('  Checking for stale lock files…');
-    $lockStale = false;
+    out('  Checking for stuck lock files (old lock + missing/expired cache = problem)…');
+    $lockStuck = false;
     foreach ($cacheFileChecks as $model => $filename) {
-        $lockPath = $ACCOUNT_ROOT . '/.secrets/' . $filename . '.lock';
+        $lockPath  = $ACCOUNT_ROOT . '/.secrets/' . $filename . '.lock';
+        $cachePath = $ACCOUNT_ROOT . '/.secrets/' . $filename;
+        $expiryPath = $cachePath . '.expires';
         if (file_exists($lockPath)) {
             $lockAge = time() - filemtime($lockPath);
-            if ($lockAge > 300) { // older than 5 minutes = stale
-                fail("[$model] Lock file is stale",
-                    "$lockPath is $lockAge seconds old — delete it if cache creation is stuck");
-                $lockStale = true;
+            // Cache is healthy if the cache file exists and is not expired
+            $cacheHealthy = false;
+            if (file_exists($cachePath) && file_exists($expiryPath)) {
+                $cacheHealthy = (time() < (int)trim(file_get_contents($expiryPath)));
+            }
+            if ($lockAge > 300 && !$cacheHealthy) {
+                // Old lock + broken cache = something is actually stuck
+                fail("[$model] Lock file is stuck",
+                    "$lockPath is $lockAge seconds old and the cache is missing/expired — delete the lock file");
+                $lockStuck = true;
             } else {
-                info("[$model] Lock file age", "$lockAge seconds (normal if created recently)");
+                // Old lock + healthy cache = normal leftover artifact, not a problem
+                info("[$model] Lock file", $lockAge . "s old, cache " . ($cacheHealthy ? "healthy ✓" : "missing (will be recreated on next request)"));
             }
         }
     }
-    if (!$lockStale) pass('No stale lock files found');
+    if (!$lockStuck) pass('No stuck lock files (old lock + broken cache)');
 }
 
 // ═══════════════════════════════════════════════════════════════

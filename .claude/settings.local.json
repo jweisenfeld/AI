@@ -37,7 +37,9 @@
       "WebSearch",
       "WebFetch(domain:ai.google.dev)",
       "WebFetch(domain:www.pasco-wa.gov)",
-      "Bash(find /c/Users/johnw/Documents/GitHub/Misc -maxdepth 3 -name *lotf*)"
+      "Bash(find /c/Users/johnw/Documents/GitHub/Misc -maxdepth 3 -name *lotf*)",
+      "Read(//c/xampp/php/**)",
+      "Read(//c/Program Files/**)"
     ]
   }
 }

@@ -299,36 +299,39 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     }
 
     // ── Cold-start auto-retry ─────────────────────────────────────────────────
-    if ($fileUri !== null && $explicitCacheName === null) {
-        $firstPassOut    = 0;
-        $firstPassCached = 0;
-        foreach (preg_split('/\r?\n/', $rawBody) as $rl) {
-            if (strncmp($rl, 'data: ', 6) !== 0) continue;
-            $rp = json_decode(substr($rl, 6), true);
-            if ($rp === null) continue;
-            if (isset($rp['usageMetadata'])) {
-                $firstPassOut    = (int)($rp['usageMetadata']['candidatesTokenCount']    ?? 0);
-                $firstPassCached = (int)($rp['usageMetadata']['cachedContentTokenCount'] ?? 0);
-            }
+    // Google has a known bug where both the Files API path AND the explicit
+    // cache path can return a near-empty "dud" response (Out ≤ 5 tokens) on
+    // cold starts. The original code only retried on the Files API path.
+    // Extended to cover explicit cache duds too — same symptom, same fix.
+    $firstPassOut    = 0;
+    $firstPassCached = 0;
+    foreach (preg_split('/\r?\n/', $rawBody) as $rl) {
+        if (strncmp($rl, 'data: ', 6) !== 0) continue;
+        $rp = json_decode(substr($rl, 6), true);
+        if ($rp === null) continue;
+        if (isset($rp['usageMetadata'])) {
+            $firstPassOut    = (int)($rp['usageMetadata']['candidatesTokenCount']    ?? 0);
+            $firstPassCached = (int)($rp['usageMetadata']['cachedContentTokenCount'] ?? 0);
         }
-        if ($firstPassOut <= 5 && $firstPassCached === 0) {
-            file_put_contents(__DIR__ . '/gemini_usage.log',
-                date('Y-m-d H:i:s') . " | AUTO_RETRY | cold-start dud (Out:{$firstPassOut}, Cached:0) — retrying\n",
-                FILE_APPEND);
-            $ch2 = curl_init($url);
-            curl_setopt($ch2, CURLOPT_POST,           true);
-            curl_setopt($ch2, CURLOPT_POSTFIELDS,     json_encode($payload));
-            curl_setopt($ch2, CURLOPT_HTTPHEADER,     ['Content-Type: application/json']);
-            curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch2, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch2, CURLOPT_TIMEOUT,        120);
-            $retryBody  = curl_exec($ch2);
-            $retryErrno = curl_errno($ch2);
-            $retryInfo  = curl_getinfo($ch2);
-            curl_close($ch2);
-            if (!$retryErrno && $retryInfo['http_code'] === 200) {
-                $rawBody = $retryBody;
-            }
+    }
+    if ($firstPassOut <= 5) {
+        $retryReason = $explicitCacheName !== null ? 'explicit-cache dud' : 'cold-start dud';
+        file_put_contents(__DIR__ . '/gemini_usage.log',
+            date('Y-m-d H:i:s') . " | AUTO_RETRY | {$retryReason} (Out:{$firstPassOut}, Cached:{$firstPassCached}) — retrying\n",
+            FILE_APPEND);
+        $ch2 = curl_init($url);
+        curl_setopt($ch2, CURLOPT_POST,           true);
+        curl_setopt($ch2, CURLOPT_POSTFIELDS,     json_encode($payload));
+        curl_setopt($ch2, CURLOPT_HTTPHEADER,     ['Content-Type: application/json']);
+        curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch2, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch2, CURLOPT_TIMEOUT,        120);
+        $retryBody  = curl_exec($ch2);
+        $retryErrno = curl_errno($ch2);
+        $retryInfo  = curl_getinfo($ch2);
+        curl_close($ch2);
+        if (!$retryErrno && $retryInfo['http_code'] === 200) {
+            $rawBody = $retryBody;
         }
     }
 
@@ -392,6 +395,57 @@ if (isset($_GET['stream']) && $_GET['stream'] === '1') {
 
 // ── Non-streaming routes ──────────────────────────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
+
+// --- DEBUG ROUTE ---
+// Direct Gemini ping — no file, no cache, no LOTF system prompt.
+// Use this to verify the API key and model name are working independently
+// of the PDF/cache setup.
+// Usage: POST {"action":"debug_chat","secret":"amentum2025","model":"gemini-2.5-flash-lite","message":"Reply with exactly three words: testing works correctly"}
+if (isset($data['action']) && $data['action'] === 'debug_chat') {
+    if (($data['secret'] ?? '') !== 'amentum2025') { send_error('Forbidden'); }
+    if (!file_exists($secretsFile)) send_error('API key file missing.');
+    require_once($secretsFile);
+    $model   = $data['model']   ?? 'gemini-2.5-flash-lite';
+    $msg     = $data['message'] ?? 'Reply with exactly three words: testing works correctly';
+    $url     = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:streamGenerateContent?alt=sse&key=" . trim($GEMINI_API_KEY);
+    $payload = [
+        'contents'          => [['role' => 'user', 'parts' => [['text' => $msg]]]],
+        'systemInstruction' => ['parts' => [['text' => 'You are a helpful assistant.']]],
+        'generationConfig'  => ['maxOutputTokens' => 100],
+    ];
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_POST,           true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS,     json_encode($payload));
+    curl_setopt($ch, CURLOPT_HTTPHEADER,     ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT,        30);
+    $rawBody   = curl_exec($ch);
+    $curlErrno = curl_errno($ch);
+    $curlError = curl_error($ch);
+    $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    // Extract text from SSE lines
+    $accumulated = '';
+    foreach (preg_split('/\r?\n/', $rawBody) as $line) {
+        if (strncmp($line, 'data: ', 6) !== 0) continue;
+        $j = json_decode(substr($line, 6), true);
+        if (!$j) continue;
+        foreach (($j['candidates'][0]['content']['parts'] ?? []) as $part) {
+            if (isset($part['thoughtSignature'])) continue;
+            if (!empty($part['text'])) { $accumulated .= $part['text']; break; }
+        }
+    }
+    echo json_encode([
+        'http_code'   => $httpCode,
+        'curl_errno'  => $curlErrno,
+        'curl_error'  => $curlError,
+        'model_used'  => $model,
+        'url_used'    => $url,
+        'text'        => $accumulated,
+        'raw_body'    => $rawBody,
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
 
 // --- QUERY LOGGING ---
 if (isset($data['action']) && $data['action'] === 'log_query') {

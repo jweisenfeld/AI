@@ -269,6 +269,20 @@
 
             let assistantDiv = null;
 
+            const tryNonStreamFallback = async () => {
+                const res = await fetch('api-proxy.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: requestBody
+                });
+                const data = await res.json();
+                if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    return data.candidates[0].content.parts[0].text;
+                }
+                const errMsg = data.error?.message || (typeof data.error === 'string' ? data.error : 'Connection failed.');
+                throw new Error(errMsg);
+            };
+
             try {
                 const fetchStart = performance.now();
                 const res = await fetch('api-proxy.php?stream=1', {
@@ -376,8 +390,20 @@
                     logQuery(text, accumulated, ttfbMs);
                     checkConversationLength();
                 } else {
+                    // Stream ended cleanly but contained no visible text.
+                    // Try one non-streaming call before surfacing an error.
                     assistantDiv.remove();
-                    appendBubble('model', '⚠️ No response received. The server may be unavailable.');
+                    try {
+                        const reply = await tryNonStreamFallback();
+                        LAST_RESPONSE_TEXT = reply;
+                        appendBubble('model', reply);
+                        HISTORY.push({ role: 'model', parts: [{ text: reply }] });
+                        logQuery(text, reply, null);
+                        checkConversationLength();
+                    } catch (fallbackErr) {
+                        const fallbackText = fallbackErr?.message || String(fallbackErr);
+                        appendBubble('model', `⚠️ No response received from the stream. (${fallbackText})`);
+                    }
                 }
 
             } catch (err) {
@@ -387,25 +413,15 @@
                 assistantDiv?.remove();
 
                 try {
-                    const res = await fetch('api-proxy.php', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: requestBody
-                    });
-                    const data = await res.json();
-                    if (data.candidates) {
-                        const reply = data.candidates[0].content.parts[0].text;
-                        LAST_RESPONSE_TEXT = reply;
-                        appendBubble('model', reply);
-                        HISTORY.push({ role: 'model', parts: [{ text: reply }] });
-                        logQuery(text, reply, null);
-                        checkConversationLength();
-                    } else {
-                        const errMsg = data.error?.message || (typeof data.error === 'string' ? data.error : 'Connection failed.');
-                        appendBubble('model', '⚠️ ' + errMsg);
-                    }
-                } catch {
-                    appendBubble('model', `⚠️ Connection failed. Try again, or refresh if this persists. (${errText})`);
+                    const reply = await tryNonStreamFallback();
+                    LAST_RESPONSE_TEXT = reply;
+                    appendBubble('model', reply);
+                    HISTORY.push({ role: 'model', parts: [{ text: reply }] });
+                    logQuery(text, reply, null);
+                    checkConversationLength();
+                } catch (fallbackErr) {
+                    const fallbackText = fallbackErr?.message || String(fallbackErr);
+                    appendBubble('model', `⚠️ Connection failed. Try again, or refresh if this persists. (${errText}; fallback: ${fallbackText})`);
                 }
             }
         }

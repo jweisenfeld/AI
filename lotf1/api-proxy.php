@@ -313,8 +313,8 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     $firstPassCached  = 0;
     $firstPassHasText = false;
     foreach (preg_split('/\r?\n/', $rawBody) as $rl) {
-        if (strncmp($rl, 'data: ', 6) !== 0) continue;
-        $rp = json_decode(substr($rl, 6), true);
+        if (!preg_match('/^data:\s?(.*)$/', $rl, $m)) continue;
+        $rp = json_decode($m[1], true);
         if ($rp === null) continue;
         if (isset($rp['usageMetadata'])) {
             $firstPassOut    = (int)($rp['usageMetadata']['candidatesTokenCount']    ?? 0);
@@ -354,8 +354,8 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     $lines     = preg_split('/\r?\n/', $rawBody);
 
     foreach ($lines as $line) {
-        if (strncmp($line, 'data: ', 6) !== 0) continue;
-        $jsonStr = substr($line, 6);
+        if (!preg_match('/^data:\s?(.*)$/', $line, $m)) continue;
+        $jsonStr = $m[1];
         $parsed  = json_decode($jsonStr, true);
         if ($parsed === null) continue;
 

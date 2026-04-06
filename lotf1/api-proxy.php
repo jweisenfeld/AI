@@ -299,12 +299,19 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     }
 
     // ── Cold-start auto-retry ─────────────────────────────────────────────────
-    // Google has a known bug where both the Files API path AND the explicit
-    // cache path can return a near-empty "dud" response (Out ≤ 5 tokens) on
-    // cold starts. The original code only retried on the Files API path.
-    // Extended to cover explicit cache duds too — same symptom, same fix.
-    $firstPassOut    = 0;
-    $firstPassCached = 0;
+    // Gemini has a known bug where responses — especially from explicit cache
+    // on cold starts — come back HTTP 200 but contain ONLY thinking tokens
+    // (thoughtSignature parts). candidatesTokenCount can be 37 or more, but
+    // every part gets filtered out and the user sees "No response received."
+    //
+    // Previous fix used Out <= 5 as the retry trigger. That was wrong:
+    // thinking-only duds show Out:37, which passes the threshold unretried.
+    //
+    // Correct fix: scan the first-pass body for actual emittable text.
+    // If none found (regardless of token count), retry.
+    $firstPassOut     = 0;
+    $firstPassCached  = 0;
+    $firstPassHasText = false;
     foreach (preg_split('/\r?\n/', $rawBody) as $rl) {
         if (strncmp($rl, 'data: ', 6) !== 0) continue;
         $rp = json_decode(substr($rl, 6), true);
@@ -313,11 +320,18 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
             $firstPassOut    = (int)($rp['usageMetadata']['candidatesTokenCount']    ?? 0);
             $firstPassCached = (int)($rp['usageMetadata']['cachedContentTokenCount'] ?? 0);
         }
+        foreach (($rp['candidates'][0]['content']['parts'] ?? []) as $part) {
+            if (isset($part['thoughtSignature'])) continue;
+            if (isset($part['text']) && $part['text'] !== '') {
+                $firstPassHasText = true;
+                break;
+            }
+        }
     }
-    if ($firstPassOut <= 5) {
+    if (!$firstPassHasText) {
         $retryReason = $explicitCacheName !== null ? 'explicit-cache dud' : 'cold-start dud';
         file_put_contents(__DIR__ . '/gemini_usage.log',
-            date('Y-m-d H:i:s') . " | AUTO_RETRY | {$retryReason} (Out:{$firstPassOut}, Cached:{$firstPassCached}) — retrying\n",
+            date('Y-m-d H:i:s') . " | AUTO_RETRY | {$retryReason} (Out:{$firstPassOut}, Cached:{$firstPassCached}, HasText:0) — retrying\n",
             FILE_APPEND);
         $ch2 = curl_init($url);
         curl_setopt($ch2, CURLOPT_POST,           true);
@@ -383,6 +397,16 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     $cacheFlag    = $cachedTokens > 0 ? "CACHE_HIT:{$cachedTokens}" : "CACHE_MISS";
     $logLine      = date('Y-m-d H:i:s') . " | $sessionId | $actualModel | In:$inTokens | Out:$outTokens | Cached:$cachedTokens | $cacheType | $cacheFlag\n";
     file_put_contents(__DIR__ . '/gemini_usage.log', $logLine, FILE_APPEND);
+}
+
+// ── Version endpoint — GET api-proxy.php?v=1 ─────────────────────────────────
+// Returns the PHP file's own modification timestamp so index.html can display
+// both the HTML version and the proxy version in the footer. No auth needed.
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['v'])) {
+    header('Content-Type: application/json');
+    header('Access-Control-Allow-Origin: *');
+    echo json_encode(['proxy_modified' => filemtime(__FILE__)]);
+    exit;
 }
 
 $data = json_decode(file_get_contents('php://input'), true);

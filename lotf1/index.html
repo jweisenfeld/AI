@@ -474,13 +474,24 @@ This tool helps you find passages in the book. Ask where something happens and y
 Use **Quick Search ⚡** for fast, focused lookups. Use **Full Search** when you want more passages or context.`);
         });
 
-        (function() {
-            const d = new Date(document.lastModified);
-            const date = d.toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' });
-            const time = d.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
-            const stamp = 'lotf1 · ' + date + ' · ' + time;
-            document.getElementById('version-stamp').textContent = stamp;
-            console.log(stamp);
+        (async function() {
+            const fmt = ts => {
+                const d = new Date(ts);
+                return d.toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' })
+                     + ' · ' + d.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
+            };
+            const htmlStamp = 'html: ' + fmt(document.lastModified);
+            document.getElementById('version-stamp').textContent = 'lotf1 · ' + htmlStamp;
+            try {
+                const r = await fetch('api-proxy.php?v=1');
+                const j = await r.json();
+                const phpStamp = 'php: ' + fmt(new Date(j.proxy_modified * 1000));
+                const full = 'lotf1 · ' + htmlStamp + '  |  ' + phpStamp;
+                document.getElementById('version-stamp').textContent = full;
+                console.log(full);
+            } catch(e) {
+                console.warn('Could not fetch proxy version:', e);
+            }
         })();
     </script>
 </body>

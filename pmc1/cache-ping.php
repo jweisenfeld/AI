@@ -20,16 +20,24 @@
 
 set_time_limit(120);
 
+// ── Access guard ─────────────────────────────────────────────────────────────
+define('PING_SECRET', 'amentum2025');
+if (php_sapi_name() !== 'cli') {
+    if (($_GET['secret'] ?? '') !== PING_SECRET) {
+        http_response_code(403);
+        die("403 Forbidden – pass ?secret=amentum2025 to run this script.\n");
+    }
+}
+
 // ── Paths ────────────────────────────────────────────────────────────────────
 $accountRoot   = dirname($_SERVER['DOCUMENT_ROOT'] ?? '') ?: '/home2/fikrttmy';
 $secretsFile   = $accountRoot . '/.secrets/amentum_geminikey.php';
 $cacheNameFile = $accountRoot . '/.secrets/gemini_cache_name.txt';
 $logFile       = __DIR__ . '/cache-ping.log';
 
-$timestamp = date('Y-m-d H:i:s');
-
 function log_msg($msg) {
-    global $logFile, $timestamp;
+    global $logFile;
+    $timestamp = date('Y-m-d H:i:s');
     $line = "[$timestamp] $msg\n";
     file_put_contents($logFile, $line, FILE_APPEND);
     echo $line;
@@ -115,7 +123,7 @@ $newUri   = $result['file']['uri'];
 $expiry   = $result['file']['expirationTime'] ?? '~48 hours';
 
 // Delete old file from Gemini to avoid accumulation (best-effort, ignore errors)
-$oldUri = trim(file_get_contents($cacheNameFile) ?: '');
+$oldUri = file_exists($cacheNameFile) ? trim((string)file_get_contents($cacheNameFile)) : '';
 if (!empty($oldUri)) {
     // Extract file name from URI for the DELETE call
     // URI format: https://generativelanguage.googleapis.com/v1beta/files/FILE_ID

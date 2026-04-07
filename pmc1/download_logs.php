@@ -1,6 +1,12 @@
 <?php
-$logDir = __DIR__ . '/student_logs';
-$zipName = 'student_logs_' . date('Ymd_His') . '.zip';
+define('DOWNLOAD_SECRET', 'amentum2025');
+if (($_GET['secret'] ?? '') !== DOWNLOAD_SECRET) {
+    http_response_code(403);
+    exit('403 Forbidden');
+}
+
+$logDir = __DIR__ . '/query_logs';
+$zipName = 'query_logs_' . date('Ymd_His') . '.zip';
 
 $files = glob($logDir . '/*.txt');
 

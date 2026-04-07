@@ -28,7 +28,7 @@ Run every day at 3:00 AM UTC:
 Run every hour:
 
 ```cron
-0 * * * * /usr/bin/flock -n /tmp/pmc1-monitor-hourly.lock /usr/local/bin/php /home2/fikrttmy/public_html/pmc1/monitor-hourly.php >> /home2/fikrttmy/public_html/pmc1/monitor-hourly.log 2>&1
+0 * * * * /usr/local/bin/php /home2/fikrttmy/public_html/pmc1/monitor-hourly.php >> /home2/fikrttmy/public_html/pmc1/monitor-hourly.log 2>&1
 ```
 
 ## 3) SMTP Setup for Email Notifications

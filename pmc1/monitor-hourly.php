@@ -9,7 +9,7 @@
  * - Sends email summary (PASS/FAIL) using /.secrets/smtp_credentials.php
  *
  * Recommended cron:
- *   0 * * * * /usr/bin/flock -n /tmp/pmc1-monitor-hourly.lock /usr/local/bin/php /home2/fikrttmy/public_html/pmc1/monitor-hourly.php >> /home2/fikrttmy/public_html/pmc1/monitor-hourly.log 2>&1
+ *   0 * * * * /usr/local/bin/php /home2/fikrttmy/public_html/pmc1/monitor-hourly.php >> /home2/fikrttmy/public_html/pmc1/monitor-hourly.log 2>&1
  */
 
 set_time_limit(120);
@@ -34,17 +34,6 @@ $expiryFile = $cacheNameFile . '.expires';
 $pingLog = __DIR__ . '/cache-ping.log';
 $monitorLog = __DIR__ . '/monitor-hourly.log';
 $monitorBaseUrlFile = $accountRoot . '/.secrets/monitor_base_url.txt';
-$selfLockFile = sys_get_temp_dir() . '/pmc1-monitor-hourly.lock';
-
-$selfLockHandle = fopen($selfLockFile, 'c');
-if ($selfLockHandle === false) {
-    http_response_code(500);
-    die("Could not open monitor lock file\n");
-}
-if (!flock($selfLockHandle, LOCK_EX | LOCK_NB)) {
-    echo '[' . gmdate('Y-m-d H:i:s') . " UTC] Another monitor instance is already running; exiting.\n";
-    exit(0);
-}
 
 function monitor_log(string $msg): void {
     global $monitorLog;

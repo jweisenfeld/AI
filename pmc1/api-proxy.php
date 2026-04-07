@@ -141,6 +141,29 @@ function get_or_create_explicit_cache(string $model, string $fileUri, string $fi
     return $cacheName;
 }
 
+/**
+ * Infer response language from the user's latest message and return an
+ * instruction for the model. Returns null for default behavior.
+ */
+function build_language_instruction(array $contents): ?string {
+    for ($i = count($contents) - 1; $i >= 0; $i--) {
+        $msg = $contents[$i] ?? null;
+        if (!is_array($msg) || ($msg['role'] ?? '') !== 'user') continue;
+        foreach (($msg['parts'] ?? []) as $part) {
+            $text = $part['text'] ?? null;
+            if (!is_string($text) || trim($text) === '') continue;
+            if (preg_match('/\p{Cyrillic}/u', $text)) {
+                return 'Language instruction: Reply in Russian (same language as the user). Keep legal citations/section numbers exactly as written.';
+            }
+            if (preg_match('/[¿¡ñáéíóúü]/iu', $text)) {
+                return 'Language instruction: Reply in Spanish (same language as the user). Keep legal citations/section numbers exactly as written.';
+            }
+            return null;
+        }
+    }
+    return null;
+}
+
 // --- STREAMING HANDLER ---
 function handle_stream($data, $secretsFile, $cacheNameFile) {
 
@@ -252,6 +275,11 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
         echo "data: [DONE]\n\n";
         flush();
         return;
+    }
+
+    $languageInstruction = build_language_instruction($contents);
+    if ($languageInstruction !== null) {
+        $contents[] = ['role' => 'user', 'parts' => [['text' => $languageInstruction]]];
     }
 
     // ── Build payload — explicit cache path vs. Files API fallback ───────────
@@ -682,6 +710,11 @@ if (isset($data['messages'])) {
 // ── Server-side payload size guard (non-streaming route) ─────────────────────
 if (strlen(json_encode($contents)) > MAX_HISTORY_CHARS) {
     send_error('History too large. Please refresh and start a new session.');
+}
+
+$languageInstruction = build_language_instruction($contents);
+if ($languageInstruction !== null) {
+    $contents[] = ['role' => 'user', 'parts' => [['text' => $languageInstruction]]];
 }
 
 // ── Explicit cache lookup ─────────────────────────────────────────────────────

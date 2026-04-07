@@ -480,6 +480,7 @@ The source document is in English; translate provisions accurately rather than l
                 let partialLine = '';
                 let ttfbMs = null;       // time-to-first-byte (first text delta)
                 let cachedTokens = null; // populated from trailing meta event
+                let wasTruncated = false;
 
                 let streamDone = false;
                 while (!streamDone) {
@@ -510,6 +511,7 @@ The source document is in English; translate provisions accurately rather than l
                         // Capture trailing metadata event (cache hit info)
                         if (parsed.meta) {
                             cachedTokens = parsed.meta.cachedTokens ?? 0;
+                            wasTruncated = Boolean(parsed.meta.truncated);
                             continue;
                         }
 
@@ -573,6 +575,15 @@ The source document is in English; translate provisions accurately rather than l
                     assistantDiv.appendChild(metaRow);
                 }
 
+                if (accumulated && wasTruncated) {
+                    const truncationNotice =
+                        '\n\n⚠️ Response was truncated due to output length limits. ' +
+                        'Ask me to continue from where I stopped (for example: "continue the list from the next fine").';
+                    accumulated += truncationNotice;
+                    bubbleEl.innerHTML = formatMessage(accumulated);
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                }
+
                 if (accumulated) {
                     LAST_RESPONSE_TEXT = accumulated;
                     HISTORY.push({ role: 'model', parts: [{ text: accumulated }] });
@@ -602,7 +613,11 @@ The source document is in English; translate provisions accurately rather than l
                     });
                     const data = await res.json();
                     if (data.candidates) {
-                        const reply = data.candidates[0].content.parts[0].text;
+                        let reply = data.candidates[0].content.parts[0].text;
+                        const finishReason = data.candidates[0].finishReason || null;
+                        if (finishReason === 'MAX_TOKENS') {
+                            reply += "\n\n⚠️ Response was truncated due to output length limits. Ask me to continue from where I stopped.";
+                        }
                         LAST_RESPONSE_TEXT = reply;
                         appendBubble('model', reply);
                         HISTORY.push({ role: 'model', parts: [{ text: reply }] });

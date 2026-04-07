@@ -174,6 +174,37 @@
     .action-btn.green  { background: rgba(16,185,129,0.1);  color: var(--green);  border: 1px solid rgba(16,185,129,0.3); }
     .action-btn:hover  { filter: brightness(1.2); text-decoration: none; }
 
+    .report-panel {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 16px 18px;
+      margin-top: 8px;
+    }
+    .report-meta {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    .report-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+      table-layout: fixed;
+    }
+    .report-table th,
+    .report-table td {
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding: 8px 6px;
+      vertical-align: top;
+      word-break: break-word;
+    }
+    .report-table th { color: var(--muted); text-align: left; font-weight: 600; }
+    .report-actions { margin-top: 12px; display: flex; gap: 8px; }
+
     @media (max-width: 600px) {
       body { padding: 16px 12px; }
       .health-label { flex: 0 0 130px; }
@@ -231,6 +262,29 @@
       </a>
     </li>
   </ul>
+
+  <h2>Live Query Report</h2>
+  <div class="report-panel">
+    <div id="query-report-meta" class="report-meta">Loading query report…</div>
+    <div style="overflow-x:auto;">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th style="width: 140px;">Timestamp</th>
+            <th style="width: 150px;">Session</th>
+            <th>User Query</th>
+            <th>Bot Reply</th>
+          </tr>
+        </thead>
+        <tbody id="query-report-body">
+          <tr><td colspan="4" style="color:var(--muted);">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="report-actions">
+      <button class="action-btn blue" onclick="loadQueryReport()">Refresh report</button>
+    </div>
+  </div>
 
   <!-- ── CACHE MANAGEMENT ───────────────────────────────── -->
   <h2>Cache Management</h2>
@@ -320,13 +374,24 @@
     </li>
 
     <li>
-      <a href="download_logs.php">
+      <a href="monitor-hourly.php?secret=amentum2025" target="_blank">
         <span class="tag tag-php">PHP</span>
-        download_logs.php — Download all student logs as a ZIP
+        monitor-hourly.php — Run hourly health monitor + email notification now
       </a>
       <p class="file-note">
-        Bundles all <code>student_logs/*.txt</code> files into a timestamped ZIP and sends it as a
-        download. Useful for grant reporting, backing up conversations, or offline analysis.
+        Runs cache freshness checks and (optionally) a synthetic chat probe, then emails PASS/FAIL to
+        <code>jweisenfeld@psd1.org</code> using <code>/.secrets/smtp_credentials.php</code>.
+      </p>
+    </li>
+
+    <li>
+      <a href="download_logs.php?secret=amentum2025">
+        <span class="tag tag-php">PHP</span>
+        download_logs.php?secret=amentum2025 — Download all query logs as a ZIP
+      </a>
+      <p class="file-note">
+        Bundles all <code>query_logs/*.txt</code> files into a timestamped ZIP and sends it as a
+        download. Useful for backup, offline analysis, and trend review.
       </p>
     </li>
 
@@ -374,6 +439,13 @@
     </li>
 
     <li style="margin-top:8px">
+      <a href="OPERATIONS.md" target="_blank">
+        <span class="tag tag-html">MD</span>
+        OPERATIONS.md — Monitoring, cron, SMTP setup, and incident runbook
+      </a>
+    </li>
+
+    <li style="margin-top:8px">
       <a href="test-stream.mjs">
         <span class="tag tag-js">MJS</span>
         test-stream.mjs — Node.js streaming test (CLI use only)
@@ -413,6 +485,13 @@
 
     function setVal(id, html) {
       document.getElementById(id).innerHTML = html;
+    }
+
+    function escapeHtml(v) {
+      return (v ?? '').toString()
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;');
     }
 
     function showRec(level, title, body) {
@@ -550,7 +629,48 @@
       document.getElementById('health-rows').style.display = 'block';
     }
 
+    async function loadQueryReport() {
+      const meta = document.getElementById('query-report-meta');
+      const body = document.getElementById('query-report-body');
+      meta.textContent = 'Loading query report…';
+      body.innerHTML = '<tr><td colspan="4" style="color:var(--muted);">Loading…</td></tr>';
+
+      try {
+        const r = await fetch('api-proxy.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'query_report',
+            secret: 'amentum2025',
+            limit: 25
+          })
+        });
+        const data = await r.json();
+        if (!data.success) throw new Error(data.error || 'Unknown error');
+
+        meta.innerHTML = `Month: <strong>${escapeHtml(data.month)}</strong> · File: <strong>${escapeHtml(data.file)}</strong> · Queries: <strong>${data.totals.queries}</strong> · Sessions: <strong>${data.totals.sessions}</strong>`;
+
+        if (!data.recent || data.recent.length === 0) {
+          body.innerHTML = '<tr><td colspan="4" style="color:var(--muted);">No queries logged yet this month.</td></tr>';
+          return;
+        }
+
+        body.innerHTML = data.recent.map(row => `
+          <tr>
+            <td>${escapeHtml(row.time)}</td>
+            <td><code>${escapeHtml(row.session_id)}</code></td>
+            <td>${escapeHtml(row.user_preview)} <small style="color:var(--muted)">(${row.user_chars} chars)</small></td>
+            <td>${escapeHtml(row.bot_preview)} <small style="color:var(--muted)">(${row.bot_chars} chars)</small></td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        meta.innerHTML = `<span style="color:var(--red)">Failed to load query report: ${escapeHtml(err.message)}</span>`;
+        body.innerHTML = '<tr><td colspan="4" style="color:var(--red);">Could not fetch query report.</td></tr>';
+      }
+    }
+
     runHealthCheck();
+    loadQueryReport();
   </script>
 </body>
 </html>

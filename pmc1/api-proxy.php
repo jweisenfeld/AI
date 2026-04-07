@@ -60,12 +60,14 @@ function get_or_create_explicit_cache(string $model, string $fileUri, string $fi
     $safeModel  = preg_replace('/[^a-z0-9\-]/', '-', $model);
     $nameFile   = $accountRoot . '/.secrets/gemini_explicit_cache_' . $safeModel . '.txt';
     $expiryFile = $nameFile . '.expires';
+    $sourceFile = $nameFile . '.source_uri';
     $lockFile   = $nameFile . '.lock';
 
     // ── Valid cache already exists? ───────────────────────────────────────────
-    if (file_exists($nameFile) && file_exists($expiryFile)) {
+    if (file_exists($nameFile) && file_exists($expiryFile) && file_exists($sourceFile)) {
         $expireTime = (int)trim(file_get_contents($expiryFile));
-        if (time() < $expireTime) {
+        $sourceUri  = trim((string)file_get_contents($sourceFile));
+        if (time() < $expireTime && $sourceUri === $fileUri) {
             $cacheName = trim(file_get_contents($nameFile));
             if (!empty($cacheName)) return $cacheName;
         }
@@ -80,9 +82,10 @@ function get_or_create_explicit_cache(string $model, string $fileUri, string $fi
         flock($lock, LOCK_EX);
         fclose($lock);
         // Re-read: the other request should have written the cache name by now
-        if (file_exists($nameFile) && file_exists($expiryFile)) {
+        if (file_exists($nameFile) && file_exists($expiryFile) && file_exists($sourceFile)) {
             $expireTime = (int)trim(file_get_contents($expiryFile));
-            if (time() < $expireTime) {
+            $sourceUri  = trim((string)file_get_contents($sourceFile));
+            if (time() < $expireTime && $sourceUri === $fileUri) {
                 $cacheName = trim(file_get_contents($nameFile));
                 if (!empty($cacheName)) return $cacheName;
             }
@@ -122,6 +125,7 @@ function get_or_create_explicit_cache(string $model, string $fileUri, string $fi
         $expireTime = time() + EXPLICIT_CACHE_TTL - 60;  // 1-min safety buffer
         file_put_contents($nameFile,   $cacheName);
         file_put_contents($expiryFile, (string)$expireTime);
+        file_put_contents($sourceFile, $fileUri);
         file_put_contents(__DIR__ . '/gemini_usage.log',
             date('Y-m-d H:i:s') . " | EXPLICIT_CACHE_CREATED | $model | $cacheName | expires:" . date('Y-m-d H:i:s', $expireTime) . "\n",
             FILE_APPEND);
@@ -526,6 +530,71 @@ if (isset($data['action']) && $data['action'] === 'log_query') {
     }
 
     echo json_encode(['success' => true]);
+    exit;
+}
+
+// --- QUERY REPORT ROUTE ---
+// Usage: POST {"action":"query_report","secret":"amentum2025","limit":25}
+if (isset($data['action']) && $data['action'] === 'query_report') {
+    if (($data['secret'] ?? '') !== 'amentum2025') { send_error('Forbidden'); }
+
+    $limit = (int)($data['limit'] ?? 25);
+    if ($limit < 1) $limit = 1;
+    if ($limit > 100) $limit = 100;
+
+    $logFilename = __DIR__ . '/query_logs/' . date('Y-m') . '.txt';
+    if (!file_exists($logFilename)) {
+        echo json_encode([
+            'success' => true,
+            'month' => date('Y-m'),
+            'file' => basename($logFilename),
+            'totals' => ['sessions' => 0, 'queries' => 0],
+            'recent' => [],
+        ]);
+        exit;
+    }
+
+    $raw = (string)file_get_contents($logFilename);
+    preg_match_all('/---\s+([0-9:\-\s]+)\s+\|\s+([a-z0-9_]+)\s+---\R(.*?)(?=\R---\s+[0-9:\-\s]+\s+\|\s+[a-z0-9_]+\s+---|\z)/is', $raw, $matches, PREG_SET_ORDER);
+
+    $entries = [];
+    $sessionMap = [];
+    foreach ($matches as $m) {
+        $timestamp = trim($m[1]);
+        $sessionId = trim($m[2]);
+        $body      = trim($m[3]);
+
+        $user = '';
+        $bot  = '';
+        if (preg_match('/USER:\s*(.*?)(?:\R+BOT:|\z)/is', $body, $um)) {
+            $user = trim($um[1]);
+        }
+        if (preg_match('/BOT:\s*(.*?)(?:\R+---|\z)/is', $body, $bm)) {
+            $bot = trim($bm[1]);
+        }
+
+        $sessionMap[$sessionId] = true;
+        $entries[] = [
+            'time' => $timestamp,
+            'session_id' => $sessionId,
+            'user_preview' => mb_substr(preg_replace('/\s+/', ' ', $user), 0, 180),
+            'bot_preview'  => mb_substr(preg_replace('/\s+/', ' ', $bot), 0, 180),
+            'user_chars'   => mb_strlen($user),
+            'bot_chars'    => mb_strlen($bot),
+        ];
+    }
+
+    $recent = array_slice(array_reverse($entries), 0, $limit);
+    echo json_encode([
+        'success' => true,
+        'month' => date('Y-m'),
+        'file' => basename($logFilename),
+        'totals' => [
+            'sessions' => count($sessionMap),
+            'queries'  => count($entries),
+        ],
+        'recent' => $recent,
+    ]);
     exit;
 }
 

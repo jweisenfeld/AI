@@ -38,6 +38,7 @@ function send_error($msg, $details = null) {
 //
 // JS client uses 80k; this server-side value is a backstop.
 define('MAX_HISTORY_CHARS', 80_000);
+define('MAX_OUTPUT_TOKENS', 8000);
 
 // ── Explicit Context Cache ────────────────────────────────────────────────────
 // TTL for explicit cache entries. 12 hours covers a full business day so
@@ -255,7 +256,7 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
 
     // ── Build payload — explicit cache path vs. Files API fallback ───────────
     $systemInstruction = ["parts" => [["text" => $data['system'] ?? "You are a municipal code reference assistant."]]];
-    $generationConfig  = ["maxOutputTokens" => 4000];
+    $generationConfig  = ["maxOutputTokens" => MAX_OUTPUT_TOKENS];
 
     if ($explicitCacheName !== null) {
         // Explicit cache: send conversation only — the cache already holds the file
@@ -354,8 +355,9 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     }
 
     // ── Parse SSE lines, re-emit text deltas, collect usageMetadata ──────────
-    $usageMeta = null;
-    $lines     = preg_split('/\r?\n/', $rawBody);
+    $usageMeta     = null;
+    $finishReason  = null;
+    $lines         = preg_split('/\r?\n/', $rawBody);
 
     foreach ($lines as $line) {
         if (strncmp($line, 'data: ', 6) !== 0) continue;
@@ -369,6 +371,10 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
             if ($usageMeta === null || isset($incoming['cachedContentTokenCount'])) {
                 $usageMeta = $incoming;
             }
+        }
+        $candidateFinish = $parsed['candidates'][0]['finishReason'] ?? null;
+        if (is_string($candidateFinish) && $candidateFinish !== '') {
+            $finishReason = $candidateFinish;
         }
 
         // Forward text delta — skip thinking-model parts (thoughtSignature)
@@ -390,6 +396,8 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
         'cachedTokens' => $cachedTok,
         'inTokens'     => (int)($usageMeta['promptTokenCount']     ?? 0),
         'outTokens'    => (int)($usageMeta['candidatesTokenCount'] ?? 0),
+        'finishReason' => $finishReason,
+        'truncated'    => ($finishReason === 'MAX_TOKENS'),
     ]]) . "\n\n";
 
     // Send done sentinel
@@ -688,7 +696,7 @@ if ($fileUri !== null && in_array($actualModel, $explicitModels)) {
 
 // ── Build payload — explicit cache path vs. Files API fallback ───────────────
 $systemInstruction = ["parts" => [["text" => $data['system'] ?? "You are a municipal code reference assistant."]]];
-$generationConfig  = ["maxOutputTokens" => 4000];
+$generationConfig  = ["maxOutputTokens" => MAX_OUTPUT_TOKENS];
 
 if ($explicitCacheName !== null) {
     // Explicit cache: send conversation only — the cache holds the file

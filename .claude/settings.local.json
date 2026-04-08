@@ -39,7 +39,12 @@
       "WebFetch(domain:www.pasco-wa.gov)",
       "Bash(find /c/Users/johnw/Documents/GitHub/Misc -maxdepth 3 -name *lotf*)",
       "Read(//c/xampp/php/**)",
-      "Read(//c/Program Files/**)"
+      "Read(//c/Program Files/**)",
+      "Bash(mkdir -p /c/Users/johnw/AppData/Local/Temp/pmc-pptx)",
+      "Read(//c/Users/johnw/AppData/Local/Temp/**)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(ls '/c/Program Files \\(x86\\)/Microsoft Office/root/Office16/')"
     ]
   }
 }

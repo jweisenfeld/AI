@@ -97,12 +97,14 @@ function get_or_create_explicit_cache(string $model, string $fileUri, string $fi
     $safeModel  = preg_replace('/[^a-z0-9\-]/', '-', $model);
     $nameFile   = $accountRoot . '/.secrets/gemini_explicit_cache_' . $projectSlug . '_' . $safeModel . '.txt';
     $expiryFile = $nameFile . '.expires';
+    $sourceFile = $nameFile . '.source_uri';
     $lockFile   = $nameFile . '.lock';
 
     // ── Valid cache already exists? ───────────────────────────────────────────
-    if (file_exists($nameFile) && file_exists($expiryFile)) {
+    if (file_exists($nameFile) && file_exists($expiryFile) && file_exists($sourceFile)) {
         $expireTime = (int)trim(file_get_contents($expiryFile));
-        if (time() < $expireTime) {
+        $sourceUri  = trim((string)file_get_contents($sourceFile));
+        if (time() < $expireTime && $sourceUri === $fileUri) {
             $cacheName = trim(file_get_contents($nameFile));
             if (!empty($cacheName)) return $cacheName;
         }
@@ -115,9 +117,10 @@ function get_or_create_explicit_cache(string $model, string $fileUri, string $fi
     if (!flock($lock, LOCK_EX | LOCK_NB)) {
         flock($lock, LOCK_EX);
         fclose($lock);
-        if (file_exists($nameFile) && file_exists($expiryFile)) {
+        if (file_exists($nameFile) && file_exists($expiryFile) && file_exists($sourceFile)) {
             $expireTime = (int)trim(file_get_contents($expiryFile));
-            if (time() < $expireTime) {
+            $sourceUri  = trim((string)file_get_contents($sourceFile));
+            if (time() < $expireTime && $sourceUri === $fileUri) {
                 $cacheName = trim(file_get_contents($nameFile));
                 if (!empty($cacheName)) return $cacheName;
             }
@@ -154,6 +157,7 @@ function get_or_create_explicit_cache(string $model, string $fileUri, string $fi
         $expireTime = time() + EXPLICIT_CACHE_TTL - 60;
         file_put_contents($nameFile,   $cacheName);
         file_put_contents($expiryFile, (string)$expireTime);
+        file_put_contents($sourceFile, $fileUri);
         file_put_contents(__DIR__ . '/gemini_usage.log',
             date('Y-m-d H:i:s') . " | EXPLICIT_CACHE_CREATED | $model | $cacheName | expires:" . date('Y-m-d H:i:s', $expireTime) . "\n",
             FILE_APPEND);

@@ -10,17 +10,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pasco Municipal Code — AI Reference</title>
     <style>
-        :root { --primary: #1e3a5f; --bg: #f5f6f8; --border: #dadce0; --text: #202124; }
+        :root { --primary: #1e3a5f; --bg: #f5f6f8; --border: #dadce0; --text: #202124; --keyboard-offset: 0px; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); height: 100vh; display: flex; flex-direction: column; margin: 0; color: var(--text); }
         .header { background: white; padding: 10px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
         .main-container { flex: 1; display: flex; overflow: hidden; justify-content: center; }
         .chat-area { width: 100%; max-width: 900px; background: white; display: flex; flex-direction: column; border-inline: 1px solid var(--border); }
-        .messages { flex: 1; overflow-y: auto; padding: 20px; }
+        .messages { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: calc(20px + var(--keyboard-offset)); }
         .message { margin-bottom: 20px; display: flex; flex-direction: column; }
         .bubble { padding: 12px 18px; border-radius: 18px; max-width: 85%; line-height: 1.5; font-size: 0.95rem; }
         .user .bubble { background: var(--primary); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
         .assistant .bubble { background: #f1f3f4; align-self: flex-start; border-bottom-left-radius: 4px; }
-        .input-area { padding: 20px; border-top: 1px solid var(--border); }
+        .input-area {
+            padding: 20px 20px calc(20px + var(--keyboard-offset) + env(safe-area-inset-bottom, 0px));
+            border-top: 1px solid var(--border);
+        }
         .input-group { display: flex; gap: 10px; align-items: flex-start; }
         textarea { flex: 1; height: 60px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; resize: none; font-family: inherit; }
         .btn { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
@@ -81,6 +84,15 @@
         .user .bubble blockquote { background: rgba(255,255,255,0.15); border-left-color: white; color: white; }
         .user .bubble th { background: rgba(255,255,255,0.2); color: white; }
         .user .bubble pre { background: rgba(0,0,0,0.3); }
+
+        @media (max-width: 768px) {
+            .messages { padding: 14px; padding-bottom: calc(14px + var(--keyboard-offset)); }
+            .input-area {
+                padding: 12px 12px calc(16px + var(--keyboard-offset) + env(safe-area-inset-bottom, 0px));
+            }
+            .input-group { gap: 8px; }
+            textarea { height: 56px; }
+        }
     </style>
 </head>
 
@@ -153,6 +165,23 @@
         //   80_000 chars ≈  20,000 tokens — allows ~3-4 pages of document paste
         //  160_000 chars ≈  40,000 tokens — large document dumps, higher cost
         const MAX_HISTORY_CHARS = 80_000;
+
+        // Helps keep the input visible above on-screen keyboards (Windows touch
+        // keyboard, iOS/Android virtual keyboard) by adding dynamic bottom space.
+        function syncKeyboardOffset() {
+            let keyboardOffset = 0;
+            if (window.visualViewport) {
+                const viewport = window.visualViewport;
+                keyboardOffset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
+            }
+            document.documentElement.style.setProperty('--keyboard-offset', `${Math.round(keyboardOffset)}px`);
+        }
+        window.addEventListener('resize', syncKeyboardOffset);
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', syncKeyboardOffset);
+            window.visualViewport.addEventListener('scroll', syncKeyboardOffset);
+        }
+        syncKeyboardOffset();
 
         function checkConversationLength() {
             const turns = Math.floor(HISTORY.length / 2);
@@ -480,6 +509,7 @@ The source document is in English; translate provisions accurately rather than l
                 let partialLine = '';
                 let ttfbMs = null;       // time-to-first-byte (first text delta)
                 let cachedTokens = null; // populated from trailing meta event
+                let wasTruncated = false;
 
                 let streamDone = false;
                 while (!streamDone) {
@@ -510,6 +540,7 @@ The source document is in English; translate provisions accurately rather than l
                         // Capture trailing metadata event (cache hit info)
                         if (parsed.meta) {
                             cachedTokens = parsed.meta.cachedTokens ?? 0;
+                            wasTruncated = Boolean(parsed.meta.truncated);
                             continue;
                         }
 
@@ -573,6 +604,15 @@ The source document is in English; translate provisions accurately rather than l
                     assistantDiv.appendChild(metaRow);
                 }
 
+                if (accumulated && wasTruncated) {
+                    const truncationNotice =
+                        '\n\n⚠️ Response was truncated due to output length limits. ' +
+                        'Ask me to continue from where I stopped (for example: "continue the list from the next fine").';
+                    accumulated += truncationNotice;
+                    bubbleEl.innerHTML = formatMessage(accumulated);
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                }
+
                 if (accumulated) {
                     LAST_RESPONSE_TEXT = accumulated;
                     HISTORY.push({ role: 'model', parts: [{ text: accumulated }] });
@@ -602,7 +642,11 @@ The source document is in English; translate provisions accurately rather than l
                     });
                     const data = await res.json();
                     if (data.candidates) {
-                        const reply = data.candidates[0].content.parts[0].text;
+                        let reply = data.candidates[0].content.parts[0].text;
+                        const finishReason = data.candidates[0].finishReason || null;
+                        if (finishReason === 'MAX_TOKENS') {
+                            reply += "\n\n⚠️ Response was truncated due to output length limits. Ask me to continue from where I stopped.";
+                        }
                         LAST_RESPONSE_TEXT = reply;
                         appendBubble('model', reply);
                         HISTORY.push({ role: 'model', parts: [{ text: reply }] });

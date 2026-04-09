@@ -44,7 +44,8 @@
       "Read(//c/Users/johnw/AppData/Local/Temp/**)",
       "Bash(npm init:*)",
       "Bash(npm install:*)",
-      "Bash(ls '/c/Program Files \\(x86\\)/Microsoft Office/root/Office16/')"
+      "Bash(ls '/c/Program Files \\(x86\\)/Microsoft Office/root/Office16/')",
+      "Bash(wc -l \"C:\\\\Users\\\\johnw\\\\Downloads\\\\gemini_usage \\(1\\).log\")"
     ]
   }
 }

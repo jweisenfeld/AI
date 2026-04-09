@@ -179,7 +179,7 @@ function build_pmc_context(string $pmcText, string $queryText, int $maxChars): s
         if ($chunkLen <= 0) continue;
         $picked[] = $chunk;
         $used += $chunkLen + 2;
-        if (count($picked) >= 120) break;
+        if (count($picked) >= 40) break;
     }
 
     if (empty($picked)) {
@@ -187,6 +187,30 @@ function build_pmc_context(string $pmcText, string $queryText, int $maxChars): s
     }
 
     return implode("\n\n", $picked);
+}
+
+function corpus_char_budget_for_model(string $model): int
+{
+    return match ($model) {
+        'gpt-4.1' => 16_000,
+        'gpt-4.1-mini' => 10_000,
+        'gpt-5' => 22_000,
+        'gpt-5-mini' => 12_000,
+        'gpt-5-nano' => 8_000,
+        default => 10_000,
+    };
+}
+
+function output_token_budget_for_model(string $model): int
+{
+    return match ($model) {
+        'gpt-4.1' => 1200,
+        'gpt-4.1-mini' => 900,
+        'gpt-5' => 1800,
+        'gpt-5-mini' => 1000,
+        'gpt-5-nano' => 700,
+        default => 900,
+    };
 }
 
 $rawInput = file_get_contents('php://input');
@@ -253,7 +277,7 @@ if ($userSystem !== '') {
 }
 if ($pmcText !== '') {
     $latestUserText = extract_latest_user_text($data['messages'] ?? []);
-    $maxCorpusChars = (strpos($model, 'mini') !== false || strpos($model, 'nano') !== false) ? 80_000 : 140_000;
+    $maxCorpusChars = corpus_char_budget_for_model($model);
     $pmcContext = build_pmc_context($pmcText, $latestUserText, $maxCorpusChars);
     $fullSystem .= "\n\nPasco Municipal Code (retrieved reference excerpt):\n" . $pmcContext;
 }
@@ -266,6 +290,12 @@ $input = [[
 ]];
 
 $messages = $data['messages'] ?? [];
+if (is_array($messages)) {
+    // Keep recent chat context but cap message payload to avoid TPM spikes.
+    while (strlen(json_encode($messages)) > 24_000 && count($messages) > 2) {
+        array_shift($messages);
+    }
+}
 foreach ($messages as $message) {
     if (!is_array($message)) {
         continue;
@@ -299,7 +329,7 @@ foreach ($messages as $message) {
 $payload = [
     'model' => $model,
     'input' => $input,
-    'max_output_tokens' => 5000,
+    'max_output_tokens' => output_token_budget_for_model($model),
 ];
 if (strpos($model, 'gpt-5') === 0) {
     $payload['reasoning'] = ['effort' => 'medium'];

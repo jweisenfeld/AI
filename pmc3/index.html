@@ -177,10 +177,9 @@
         // Images are NOT stored in HISTORY (sent once, then dropped), so this
         // only limits text conversation history.
         //
-        //   40_000 chars ≈  10,000 tokens — default, short sessions
-        //   80_000 chars ≈  20,000 tokens — allows ~3-4 pages of document paste
-        //  160_000 chars ≈  40,000 tokens — large document dumps, higher cost
-        const MAX_HISTORY_CHARS = 80_000;
+        //   24_000 chars ≈   6,000 tokens — safer for TPM-limited orgs
+        //   40_000 chars ≈  10,000 tokens — higher chance of TPM errors
+        const MAX_HISTORY_CHARS = 24_000;
 
         // Helps keep the input visible above on-screen keyboards (Windows touch
         // keyboard, iOS/Android virtual keyboard) by adding dynamic bottom space.
@@ -660,9 +659,9 @@ The source document is in English; translate provisions accurately rather than l
                     logQuery(logUserText, accumulated, ttfbMs);
                     checkConversationLength();
                 } else {
-                    // Stream completed with no text — remove orphaned bubble
+                    // Stream completed with no text — escalate to fallback route.
                     assistantDiv.remove();
-                    appendBubble('model', '⚠️ No response received. The server may be unavailable.');
+                    throw new Error('Empty stream response');
                 }
 
             } catch (err) {

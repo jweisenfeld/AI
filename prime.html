@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Prime Number Checker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background-color: #f0f8ff;
+        }
+
+        h1 {
+            color: #0a4d8c;
+        }
+
+        input,
+        button {
+            font-size: 1rem;
+            padding: 8px;
+            margin-top: 8px;
+        }
+
+        #result {
+            margin-top: 20px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: #333;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Prime Number Checker</h1> <label for="numberInput">Enter an integer:</label><br /> <input type="number"
+        id="numberInput" /><br /> <button onclick="checkPrime()">Check</button>
+    <div id="result"></div>
+    <script> function isPrime(num) { if (num <= 1) return false; // 0 and 1 are not prime if (num === 2) return true; // 2 is prime if (num % 2 === 0) return false; // even numbers > 2 are not prime // Check odd numbers from 3 to sqrt(num) const limit = Math.sqrt(num); for (let i = 3; i <= limit; i += 2) { if (num % i === 0) return false; } return true; } function checkPrime() { const input = document.getElementById('numberInput').value; const num = parseInt(input, 10); const resultDiv = document.getElementById('result'); if (isNaN(num)) { resultDiv.textContent = 'Please enter a valid integer.'; resultDiv.style.color = 'red'; return; } if (isPrime(num)) { resultDiv.textContent = `${num} is a prime number! 🎉`; resultDiv.style.color = 'green'; } else { resultDiv.textContent = `${num} is NOT a prime number.`; resultDiv.style.color = 'red'; } } </script>
+</body>
+
+</html>

@@ -416,107 +416,78 @@
                 }
             }
 
-            let assistantDiv = null;
+            // ── Non-streaming fetch (LiteSpeed buffers SSE, so we use JSON directly) ──
+            // PHP takes 15–60 s for a cold cache write; the timer shows progress.
+            let elapsed = 0;
+            const timerInterval = setInterval(() => {
+                elapsed++;
+                const tb = thinkingDiv.querySelector('.bubble');
+                if (tb) tb.textContent = `Thinking… ${elapsed}s`;
+            }, 1000);
 
             try {
                 const fetchStart = performance.now();
-                const res = await fetch('api-proxy.php?stream=1', {
+                const res = await fetch('api-proxy.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: requestBody
                 });
+                clearInterval(timerInterval);
+                const totalMs = Math.round(performance.now() - fetchStart);
 
-                if (!res.ok || !res.body) throw new Error('Stream unavailable');
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
 
                 thinkingDiv.remove();
-                assistantDiv = document.createElement('div');
-                assistantDiv.className = 'message assistant';
-                assistantDiv.innerHTML = '<div class="bubble"></div>';
-                messagesDiv.appendChild(assistantDiv);
-                const bubbleEl = assistantDiv.querySelector('.bubble');
 
-                const reader = res.body.getReader();
-                const decoder = new TextDecoder();
-                let accumulated = '';
-                let partialLine = '';
-                let ttfbMs = null;
-                let cachedTokens = null;
-                let cacheWrite = null;
-                let streamDone = false;
-
-                while (!streamDone) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-
-                    partialLine += decoder.decode(value, { stream: true });
-                    const lines = partialLine.split('\n');
-                    partialLine = lines.pop();
-
-                    for (const line of lines) {
-                        const trimmed = line.trimEnd();
-                        if (!trimmed.startsWith('data: ')) continue;
-
-                        const payload = trimmed.slice(6);
-                        if (payload === '[DONE]') { streamDone = true; break; }
-
-                        let parsed;
-                        try { parsed = JSON.parse(payload); } catch { continue; }
-
-                        if (parsed.error) {
-                            throw new Error(parsed.error?.message || JSON.stringify(parsed.error));
-                        }
-
-                        // Metadata event (cache + token counts)
-                        if (parsed.meta) {
-                            cachedTokens = parsed.meta.cachedTokens ?? 0;
-                            cacheWrite   = parsed.meta.cacheWrite   ?? 0;
-                            continue;
-                        }
-
-                        // Text delta
-                        const delta = parsed.text ?? null;
-                        if (delta) {
-                            if (ttfbMs === null) {
-                                ttfbMs = Math.round(performance.now() - fetchStart);
-                            }
-                            accumulated += delta;
-                            bubbleEl.innerHTML = formatMessage(accumulated);
-                            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-                        }
+                // Extract text from Claude response (content array of blocks)
+                let reply = '';
+                if (data.content && Array.isArray(data.content)) {
+                    for (const block of data.content) {
+                        if (block.type === 'text') reply += block.text;
                     }
                 }
 
-                // Show TTFB + cache badge beneath the bubble
-                if (accumulated && (ttfbMs !== null || cachedTokens !== null)) {
+                if (!reply) {
+                    const errMsg = data.error?.message
+                        || (typeof data.error === 'string' ? data.error : 'Empty response from Claude.');
+                    appendBubble('assistant', '⚠️ ' + errMsg);
+                } else {
+                    LAST_RESPONSE_TEXT = reply;
+                    HISTORY.push({ role: 'assistant', content: reply });
+
+                    const assistantDiv = appendBubble('assistant', reply);
+
+                    // ── Meta row: total time + cache badge + model ────────────────
+                    const usage      = data.usage ?? {};
+                    const cacheRead  = usage.cache_read_input_tokens     ?? 0;
+                    const cacheWrite = usage.cache_creation_input_tokens ?? 0;
+
                     const metaRow = document.createElement('div');
                     metaRow.className = 'meta-tags';
 
-                    if (ttfbMs !== null) {
-                        const ttfbTag = document.createElement('span');
-                        ttfbTag.className = 'ttfb-tag';
-                        ttfbTag.textContent = `⏱ ${ttfbMs < 1000 ? ttfbMs + 'ms' : (ttfbMs/1000).toFixed(1) + 's'}`;
-                        metaRow.appendChild(ttfbTag);
-                    }
+                    const timeTag = document.createElement('span');
+                    timeTag.className = 'ttfb-tag';
+                    timeTag.textContent = `⏱ ${totalMs < 1000 ? totalMs + 'ms' : (totalMs/1000).toFixed(1) + 's'}`;
+                    metaRow.appendChild(timeTag);
 
-                    if (cachedTokens !== null) {
-                        const cacheTag = document.createElement('span');
-                        if (cachedTokens > 0) {
-                            const pct = Math.round(cachedTokens / 1000);
-                            cacheTag.className = 'cache-tag hit';
-                            cacheTag.title = `${cachedTokens.toLocaleString()} tokens read from cache (90% discount)`;
-                            cacheTag.textContent = `⚡ cached ${pct}k tok`;
-                        } else if (cacheWrite > 0) {
-                            const pct = Math.round(cacheWrite / 1000);
-                            cacheTag.className = 'cache-tag write';
-                            cacheTag.title = `${cacheWrite.toLocaleString()} tokens written to cache — next query gets 90% off`;
-                            cacheTag.textContent = `✍ wrote ${pct}k tok`;
-                        } else {
-                            cacheTag.className = 'cache-tag miss';
-                            cacheTag.title = 'No cached tokens — cache may not be active';
-                            cacheTag.textContent = '○ no cache';
-                        }
-                        metaRow.appendChild(cacheTag);
+                    const cacheTag = document.createElement('span');
+                    if (cacheRead > 0) {
+                        const pct = Math.round(cacheRead / 1000);
+                        cacheTag.className = 'cache-tag hit';
+                        cacheTag.title = `${cacheRead.toLocaleString()} tokens read from cache (90% discount)`;
+                        cacheTag.textContent = `⚡ cached ${pct}k tok`;
+                    } else if (cacheWrite > 0) {
+                        const pct = Math.round(cacheWrite / 1000);
+                        cacheTag.className = 'cache-tag write';
+                        cacheTag.title = `${cacheWrite.toLocaleString()} tokens written to cache — next query gets 90% off`;
+                        cacheTag.textContent = `✍ wrote ${pct}k tok`;
+                    } else {
+                        cacheTag.className = 'cache-tag miss';
+                        cacheTag.title = 'No cached tokens';
+                        cacheTag.textContent = '○ no cache';
                     }
+                    metaRow.appendChild(cacheTag);
 
                     const modelTag = document.createElement('span');
                     modelTag.className = 'ttfb-tag';
@@ -524,54 +495,16 @@
                     metaRow.appendChild(modelTag);
 
                     assistantDiv.appendChild(metaRow);
-                }
 
-                if (accumulated) {
-                    LAST_RESPONSE_TEXT = accumulated;
-                    HISTORY.push({ role: 'assistant', content: accumulated });
-                    logQuery(logUserText, accumulated, ttfbMs);
+                    logQuery(logUserText, reply, totalMs);
                     checkConversationLength();
-                } else {
-                    assistantDiv.remove();
-                    appendBubble('assistant', '⚠️ No response received. The server may be unavailable.');
                 }
 
             } catch (err) {
-                // Streaming failed — fall back to non-streaming route
-                const errText = err?.message || String(err);
-                console.warn('SSE stream failed, falling back:', errText);
+                clearInterval(timerInterval);
                 thinkingDiv.remove();
-                assistantDiv?.remove();
-
-                try {
-                    const res = await fetch('api-proxy.php', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: requestBody
-                    });
-                    const data = await res.json();
-                    // Claude non-streaming response: data.content[0].text
-                    if (data.content && Array.isArray(data.content)) {
-                        let reply = '';
-                        for (const block of data.content) {
-                            if (block.type === 'text') reply += block.text;
-                        }
-                        if (reply) {
-                            LAST_RESPONSE_TEXT = reply;
-                            appendBubble('assistant', reply);
-                            HISTORY.push({ role: 'assistant', content: reply });
-                            logQuery(logUserText, reply, null);
-                            checkConversationLength();
-                        } else {
-                            appendBubble('assistant', '⚠️ Empty response from Claude.');
-                        }
-                    } else {
-                        const errMsg = data.error?.message || (typeof data.error === 'string' ? data.error : 'Connection failed.');
-                        appendBubble('assistant', '⚠️ ' + errMsg);
-                    }
-                } catch (fallbackErr) {
-                    appendBubble('assistant', `⚠️ Connection failed. Try again, or refresh if this persists. (${errText})`);
-                }
+                const errText = err?.message || String(err);
+                appendBubble('assistant', `⚠️ Request failed: ${errText}. Try again.`);
             }
         }
 
@@ -682,6 +615,8 @@ The source document is in English; translate provisions accurately rather than l
             appendBubble('assistant', `**Welcome to the Pasco Municipal Code AI Reference — powered by Anthropic Claude.**
 
 The full text of the PMC is loaded and ready. Ask questions in **English or Spanish** — responses will match your language.
+
+> ⏳ **First query takes 30–60 s** (925k-token cache write). Subsequent queries are faster once the cache is warm.
 
 #### English
 - *"What are the setback requirements for commercial development in the C-1 zone?"*

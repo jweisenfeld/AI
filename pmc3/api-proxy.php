@@ -302,14 +302,15 @@ foreach ($messages as $message) {
     }
     $role = (($message['role'] ?? '') === 'assistant' || ($message['role'] ?? '') === 'model') ? 'assistant' : 'user';
     $content = [];
+    $textPartType = $role === 'assistant' ? 'output_text' : 'input_text';
 
     foreach (($message['parts'] ?? []) as $part) {
         $text = flatten_text_part($part);
         if ($text !== '') {
-            $content[] = ['type' => 'input_text', 'text' => $text];
+            $content[] = ['type' => $textPartType, 'text' => $text];
         }
 
-        if (isset($part['inlineData']['data'], $part['inlineData']['mimeType'])) {
+        if ($role === 'user' && isset($part['inlineData']['data'], $part['inlineData']['mimeType'])) {
             $mime = (string)$part['inlineData']['mimeType'];
             $base64 = (string)$part['inlineData']['data'];
             if ($mime !== '' && $base64 !== '') {

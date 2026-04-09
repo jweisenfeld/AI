@@ -45,7 +45,14 @@
       "Bash(npm init:*)",
       "Bash(npm install:*)",
       "Bash(ls '/c/Program Files \\(x86\\)/Microsoft Office/root/Office16/')",
-      "Bash(wc -l \"C:\\\\Users\\\\johnw\\\\Downloads\\\\gemini_usage \\(1\\).log\")"
+      "Bash(wc -l \"C:\\\\Users\\\\johnw\\\\Downloads\\\\gemini_usage \\(1\\).log\")",
+      "Bash(SCRIPTS=\"C:/Users/johnw/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/94aa8a3a-d09e-4b8d-b141-b86309693b3e/65d31c19-dc7d-4a41-81f2-81133cf18086/skills/pptx/scripts\")",
+      "Bash(PPTX=\"C:/Users/johnw/Documents/GitHub/AI/pmc1/PMC-AI-Technical-Overview.pptx\")",
+      "Bash(UNPACKED=\"C:/Users/johnw/AppData/Local/Temp/pmc-pptx/unpacked\")",
+      "Bash(__NEW_LINE_7a1eb7637cf098cd__ python:*)",
+      "Bash(__NEW_LINE_e204c7bc039264dd__ python:*)",
+      "Bash(__NEW_LINE_1d1d1825fe2dc1c6__ python:*)",
+      "Bash(powershell -Command \"Add-Type -AssemblyName PresentationFramework; Write-Host ''wpf ok''\")"
     ]
   }
 }

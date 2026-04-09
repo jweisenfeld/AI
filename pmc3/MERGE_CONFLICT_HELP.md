@@ -37,3 +37,24 @@ php -l pmc3/index.html
 - `index.html`: keep model picker values as `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `gpt-4.1`, `gpt-4.1-mini`.
 - `api-proxy.php`: keep stream error handling + completed-response text fallback.
 - `api-proxy.php`: keep model aliases for both `gpt-5*` and `gpt-5.4*` inputs.
+
+## For the exact conflict in your screenshot (`$modelMap`)
+
+Choose **Current change** (or **Accept both** and then keep the block below exactly):
+
+```php
+$modelMap = [
+    'gpt-5' => 'gpt-5',
+    'gpt-5-mini' => 'gpt-5-mini',
+    'gpt-5-nano' => 'gpt-5-nano',
+    'gpt-5.4' => 'gpt-5',
+    'gpt-5.4-mini' => 'gpt-5-mini',
+    'gpt-5.4-nano' => 'gpt-5-nano',
+    'gpt-4.1' => 'gpt-4.1',
+    'gpt-4.1-mini' => 'gpt-4.1-mini',
+];
+$requested = (string)($data['model'] ?? 'gpt-5-mini');
+$model = $modelMap[$requested] ?? 'gpt-5-mini';
+```
+
+Do **not** keep the incoming-only `gpt-5.4-*` default block by itself; that drops the stable `gpt-5*` inputs.

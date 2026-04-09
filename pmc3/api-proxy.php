@@ -144,9 +144,14 @@ if ($apiKey === '') {
 }
 
 $modelMap = [
+    // Stable aliases (to reduce merge/deploy drift across branches):
     'gpt-5' => 'gpt-5',
     'gpt-5-mini' => 'gpt-5-mini',
     'gpt-5-nano' => 'gpt-5-nano',
+    // Accept legacy/alternate IDs seen in prior branch revisions:
+    'gpt-5.4' => 'gpt-5',
+    'gpt-5.4-mini' => 'gpt-5-mini',
+    'gpt-5.4-nano' => 'gpt-5-nano',
     'gpt-4.1' => 'gpt-4.1',
     'gpt-4.1-mini' => 'gpt-4.1-mini',
 ];

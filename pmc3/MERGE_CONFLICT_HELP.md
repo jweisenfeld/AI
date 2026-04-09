@@ -29,6 +29,7 @@ If any lines are returned, conflicts are not fully resolved.
 ```bash
 php -l pmc3/api-proxy.php
 php -l pmc3/index.html
+./pmc3/validate-merge-clean.sh
 ```
 
 ## What to keep from the resolved files

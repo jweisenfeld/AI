@@ -157,12 +157,21 @@ $modelMap = [
 ];
 $requested = (string)($data['model'] ?? 'gpt-5-mini');
 $model = $modelMap[$requested] ?? 'gpt-5-mini';
+    'gpt-5.4' => 'gpt-5.4',
+    'gpt-5.4-mini' => 'gpt-5.4-mini',
+    'gpt-5.4-nano' => 'gpt-5.4-nano',
+    'gpt-4.1' => 'gpt-4.1',
+    'gpt-4.1-mini' => 'gpt-4.1-mini',
+];
+$requested = (string)($data['model'] ?? 'gpt-5.4-mini');
+$model = $modelMap[$requested] ?? 'gpt-5.4-mini';
 
 $pmcSourcePath = dirname(__DIR__) . '/pmc1/Pasco-Municipal-Code.html';
 $pmcText = '';
 if (file_exists($pmcSourcePath)) {
     $rawPmc = (string)file_get_contents($pmcSourcePath);
     $pmcText = html_entity_decode(strip_tags($rawPmc), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $pmcText = preg_replace('/\s+/u', ' ', $pmcText) ?? $pmcText;
 }
 
 $systemPrefix = "You are the Pasco Municipal Code AI Reference. Use only the provided Pasco Municipal Code text as your primary authority. Cite section numbers in this style: §X.XX.XXX whenever possible. If the answer is not present in the code, say so clearly and suggest where to verify.";
@@ -221,6 +230,9 @@ $payload = [
 if (strpos($model, 'gpt-5') === 0) {
     $payload['reasoning'] = ['effort' => 'medium'];
 }
+    'reasoning' => ['effort' => 'medium'],
+    'max_output_tokens' => 5000,
+];
 
 $isStream = (($_GET['stream'] ?? '') === '1');
 
@@ -253,6 +265,9 @@ if ($isStream) {
     $sentAnyDelta = false;
 
     curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($ch, $chunk) use (&$cachedInputTokens, &$inputTokens, &$outputTokens, &$isTruncated, &$sentAnyDelta) {
+    $isTruncated = false;
+
+    curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($ch, $chunk) use (&$cachedInputTokens, &$isTruncated) {
         static $buffer = '';
         $buffer .= $chunk;
         $lines = explode("\n", $buffer);
@@ -307,6 +322,20 @@ if ($isStream) {
                     echo 'data: ' . json_encode(['text' => $finalText]) . "\n\n";
                     flush();
                 }
+            if (($event['type'] ?? '') === 'response.output_text.delta') {
+                $delta = (string)($event['delta'] ?? '');
+                if ($delta !== '') {
+                    echo 'data: ' . json_encode(['text' => $delta]) . "\n\n";
+                    flush();
+                }
+            }
+
+            if (($event['type'] ?? '') === 'response.completed') {
+                $usage = $event['response']['usage'] ?? [];
+                $details = $usage['input_tokens_details'] ?? [];
+                $cachedInputTokens = (int)($details['cached_tokens'] ?? 0);
+                $status = (string)($event['response']['status'] ?? '');
+                $isTruncated = ($status === 'incomplete');
             }
         }
 

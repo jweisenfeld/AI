@@ -16,6 +16,25 @@ git add pmc3/index.html pmc3/api-proxy.php
 git commit -m "Resolve pmc3 merge conflicts with known-good files"
 ```
 
+## If you are in the Web Codex UI (no Bash)
+
+Use this exact process in the PR conflict editor:
+
+1. Click **Resolve conflicts**.
+2. For each conflict in `pmc3/index.html` and `pmc3/api-proxy.php`:
+   - click **Accept both changes**,
+   - then manually delete all conflict markers:
+     - `<<<<<<< ...`
+     - `=======`
+     - `>>>>>>> ...`
+3. Keep the **cost panel + `updateCostPanel(...)`** blocks in `index.html`.
+4. Keep the `$modelMap` alias block that supports both `gpt-5*` and `gpt-5.4*` inputs.
+5. Click **Mark as resolved** for each file.
+6. Click **Commit merge**.
+7. Re-open the files and visually verify there are no conflict-marker lines left.
+
+If you can use the built-in file search in Web Codex, search for `<<<<<<<` and confirm zero matches before merging.
+
 ## Option B: keep your branch but verify no conflict markers remain
 
 ```bash

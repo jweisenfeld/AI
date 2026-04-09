@@ -104,8 +104,14 @@ function handle_stream($data, $secretsFile) {
     $requested   = $data['model'] ?? 'claude-sonnet-4-6';
     $actualModel = $modelMap[$requested] ?? 'claude-sonnet-4-6';
 
+    // ── Debug logging (writes to claude_debug.log regardless of stream outcome)
+    $dlog = __DIR__ . '/claude_debug.log';
+    $dpfx = date('H:i:s') . ' ';
+    file_put_contents($dlog, $dpfx . "START model=$actualModel\n", FILE_APPEND);
+
     // ── Load PMC document ────────────────────────────────────────────────────
     $pmcText = load_pmc_text();
+    file_put_contents($dlog, $dpfx . "PMC=" . ($pmcText === null ? 'NULL' : strlen($pmcText).'B') . "\n", FILE_APPEND);
 
     // ── Build messages array ─────────────────────────────────────────────────
     // Claude requires alternating user/assistant turns.
@@ -209,9 +215,12 @@ function handle_stream($data, $secretsFile) {
         'httpCode'   => 0,
     ];
 
+    $jsonPayload = json_encode($payload, JSON_UNESCAPED_UNICODE);
+    file_put_contents($dlog, $dpfx . "PAYLOAD_SIZE=" . ($jsonPayload === false ? 'JSON_FAIL' : strlen($jsonPayload).'B') . "\n", FILE_APPEND);
+
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_POST,           true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS,     json_encode($payload, JSON_UNESCAPED_UNICODE));
+    curl_setopt($ch, CURLOPT_POSTFIELDS,     $jsonPayload);
     curl_setopt($ch, CURLOPT_HTTPHEADER,     [
         'Content-Type: application/json',
         'x-api-key: '           . $apiKey,
@@ -298,10 +307,12 @@ function handle_stream($data, $secretsFile) {
         return strlen($chunk);
     });
 
+    file_put_contents($dlog, $dpfx . "CURL_START\n", FILE_APPEND);
     curl_exec($ch);
     $curlErrno = curl_errno($ch);
     $curlError = curl_error($ch);
     curl_close($ch);
+    file_put_contents($dlog, $dpfx . "CURL_END errno=$curlErrno httpCode={$st['httpCode']} inTok={$st['inTok']} outTok={$st['outTok']} cacheRead={$st['cacheRead']} cacheWrite={$st['cacheWrite']}\n", FILE_APPEND);
 
     // ── Report any transport-level errors ────────────────────────────────────
     if ($curlErrno) {
@@ -322,6 +333,7 @@ function handle_stream($data, $secretsFile) {
 
     echo "data: [DONE]\n\n";
     flush();
+    file_put_contents($dlog, $dpfx . "DONE\n", FILE_APPEND);
 
     // ── Usage logging ─────────────────────────────────────────────────────────
     $sessionId  = preg_replace('/[^a-z0-9_]/i', '_', $data['session_id'] ?? 'unknown');
@@ -336,6 +348,32 @@ function handle_stream($data, $secretsFile) {
 
 // ── Route dispatcher ──────────────────────────────────────────────────────────
 $data = json_decode(file_get_contents('php://input'), true);
+
+// ── ?stream=test — pure PHP→Browser streaming sanity check (no Anthropic call)
+// Visit https://psd1.net/pmc2/api-proxy.php?stream=test in a browser.
+// If you see text appearing word-by-word, PHP→LiteSpeed→Browser streaming works.
+if (isset($_GET['stream']) && $_GET['stream'] === 'test') {
+    @ini_set('output_buffering',        '0');
+    @ini_set('implicit_flush',          '1');
+    @ini_set('zlib.output_compression', '0');
+    while (ob_get_level()) { ob_end_clean(); }
+    header('Content-Type: text/event-stream; charset=utf-8');
+    header('Cache-Control: no-cache, no-store');
+    header('X-LiteSpeed-Cache-Control: no-cache, no-store, must-revalidate');
+    header('Content-Encoding: identity');
+    header('Connection: keep-alive');
+    echo ": init\n\n"; flush();
+    $words = ['PHP', 'streaming', 'to', 'LiteSpeed', 'is', 'working', 'correctly!'];
+    foreach ($words as $i => $word) {
+        sleep(1);
+        echo "data: " . json_encode(['text' => $word . ' ']) . "\n\n";
+        @ob_flush(); flush();
+    }
+    echo "data: " . json_encode(['meta' => ['cachedTokens'=>0,'cacheWrite'=>0,'inTokens'=>0,'outTokens'=>7]]) . "\n\n";
+    echo "data: [DONE]\n\n";
+    flush();
+    exit;
+}
 
 if (isset($_GET['stream']) && $_GET['stream'] === '1') {
     handle_stream($data, $secretsFile);

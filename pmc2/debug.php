@@ -149,4 +149,24 @@ if ($pmcText !== null) {
     echo "SKIPPED — no PMC text loaded.\n";
 }
 echo "\n";
+
+// ── 7. Stream test link ───────────────────────────────────────────────────────
+echo "=== STREAMING TEST ===\n";
+$proto = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+$host  = $_SERVER['HTTP_HOST'] ?? 'psd1.net';
+echo "Open this URL in a browser tab — you should see words appear one per second:\n";
+echo "  {$proto}://{$host}/pmc2/api-proxy.php?stream=test\n";
+echo "(If page loads instantly with all words at once, LiteSpeed is buffering output.)\n\n";
+
+// ── 8. Last debug log entries ─────────────────────────────────────────────────
+echo "=== LAST DEBUG LOG (claude_debug.log) ===\n";
+$debugLog = __DIR__ . '/claude_debug.log';
+if (file_exists($debugLog)) {
+    $lines = file($debugLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $tail  = array_slice($lines, -40);
+    echo implode("\n", $tail) . "\n";
+} else {
+    echo "(no log yet — send a chat message first, then refresh this page)\n";
+}
+echo "\n";
 echo "=== END ===\n";

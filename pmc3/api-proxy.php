@@ -204,12 +204,12 @@ function corpus_char_budget_for_model(string $model): int
 function output_token_budget_for_model(string $model): int
 {
     return match ($model) {
-        'gpt-4.1' => 1200,
-        'gpt-4.1-mini' => 900,
-        'gpt-5' => 1800,
-        'gpt-5-mini' => 1000,
-        'gpt-5-nano' => 700,
-        default => 900,
+        'gpt-4.1' => 1600,
+        'gpt-4.1-mini' => 1200,
+        'gpt-5' => 2200,
+        'gpt-5-mini' => 1800,
+        'gpt-5-nano' => 900,
+        default => 1200,
     };
 }
 

@@ -81,8 +81,12 @@ if (function_exists('curl_version')) {
     $cv = curl_version();
     echo "curl version         : " . $cv['version'] . "\n";
     echo "SSL version          : " . $cv['ssl_version'] . "\n";
-    echo "CURLOPT_WRITEFUNCTION: " . (defined('CURLOPT_WRITEFUNCTION') ? "YES (const=" . CURLOPT_WRITEFUNCTION . ")" : "NO — streaming will not work") . "\n";
+    echo "CURLOPT_WRITEFUNCTION  : " . (defined('CURLOPT_WRITEFUNCTION')  ? "YES (const=" . CURLOPT_WRITEFUNCTION  . ")" : "NO — streaming broken") . "\n";
+echo "CURLOPT_PROGRESSFUNC  : " . (defined('CURLOPT_PROGRESSFUNCTION') ? "YES" : "NO — heartbeat unavailable") . "\n";
 }
+echo "output_buffering       : " . ini_get('output_buffering') . "\n";
+echo "implicit_flush         : " . ini_get('implicit_flush') . "\n";
+echo "zlib.output_compression: " . ini_get('zlib.output_compression') . "\n";
 echo "\n";
 
 // ── 5. Minimal Anthropic API test ─────────────────────────────────────────────

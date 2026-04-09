@@ -62,13 +62,26 @@ define('MODEL_MAP_JSON', json_encode([
 
 // ── STREAMING HANDLER ────────────────────────────────────────────────────────
 function handle_stream($data, $secretsFile) {
+    // Disable ALL layers of PHP/SAPI output buffering.
+    // On LiteSpeed (this server's SAPI), ini_set is the reliable way;
+    // X-Accel-Buffering: no is nginx-only and ignored here.
+    @ini_set('output_buffering',        '0');
+    @ini_set('implicit_flush',          '1');
+    @ini_set('zlib.output_compression', '0');
+    while (ob_get_level()) { ob_end_clean(); }   // discard, not flush (nothing yet)
+
     header('Content-Type: text/event-stream; charset=utf-8');
-    header('Cache-Control: no-cache');
-    header('X-Accel-Buffering: no');
+    header('Cache-Control: no-cache, no-store');
+    header('X-Accel-Buffering: no');             // nginx (harmless on LiteSpeed)
+    header('X-LiteSpeed-Cache-Control: no-cache, no-store, must-revalidate');
     header('Content-Encoding: identity');
     header('Connection: keep-alive');
     if (function_exists('apache_setenv')) { apache_setenv('no-gzip', '1'); }
-    while (ob_get_level()) { ob_end_flush(); }
+
+    // Send an init ping IMMEDIATELY so LiteSpeed sees live data and does not
+    // treat this as an idle/pending response while we wait for Anthropic TTFB.
+    echo ": init\n\n";
+    flush();
 
     if (!file_exists($secretsFile)) {
         echo "data: " . json_encode(['error' => 'API key file missing']) . "\n\n";
@@ -208,6 +221,22 @@ function handle_stream($data, $secretsFile) {
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);   // ← must be false for write callback
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_TIMEOUT,        180);
+
+    // Heartbeat: send a SSE comment every ~4 s while curl is waiting for Anthropic
+    // to start streaming (TTFB can be 10–20 s for a 925k-token input).
+    // This prevents LiteSpeed's idle-connection timeout from killing the response.
+    // SSE comment lines (": hb") are silently ignored by the frontend parser.
+    curl_setopt($ch, CURLOPT_NOPROGRESS, false);
+    curl_setopt($ch, CURLOPT_PROGRESSFUNCTION, function (...$_) {
+        static $last = 0;
+        $now = microtime(true);
+        if ($now - $last > 4.0) {
+            echo ": hb\n\n";
+            @ob_flush(); flush();
+            $last = $now;
+        }
+        return 0;   // 0 = continue transfer
+    });
 
     // Capture HTTP status code from response headers
     curl_setopt($ch, CURLOPT_HEADERFUNCTION, function($ch, $header) use (&$st) {

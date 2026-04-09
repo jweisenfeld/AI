@@ -70,6 +70,24 @@ function flatten_text_part($part): string
     return '';
 }
 
+
+function extract_text_from_event_response(array $response): string
+{
+    if (isset($response['output_text']) && is_string($response['output_text']) && $response['output_text'] !== '') {
+        return $response['output_text'];
+    }
+    $chunks = [];
+    foreach (($response['output'] ?? []) as $item) {
+        if (($item['type'] ?? '') !== 'message') continue;
+        foreach (($item['content'] ?? []) as $content) {
+            if (($content['type'] ?? '') === 'output_text') {
+                $chunks[] = (string)($content['text'] ?? '');
+            }
+        }
+    }
+    return trim(implode('', $chunks));
+}
+
 function extract_reply_from_response(array $decoded): string
 {
     if (isset($decoded['output_text']) && is_string($decoded['output_text']) && $decoded['output_text'] !== '') {
@@ -126,6 +144,19 @@ if ($apiKey === '') {
 }
 
 $modelMap = [
+    // Stable aliases (to reduce merge/deploy drift across branches):
+    'gpt-5' => 'gpt-5',
+    'gpt-5-mini' => 'gpt-5-mini',
+    'gpt-5-nano' => 'gpt-5-nano',
+    // Accept legacy/alternate IDs seen in prior branch revisions:
+    'gpt-5.4' => 'gpt-5',
+    'gpt-5.4-mini' => 'gpt-5-mini',
+    'gpt-5.4-nano' => 'gpt-5-nano',
+    'gpt-4.1' => 'gpt-4.1',
+    'gpt-4.1-mini' => 'gpt-4.1-mini',
+];
+$requested = (string)($data['model'] ?? 'gpt-5-mini');
+$model = $modelMap[$requested] ?? 'gpt-5-mini';
     'gpt-5.4' => 'gpt-5.4',
     'gpt-5.4-mini' => 'gpt-5.4-mini',
     'gpt-5.4-nano' => 'gpt-5.4-nano',
@@ -194,6 +225,11 @@ foreach ($messages as $message) {
 $payload = [
     'model' => $model,
     'input' => $input,
+    'max_output_tokens' => 5000,
+];
+if (strpos($model, 'gpt-5') === 0) {
+    $payload['reasoning'] = ['effort' => 'medium'];
+}
     'reasoning' => ['effort' => 'medium'],
     'max_output_tokens' => 5000,
 ];
@@ -223,6 +259,12 @@ if ($isStream) {
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
 
     $cachedInputTokens = 0;
+    $inputTokens = 0;
+    $outputTokens = 0;
+    $isTruncated = false;
+    $sentAnyDelta = false;
+
+    curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($ch, $chunk) use (&$cachedInputTokens, &$inputTokens, &$outputTokens, &$isTruncated, &$sentAnyDelta) {
     $isTruncated = false;
 
     curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($ch, $chunk) use (&$cachedInputTokens, &$isTruncated) {
@@ -246,6 +288,40 @@ if ($isStream) {
                 continue;
             }
 
+            $type = (string)($event['type'] ?? '');
+
+            if ($type === 'error' || $type === 'response.error') {
+                $message = (string)($event['error']['message'] ?? 'OpenAI stream error');
+                echo 'data: ' . json_encode(['error' => ['message' => $message]]) . "\n\n";
+                flush();
+                continue;
+            }
+
+            if ($type === 'response.output_text.delta') {
+                $delta = (string)($event['delta'] ?? '');
+                if ($delta !== '') {
+                    $sentAnyDelta = true;
+                    echo 'data: ' . json_encode(['text' => $delta]) . "\n\n";
+                    flush();
+                }
+                continue;
+            }
+
+            if ($type === 'response.completed') {
+                $responseObj = $event['response'] ?? [];
+                $usage = $responseObj['usage'] ?? [];
+                $details = $usage['input_tokens_details'] ?? [];
+                $inputTokens = (int)($usage['input_tokens'] ?? 0);
+                $outputTokens = (int)($usage['output_tokens'] ?? 0);
+                $cachedInputTokens = (int)($details['cached_tokens'] ?? 0);
+                $status = (string)($responseObj['status'] ?? '');
+                $isTruncated = ($status === 'incomplete');
+
+                $finalText = extract_text_from_event_response(is_array($responseObj) ? $responseObj : []);
+                if (!$sentAnyDelta && $finalText !== '') {
+                    echo 'data: ' . json_encode(['text' => $finalText]) . "\n\n";
+                    flush();
+                }
             if (($event['type'] ?? '') === 'response.output_text.delta') {
                 $delta = (string)($event['delta'] ?? '');
                 if ($delta !== '') {
@@ -277,6 +353,8 @@ if ($isStream) {
     echo 'data: ' . json_encode([
         'meta' => [
             'cachedTokens' => $cachedInputTokens,
+            'inputTokens' => $inputTokens,
+            'outputTokens' => $outputTokens,
             'truncated' => $isTruncated,
         ],
     ]) . "\n\n";

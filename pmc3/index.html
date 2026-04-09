@@ -50,6 +50,9 @@
         .copy-btn svg { width: 16px; height: 16px; }
         .copy-btn::after { content: attr(data-tooltip); position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 0.75em; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.15s; }
         .copy-btn:hover::after { opacity: 1; }
+        .cost-panel { margin: 10px 20px 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: #fafbfc; font-size: 0.8rem; color: #4a4f55; display: flex; gap: 12px; flex-wrap: wrap; }
+        .cost-panel strong { color: #1e3a5f; }
+        .cost-chip { background: #eef3fb; border: 1px solid #d7e3f5; border-radius: 999px; padding: 2px 8px; }
 
         /* ── Rich content inside assistant bubbles ── */
         .bubble h1, .bubble h2, .bubble h3, .bubble h4 { margin: 14px 0 6px 0; }
@@ -103,6 +106,9 @@
         </div>
         <div style="display:flex; gap:10px; align-items:center;">
             <select id="model-select" title="Select AI model">
+                <option value="gpt-5-mini" selected>GPT-5 mini $ &#x26A1;</option>
+                <option value="gpt-5">GPT-5 $$$</option>
+                <option value="gpt-5-nano">GPT-5 nano $</option>
                 <option value="gpt-5.4-mini" selected>GPT-5.4 mini $ &#x26A1;</option>
                 <option value="gpt-5.4">GPT-5.4 $$$</option>
                 <option value="gpt-5.4-nano">GPT-5.4 nano $</option>
@@ -114,6 +120,12 @@
 
     <div class="main-container">
         <div class="chat-area">
+            <div id="cost-panel" class="cost-panel">
+                <span><strong>Cost estimate:</strong></span>
+                <span id="cost-last" class="cost-chip">Last turn: —</span>
+                <span id="cost-session" class="cost-chip">Session total: —</span>
+                <span id="cost-tokens" class="cost-chip">Tokens: —</span>
+            </div>
             <div class="messages" id="messages"></div>
             <div id="convo-banner" class="convo-banner"></div>
             <div id="image-previews" style="padding: 0 20px; display: flex; gap: 8px;"></div>
@@ -148,6 +160,14 @@
         let HISTORY = []; let PENDING_IMAGES = [];
         let SESSION_ID = 'session_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
         let LAST_RESPONSE_TEXT = '';  // plain text of the most recent AI reply
+        let SESSION_COST_USD = 0;
+        const PRICING_PER_1M = {
+            'gpt-5':       { input: 1.25, cachedInput: 0.125, output: 10.00 },
+            'gpt-5-mini':  { input: 0.25, cachedInput: 0.025, output: 2.00 },
+            'gpt-5-nano':  { input: 0.05, cachedInput: 0.005, output: 0.40 },
+            'gpt-4.1':     { input: 2.00, cachedInput: 0.50,  output: 8.00 },
+            'gpt-4.1-mini':{ input: 0.40, cachedInput: 0.10,  output: 1.60 },
+        };
 
         // ── Conversation length guard ─────────────────────────────────────────────
         // HISTORY stores alternating user/model turns; divide by 2 for exchange count.
@@ -181,6 +201,28 @@
             window.visualViewport.addEventListener('scroll', syncKeyboardOffset);
         }
         syncKeyboardOffset();
+
+        function updateCostPanel(modelId, usageMeta) {
+            const pricing = PRICING_PER_1M[modelId];
+            if (!pricing || !usageMeta) return;
+
+            const inputTokens = Math.max(0, Number(usageMeta.inputTokens ?? usageMeta.input_tokens ?? 0));
+            const outputTokens = Math.max(0, Number(usageMeta.outputTokens ?? usageMeta.output_tokens ?? 0));
+            const cachedTokens = Math.max(0, Number(usageMeta.cachedTokens ?? usageMeta.cached_tokens ?? usageMeta.input_tokens_details?.cached_tokens ?? 0));
+            const nonCachedInput = Math.max(0, inputTokens - cachedTokens);
+
+            const turnCost =
+                (nonCachedInput / 1_000_000) * pricing.input +
+                (cachedTokens / 1_000_000) * pricing.cachedInput +
+                (outputTokens / 1_000_000) * pricing.output;
+
+            SESSION_COST_USD += turnCost;
+
+            document.getElementById('cost-last').textContent = `Last turn: $${turnCost.toFixed(4)}`;
+            document.getElementById('cost-session').textContent = `Session total: $${SESSION_COST_USD.toFixed(4)}`;
+            document.getElementById('cost-tokens').textContent =
+                `Tokens: in ${inputTokens.toLocaleString()} (${cachedTokens.toLocaleString()} cached), out ${outputTokens.toLocaleString()}`;
+        }
 
         function checkConversationLength() {
             const turns = Math.floor(HISTORY.length / 2);
@@ -508,6 +550,7 @@ The source document is in English; translate provisions accurately rather than l
                 let partialLine = '';
                 let ttfbMs = null;       // time-to-first-byte (first text delta)
                 let cachedTokens = null; // populated from trailing meta event
+                let usageMeta = null;
                 let wasTruncated = false;
 
                 let streamDone = false;
@@ -539,6 +582,7 @@ The source document is in English; translate provisions accurately rather than l
                         // Capture trailing metadata event (cache hit info)
                         if (parsed.meta) {
                             cachedTokens = parsed.meta.cachedTokens ?? 0;
+                            usageMeta = parsed.meta;
                             wasTruncated = Boolean(parsed.meta.truncated);
                             continue;
                         }
@@ -615,6 +659,7 @@ The source document is in English; translate provisions accurately rather than l
                 if (accumulated) {
                     LAST_RESPONSE_TEXT = accumulated;
                     HISTORY.push({ role: 'model', parts: [{ text: accumulated }] });
+                    updateCostPanel(document.getElementById('model-select').value, usageMeta);
                     logQuery(logUserText, accumulated, ttfbMs);
                     checkConversationLength();
                 } else {
@@ -653,6 +698,7 @@ The source document is in English; translate provisions accurately rather than l
                         LAST_RESPONSE_TEXT = safeReply;
                         appendBubble('model', safeReply);
                         HISTORY.push({ role: 'model', parts: [{ text: safeReply }] });
+                        updateCostPanel(document.getElementById('model-select').value, data.usage || null);
                         logQuery(logUserText, safeReply, null);
                         checkConversationLength();
                     } else {

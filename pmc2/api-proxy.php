@@ -20,8 +20,28 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') { exit; }
 $accountRoot = dirname($_SERVER['DOCUMENT_ROOT']);
 $secretsFile = $accountRoot . '/.secrets/claudekey.php';
 
-// PMC clean text — shared with pmc1 (single source of truth)
-define('PMC_FILE', __DIR__ . '/../pmc1/Pasco-Municipal-Code-clean.txt');
+// PMC text — prefer local copy in pmc2 folder; fall back to pmc1 if needed.
+// Supports both clean .txt (preferred) and .html (tags stripped on load).
+function load_pmc_text(): ?string {
+    $candidates = [
+        __DIR__ . '/Pasco-Municipal-Code-clean.txt',   // local clean text (ideal)
+        __DIR__ . '/Pasco-Municipal-Code-clean.html',  // local HTML (stripped)
+        __DIR__ . '/../pmc1/Pasco-Municipal-Code-clean.txt',  // pmc1 fallback
+        __DIR__ . '/../pmc1/Pasco-Municipal-Code-clean.html', // pmc1 HTML fallback
+    ];
+    foreach ($candidates as $path) {
+        if (file_exists($path)) {
+            $raw = file_get_contents($path);
+            if ($raw === false) continue;
+            // Strip HTML tags and normalise whitespace when loading an .html file
+            if (str_ends_with($path, '.html')) {
+                $raw = preg_replace('/\s+/', ' ', strip_tags($raw));
+            }
+            return $raw;
+        }
+    }
+    return null;
+}
 
 function send_error($msg, $details = null) {
     echo json_encode(['error' => $msg, 'details' => $details]);
@@ -72,10 +92,7 @@ function handle_stream($data, $secretsFile) {
     $actualModel = $modelMap[$requested] ?? 'claude-sonnet-4-6';
 
     // ── Load PMC document ────────────────────────────────────────────────────
-    $pmcText = null;
-    if (file_exists(PMC_FILE)) {
-        $pmcText = file_get_contents(PMC_FILE);
-    }
+    $pmcText = load_pmc_text();
 
     // ── Build messages array ─────────────────────────────────────────────────
     // Claude requires alternating user/assistant turns.
@@ -341,7 +358,7 @@ $requested   = $data['model'] ?? 'claude-sonnet-4-6';
 $actualModel = $modelMap[$requested] ?? 'claude-sonnet-4-6';
 
 // Build messages (same logic as streaming)
-$pmcText     = file_exists(PMC_FILE) ? file_get_contents(PMC_FILE) : null;
+$pmcText     = load_pmc_text();
 $messages    = [];
 $pmcInjected = false;
 

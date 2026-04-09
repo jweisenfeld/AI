@@ -109,6 +109,86 @@ function extract_reply_from_response(array $decoded): string
     return trim(implode('', $chunks));
 }
 
+function extract_latest_user_text(array $messages): string
+{
+    for ($i = count($messages) - 1; $i >= 0; $i--) {
+        $m = $messages[$i] ?? null;
+        if (!is_array($m) || (($m['role'] ?? '') !== 'user')) {
+            continue;
+        }
+        $parts = $m['parts'] ?? [];
+        $texts = [];
+        foreach ($parts as $p) {
+            if (isset($p['text']) && is_string($p['text'])) {
+                $texts[] = $p['text'];
+            }
+        }
+        $joined = trim(implode(' ', $texts));
+        if ($joined !== '') {
+            return $joined;
+        }
+    }
+    return '';
+}
+
+function build_pmc_context(string $pmcText, string $queryText, int $maxChars): string
+{
+    if ($pmcText === '') return '';
+
+    if (mb_strlen($pmcText) <= $maxChars) {
+        return $pmcText;
+    }
+
+    // Split into rough paragraphs and rank by keyword overlap with the latest user query.
+    $paragraphs = preg_split("/\n\s*\n/u", $pmcText) ?: [$pmcText];
+    $query = mb_strtolower($queryText);
+    preg_match_all('/[a-z0-9]{3,}/iu', $query, $qmatches);
+    $terms = array_slice(array_values(array_unique($qmatches[0] ?? [])), 0, 30);
+
+    $scored = [];
+    foreach ($paragraphs as $idx => $para) {
+        $p = trim($para);
+        if ($p === '') continue;
+        $lp = mb_strtolower($p);
+        $score = 0;
+        foreach ($terms as $t) {
+            if (mb_strpos($lp, mb_strtolower($t)) !== false) $score++;
+        }
+        // Prefer paragraphs that contain explicit section symbols/references.
+        if (preg_match('/§\s*\d+\.\d+\.\d+/u', $p)) $score += 2;
+        $scored[] = ['idx' => $idx, 'score' => $score, 'text' => $p];
+    }
+
+    usort($scored, function ($a, $b) {
+        if ($a['score'] === $b['score']) return $a['idx'] <=> $b['idx'];
+        return $b['score'] <=> $a['score'];
+    });
+
+    $picked = [];
+    $used = 0;
+    foreach ($scored as $row) {
+        if ($used >= $maxChars) break;
+        $chunk = $row['text'];
+        if ($chunk === '') continue;
+        $remaining = $maxChars - $used;
+        $chunkLen = mb_strlen($chunk);
+        if ($chunkLen > $remaining) {
+            $chunk = mb_substr($chunk, 0, max(0, $remaining - 1));
+            $chunkLen = mb_strlen($chunk);
+        }
+        if ($chunkLen <= 0) continue;
+        $picked[] = $chunk;
+        $used += $chunkLen + 2;
+        if (count($picked) >= 120) break;
+    }
+
+    if (empty($picked)) {
+        return mb_substr($pmcText, 0, $maxChars);
+    }
+
+    return implode("\n\n", $picked);
+}
+
 $rawInput = file_get_contents('php://input');
 $data = json_decode($rawInput, true);
 if (!is_array($data)) {
@@ -172,7 +252,10 @@ if ($userSystem !== '') {
     $fullSystem .= "\n\nAdditional system guidance:\n" . $userSystem;
 }
 if ($pmcText !== '') {
-    $fullSystem .= "\n\nPasco Municipal Code (reference corpus):\n" . $pmcText;
+    $latestUserText = extract_latest_user_text($data['messages'] ?? []);
+    $maxCorpusChars = (strpos($model, 'mini') !== false || strpos($model, 'nano') !== false) ? 80_000 : 140_000;
+    $pmcContext = build_pmc_context($pmcText, $latestUserText, $maxCorpusChars);
+    $fullSystem .= "\n\nPasco Municipal Code (retrieved reference excerpt):\n" . $pmcContext;
 }
 
 $input = [[

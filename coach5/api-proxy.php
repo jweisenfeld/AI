@@ -271,7 +271,7 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
         if ($fileUri !== null) {
             array_unshift($contents, [
                 'role'  => 'user',
-                'parts' => [[ 'file_data' => [ 'mime_type' => $fileMimeType, 'file_uri' => $fileUri ] ]]
+                'parts' => [[ 'fileData' => [ 'mimeType' => $fileMimeType, 'fileUri' => $fileUri ] ]]
             ]);
         }
         $payload = [
@@ -313,7 +313,7 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
             $fallbackContents = $contents;
             array_unshift($fallbackContents, [
                 'role'  => 'user',
-                'parts' => [[ 'file_data' => [ 'mime_type' => $fileMimeType, 'file_uri' => $fileUri ] ]]
+                'parts' => [[ 'fileData' => [ 'mimeType' => $fileMimeType, 'fileUri' => $fileUri ] ]]
             ]);
             $fallbackPayload = [
                 "contents"          => $fallbackContents,
@@ -735,7 +735,7 @@ if ($explicitCacheName !== null) {
     if ($fileUri !== null) {
         array_unshift($contents, [
             'role'  => 'user',
-            'parts' => [[ 'file_data' => [ 'mime_type' => $fileMimeType, 'file_uri' => $fileUri ] ]]
+            'parts' => [[ 'fileData' => [ 'mimeType' => $fileMimeType, 'fileUri' => $fileUri ] ]]
         ]);
     }
     $payload = [
@@ -766,7 +766,7 @@ if (!$curlErrno && $httpCode === 400 && $explicitCacheName !== null && $fileUri 
     $fallbackContents = $contents;
     array_unshift($fallbackContents, [
         'role'  => 'user',
-        'parts' => [[ 'file_data' => [ 'mime_type' => $fileMimeType, 'file_uri' => $fileUri ] ]]
+        'parts' => [[ 'fileData' => [ 'mimeType' => $fileMimeType, 'fileUri' => $fileUri ] ]]
     ]);
     $fallbackPayload = [
         "contents"          => $fallbackContents,

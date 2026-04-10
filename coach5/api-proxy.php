@@ -49,6 +49,7 @@ define('MAX_HISTORY_CHARS', 40_000);
 // Expand after verifying additional models via test-explicit-cache-all-models.php.
 define('EXPLICIT_CACHE_TTL', 4 * 3600);
 define('EXPLICIT_CACHE_MODELS_JSON', json_encode(['gemini-2.5-flash-lite']));
+define('MAX_OUTPUT_TOKENS', 800);
 
 /**
  * Returns a valid explicit cachedContent name for $model, creating one if needed.
@@ -255,7 +256,7 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
 
     // ── Build payload — explicit cache path vs. Files API fallback ───────────
     $systemInstruction = ["parts" => [["text" => $systemText]]];
-    $generationConfig  = ["maxOutputTokens" => 2000];
+    $generationConfig  = ["maxOutputTokens" => MAX_OUTPUT_TOKENS];
 
     if ($explicitCacheName !== null) {
         // Explicit cache: send conversation only — the cache already holds the
@@ -750,7 +751,7 @@ if ($fileUri !== null && in_array($actualModel, $explicitModels)) {
 
 // ── Build payload — explicit cache path vs. Files API fallback ───────────────
 $systemInstruction = ["parts" => [["text" => $systemText]]];
-$generationConfig  = ["maxOutputTokens" => 2000];
+$generationConfig  = ["maxOutputTokens" => MAX_OUTPUT_TOKENS];
 
 if ($explicitCacheName !== null) {
     // Explicit cache: send conversation only — the cache holds file + system.

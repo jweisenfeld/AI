@@ -206,9 +206,9 @@ function output_token_budget_for_model(string $model): int
     return match ($model) {
         'gpt-4.1' => 1600,
         'gpt-4.1-mini' => 1200,
-        'gpt-5' => 2200,
-        'gpt-5-mini' => 1800,
-        'gpt-5-nano' => 900,
+        'gpt-5' => 3200,
+        'gpt-5-mini' => 2600,
+        'gpt-5-nano' => 2600,
         default => 1200,
     };
 }
@@ -251,11 +251,12 @@ $modelMap = [
     // Stable aliases (to reduce merge/deploy drift across branches):
     'gpt-5' => 'gpt-5',
     'gpt-5-mini' => 'gpt-5-mini',
-    'gpt-5-nano' => 'gpt-5-nano',
+    // Nano isn't enabled in all orgs; route to mini for reliability.
+    'gpt-5-nano' => 'gpt-5-mini',
     // Accept legacy/alternate IDs seen in prior branch revisions:
     'gpt-5.4' => 'gpt-5',
     'gpt-5.4-mini' => 'gpt-5-mini',
-    'gpt-5.4-nano' => 'gpt-5-nano',
+    'gpt-5.4-nano' => 'gpt-5-mini',
     'gpt-4.1' => 'gpt-4.1',
     'gpt-4.1-mini' => 'gpt-4.1-mini',
 ];

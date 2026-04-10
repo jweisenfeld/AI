@@ -412,7 +412,7 @@ The source document is in English; translate provisions accurately rather than l
 - Use headers, tables, and numbered lists freely — this is a professional reference tool.
 - For complex multi-section answers: lead with a brief summary, then detail each relevant section.
 - For direct lookup queries: lead with the section text or key provision, then add context or cross-references.
-- No artificial response length cap — answer as completely as the question requires.
+- Be concise by default. Expand in detail only when the user requests a full analysis.
 - End responses with a brief "See also:" note citing related sections when relevant, not with generic follow-up questions.
 - Use bold for section numbers (e.g., **§17.24.020**) to make citations scannable.
 `;
@@ -680,7 +680,10 @@ The source document is in English; translate provisions accurately rather than l
                         headers: { 'Content-Type': 'application/json' },
                         body: requestBody
                     });
-                    const data = await res.json();
+                    const raw = await res.text();
+                    let data = {};
+                    try { data = JSON.parse(raw); }
+                    catch { data = { error: raw || 'Connection failed.' }; }
                     const reply = data.reply
                         || data.candidates?.[0]?.content?.parts?.[0]?.text
                         || data.output_text

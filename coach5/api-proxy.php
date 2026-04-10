@@ -56,9 +56,14 @@ define('EXPLICIT_CACHE_MODELS_JSON', json_encode(['gemini-2.5-flash-lite']));
  * simultaneously on a cold start.  Returns null on failure — caller falls back
  * to Files API (implicit caching) with no disruption to the student.
  */
-function get_or_create_explicit_cache(string $model, string $fileUri, string $fileMime, string $apiKey, string $accountRoot): ?string {
+function get_or_create_explicit_cache(string $model, string $fileUri, string $fileMime, string $apiKey, string $accountRoot, string $systemText): ?string {
     $safeModel  = preg_replace('/[^a-z0-9\-]/', '-', $model);
-    $nameFile   = $accountRoot . '/.secrets/gemini_explicit_cache_' . $safeModel . '.txt';
+    // Explicit cache entries must include systemInstruction (Gemini rejects
+    // GenerateContent requests that set both cachedContent + systemInstruction).
+    // Include a hash of system text in the filename so prompt updates create
+    // a fresh cache automatically rather than reusing an incompatible one.
+    $sysHash    = substr(sha1($systemText), 0, 12);
+    $nameFile   = $accountRoot . '/.secrets/gemini_explicit_cache_' . $safeModel . '_' . $sysHash . '.txt';
     $expiryFile = $nameFile . '.expires';
     $lockFile   = $nameFile . '.lock';
 
@@ -98,6 +103,7 @@ function get_or_create_explicit_cache(string $model, string $fileUri, string $fi
             'role'  => 'user',
             'parts' => [['fileData' => ['mimeType' => $fileMime, 'fileUri' => $fileUri]]]
         ]],
+        'systemInstruction' => ['parts' => [['text' => $systemText]]],
         'ttl' => EXPLICIT_CACHE_TTL . 's',
     ];
 
@@ -203,12 +209,13 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     // create) a persistent explicit context cache.  On success, the file URI
     // is NOT prepended to contents — the cache replaces it.  On failure the
     // code falls through to the Files API path with no student-visible impact.
+    $systemText        = $data['system'] ?? "You are a civil engineer.";
     $explicitCacheName = null;
     $explicitModels    = json_decode(EXPLICIT_CACHE_MODELS_JSON, true);
     if ($fileUri !== null && in_array($actualModel, $explicitModels)) {
         $accountRootLocal  = dirname(dirname($cacheNameFile));  // derive: .secrets/../ = account root
         $explicitCacheName = get_or_create_explicit_cache(
-            $actualModel, $fileUri, $fileMimeType, trim($GEMINI_API_KEY), $accountRootLocal
+            $actualModel, $fileUri, $fileMimeType, trim($GEMINI_API_KEY), $accountRootLocal, $systemText
         );
     }
 
@@ -243,16 +250,16 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     }
 
     // ── Build payload — explicit cache path vs. Files API fallback ───────────
-    $systemInstruction = ["parts" => [["text" => $data['system'] ?? "You are a civil engineer."]]];
+    $systemInstruction = ["parts" => [["text" => $systemText]]];
     $generationConfig  = ["maxOutputTokens" => 2000];
 
     if ($explicitCacheName !== null) {
-        // Explicit cache: send conversation only — the cache already holds the file.
-        // Do NOT prepend the file URI; 'cachedContent' replaces it.
+        // Explicit cache: send conversation only — the cache already holds the
+        // file + system instruction. Do NOT include systemInstruction here;
+        // Gemini rejects cachedContent requests that also set it.
         $payload = [
             "cachedContent"     => $explicitCacheName,
             "contents"          => $contents,
-            "systemInstruction" => $systemInstruction,
             "generationConfig"  => $generationConfig,
         ];
     } else {
@@ -661,24 +668,25 @@ if (strlen(json_encode($contents)) > MAX_HISTORY_CHARS) {
 }
 
 // ── Explicit cache lookup ─────────────────────────────────────────────────────
+$systemText        = $data['system'] ?? "You are a civil engineer.";
 $explicitCacheName = null;
 $explicitModels    = json_decode(EXPLICIT_CACHE_MODELS_JSON, true);
 if ($fileUri !== null && in_array($actualModel, $explicitModels)) {
     $explicitCacheName = get_or_create_explicit_cache(
-        $actualModel, $fileUri, $fileMimeType, trim($GEMINI_API_KEY), $accountRoot
+        $actualModel, $fileUri, $fileMimeType, trim($GEMINI_API_KEY), $accountRoot, $systemText
     );
 }
 
 // ── Build payload — explicit cache path vs. Files API fallback ───────────────
-$systemInstruction = ["parts" => [["text" => $data['system'] ?? "You are a civil engineer."]]];
+$systemInstruction = ["parts" => [["text" => $systemText]]];
 $generationConfig  = ["maxOutputTokens" => 2000];
 
 if ($explicitCacheName !== null) {
-    // Explicit cache: send conversation only — the cache holds the file.
+    // Explicit cache: send conversation only — the cache holds file + system.
+    // Gemini forbids setting systemInstruction alongside cachedContent here.
     $payload = [
         "cachedContent"     => $explicitCacheName,
         "contents"          => $contents,
-        "systemInstruction" => $systemInstruction,
         "generationConfig"  => $generationConfig,
     ];
 } else {

@@ -494,6 +494,7 @@
                 messages: messagesWithPhase
             });
 
+            let assistantDiv = null;
             try {
                 const fetchStart = performance.now();
                 const res = await fetch('api-proxy.php?stream=1', {
@@ -506,7 +507,7 @@
 
                 // Replace thinking bubble with an empty assistant bubble to fill in
                 thinkingDiv.remove();
-                const assistantDiv = document.createElement('div');
+                assistantDiv = document.createElement('div');
                 assistantDiv.className = 'message assistant';
                 assistantDiv.innerHTML = '<div class="bubble"></div>';
                 messagesDiv.appendChild(assistantDiv);

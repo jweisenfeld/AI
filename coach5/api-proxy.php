@@ -49,6 +49,7 @@ define('MAX_HISTORY_CHARS', 40_000);
 // Expand after verifying additional models via test-explicit-cache-all-models.php.
 define('EXPLICIT_CACHE_TTL', 4 * 3600);
 define('EXPLICIT_CACHE_MODELS_JSON', json_encode(['gemini-2.5-flash-lite']));
+define('MAX_OUTPUT_TOKENS', 800);
 
 /**
  * Returns a valid explicit cachedContent name for $model, creating one if needed.
@@ -56,9 +57,18 @@ define('EXPLICIT_CACHE_MODELS_JSON', json_encode(['gemini-2.5-flash-lite']));
  * simultaneously on a cold start.  Returns null on failure — caller falls back
  * to Files API (implicit caching) with no disruption to the student.
  */
-function get_or_create_explicit_cache(string $model, string $fileUri, string $fileMime, string $apiKey, string $accountRoot): ?string {
+function explicit_cache_name_file(string $model, string $accountRoot, string $systemText): string {
     $safeModel  = preg_replace('/[^a-z0-9\-]/', '-', $model);
-    $nameFile   = $accountRoot . '/.secrets/gemini_explicit_cache_' . $safeModel . '.txt';
+    // Explicit cache entries must include systemInstruction (Gemini rejects
+    // GenerateContent requests that set both cachedContent + systemInstruction).
+    // Include a hash of system text in the filename so prompt updates create
+    // a fresh cache automatically rather than reusing an incompatible one.
+    $sysHash    = substr(sha1($systemText), 0, 12);
+    return $accountRoot . '/.secrets/gemini_explicit_cache_' . $safeModel . '_' . $sysHash . '.txt';
+}
+
+function get_or_create_explicit_cache(string $model, string $fileUri, string $fileMime, string $apiKey, string $accountRoot, string $systemText): ?string {
+    $nameFile   = explicit_cache_name_file($model, $accountRoot, $systemText);
     $expiryFile = $nameFile . '.expires';
     $lockFile   = $nameFile . '.lock';
 
@@ -98,6 +108,7 @@ function get_or_create_explicit_cache(string $model, string $fileUri, string $fi
             'role'  => 'user',
             'parts' => [['fileData' => ['mimeType' => $fileMime, 'fileUri' => $fileUri]]]
         ]],
+        'systemInstruction' => ['parts' => [['text' => $systemText]]],
         'ttl' => EXPLICIT_CACHE_TTL . 's',
     ];
 
@@ -203,12 +214,13 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     // create) a persistent explicit context cache.  On success, the file URI
     // is NOT prepended to contents — the cache replaces it.  On failure the
     // code falls through to the Files API path with no student-visible impact.
+    $systemText        = $data['system'] ?? "You are a civil engineer.";
     $explicitCacheName = null;
     $explicitModels    = json_decode(EXPLICIT_CACHE_MODELS_JSON, true);
     if ($fileUri !== null && in_array($actualModel, $explicitModels)) {
         $accountRootLocal  = dirname(dirname($cacheNameFile));  // derive: .secrets/../ = account root
         $explicitCacheName = get_or_create_explicit_cache(
-            $actualModel, $fileUri, $fileMimeType, trim($GEMINI_API_KEY), $accountRootLocal
+            $actualModel, $fileUri, $fileMimeType, trim($GEMINI_API_KEY), $accountRootLocal, $systemText
         );
     }
 
@@ -243,16 +255,16 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     }
 
     // ── Build payload — explicit cache path vs. Files API fallback ───────────
-    $systemInstruction = ["parts" => [["text" => $data['system'] ?? "You are a civil engineer."]]];
-    $generationConfig  = ["maxOutputTokens" => 2000];
+    $systemInstruction = ["parts" => [["text" => $systemText]]];
+    $generationConfig  = ["maxOutputTokens" => MAX_OUTPUT_TOKENS];
 
     if ($explicitCacheName !== null) {
-        // Explicit cache: send conversation only — the cache already holds the file.
-        // Do NOT prepend the file URI; 'cachedContent' replaces it.
+        // Explicit cache: send conversation only — the cache already holds the
+        // file + system instruction. Do NOT include systemInstruction here;
+        // Gemini rejects cachedContent requests that also set it.
         $payload = [
             "cachedContent"     => $explicitCacheName,
             "contents"          => $contents,
-            "systemInstruction" => $systemInstruction,
             "generationConfig"  => $generationConfig,
         ];
     } else {
@@ -260,7 +272,7 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
         if ($fileUri !== null) {
             array_unshift($contents, [
                 'role'  => 'user',
-                'parts' => [[ 'file_data' => [ 'mime_type' => $fileMimeType, 'file_uri' => $fileUri ] ]]
+                'parts' => [[ 'fileData' => [ 'mimeType' => $fileMimeType, 'fileUri' => $fileUri ] ]]
             ]);
         }
         $payload = [
@@ -291,6 +303,73 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
     $curlInfo  = curl_getinfo($ch);
     curl_close($ch);
 
+    if ($curlErrno || $curlInfo['http_code'] !== 200) {
+        // If explicit cache path fails (often INVALID_ARGUMENT from stale or
+        // incompatible cachedContent), retry once via Files API fallback.
+        if (!$curlErrno && $curlInfo['http_code'] === 400 && $explicitCacheName !== null && $fileUri !== null) {
+            file_put_contents(__DIR__ . '/gemini_usage.log',
+                date('Y-m-d H:i:s') . " | EXPLICIT_CACHE_BYPASS | $actualModel | HTTP:400 | retrying Files API path\n",
+                FILE_APPEND);
+
+            $fallbackContents = $contents;
+            array_unshift($fallbackContents, [
+                'role'  => 'user',
+                'parts' => [[ 'fileData' => [ 'mimeType' => $fileMimeType, 'fileUri' => $fileUri ] ]]
+            ]);
+            $fallbackPayload = [
+                "contents"          => $fallbackContents,
+                "systemInstruction" => $systemInstruction,
+                "generationConfig"  => $generationConfig,
+            ];
+
+            $chRetry = curl_init($url);
+            curl_setopt($chRetry, CURLOPT_POST,           true);
+            curl_setopt($chRetry, CURLOPT_POSTFIELDS,     json_encode($fallbackPayload));
+            curl_setopt($chRetry, CURLOPT_HTTPHEADER,     ['Content-Type: application/json']);
+            curl_setopt($chRetry, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($chRetry, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($chRetry, CURLOPT_TIMEOUT,        120);
+            $rawBody   = curl_exec($chRetry);
+            $curlErrno = curl_errno($chRetry);
+            $curlError = curl_error($chRetry);
+            $curlInfo  = curl_getinfo($chRetry);
+            curl_close($chRetry);
+
+            if (!$curlErrno && $curlInfo['http_code'] === 200) {
+                $explicitCacheName = null; // logging should reflect fallback path
+            }
+        }
+    }
+    if (!$curlErrno && $curlInfo['http_code'] === 400) {
+        // Last-resort safety net: retry with NO external file context at all.
+        // This guarantees students still get a coach response even if file URI
+        // or cached content is invalid.
+        file_put_contents(__DIR__ . '/gemini_usage.log',
+            date('Y-m-d H:i:s') . " | FILE_CONTEXT_BYPASS | $actualModel | HTTP:400 | retrying without file context\n",
+            FILE_APPEND);
+        $noFilePayload = [
+            "contents"          => $contents,
+            "systemInstruction" => $systemInstruction,
+            "generationConfig"  => $generationConfig,
+        ];
+        $chRetry2 = curl_init($url);
+        curl_setopt($chRetry2, CURLOPT_POST,           true);
+        curl_setopt($chRetry2, CURLOPT_POSTFIELDS,     json_encode($noFilePayload));
+        curl_setopt($chRetry2, CURLOPT_HTTPHEADER,     ['Content-Type: application/json']);
+        curl_setopt($chRetry2, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($chRetry2, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($chRetry2, CURLOPT_TIMEOUT,        120);
+        $rawBody   = curl_exec($chRetry2);
+        $curlErrno = curl_errno($chRetry2);
+        $curlError = curl_error($chRetry2);
+        $curlInfo  = curl_getinfo($chRetry2);
+        curl_close($chRetry2);
+
+        if (!$curlErrno && $curlInfo['http_code'] === 200) {
+            $explicitCacheName = null;
+            $fileUri = null;
+        }
+    }
     if ($curlErrno || $curlInfo['http_code'] !== 200) {
         $errMsg = $curlErrno ? "curl error $curlErrno: $curlError"
                              : "Gemini returned HTTP " . $curlInfo['http_code'];
@@ -661,24 +740,25 @@ if (strlen(json_encode($contents)) > MAX_HISTORY_CHARS) {
 }
 
 // ── Explicit cache lookup ─────────────────────────────────────────────────────
+$systemText        = $data['system'] ?? "You are a civil engineer.";
 $explicitCacheName = null;
 $explicitModels    = json_decode(EXPLICIT_CACHE_MODELS_JSON, true);
 if ($fileUri !== null && in_array($actualModel, $explicitModels)) {
     $explicitCacheName = get_or_create_explicit_cache(
-        $actualModel, $fileUri, $fileMimeType, trim($GEMINI_API_KEY), $accountRoot
+        $actualModel, $fileUri, $fileMimeType, trim($GEMINI_API_KEY), $accountRoot, $systemText
     );
 }
 
 // ── Build payload — explicit cache path vs. Files API fallback ───────────────
-$systemInstruction = ["parts" => [["text" => $data['system'] ?? "You are a civil engineer."]]];
-$generationConfig  = ["maxOutputTokens" => 2000];
+$systemInstruction = ["parts" => [["text" => $systemText]]];
+$generationConfig  = ["maxOutputTokens" => MAX_OUTPUT_TOKENS];
 
 if ($explicitCacheName !== null) {
-    // Explicit cache: send conversation only — the cache holds the file.
+    // Explicit cache: send conversation only — the cache holds file + system.
+    // Gemini forbids setting systemInstruction alongside cachedContent here.
     $payload = [
         "cachedContent"     => $explicitCacheName,
         "contents"          => $contents,
-        "systemInstruction" => $systemInstruction,
         "generationConfig"  => $generationConfig,
     ];
 } else {
@@ -686,7 +766,7 @@ if ($explicitCacheName !== null) {
     if ($fileUri !== null) {
         array_unshift($contents, [
             'role'  => 'user',
-            'parts' => [[ 'file_data' => [ 'mime_type' => $fileMimeType, 'file_uri' => $fileUri ] ]]
+            'parts' => [[ 'fileData' => [ 'mimeType' => $fileMimeType, 'fileUri' => $fileUri ] ]]
         ]);
     }
     $payload = [
@@ -703,7 +783,74 @@ curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
 curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
 $response = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$curlErrno = curl_errno($ch);
+$curlError = curl_error($ch);
 curl_close($ch);
+
+// Explicit cache fallback: if cachedContent request is rejected as INVALID_ARGUMENT,
+// retry once using Files API path so students still get a response.
+if (!$curlErrno && $httpCode === 400 && $explicitCacheName !== null && $fileUri !== null) {
+    file_put_contents(__DIR__ . '/gemini_usage.log',
+        date('Y-m-d H:i:s') . " | EXPLICIT_CACHE_BYPASS | $actualModel | HTTP:400 | retrying Files API path\n",
+        FILE_APPEND);
+
+    $fallbackContents = $contents;
+    array_unshift($fallbackContents, [
+        'role'  => 'user',
+        'parts' => [[ 'fileData' => [ 'mimeType' => $fileMimeType, 'fileUri' => $fileUri ] ]]
+    ]);
+    $fallbackPayload = [
+        "contents"          => $fallbackContents,
+        "systemInstruction" => $systemInstruction,
+        "generationConfig"  => $generationConfig,
+    ];
+
+    $ch2 = curl_init($url);
+    curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch2, CURLOPT_POST, true);
+    curl_setopt($ch2, CURLOPT_POSTFIELDS, json_encode($fallbackPayload));
+    curl_setopt($ch2, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    $response = curl_exec($ch2);
+    $httpCode = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
+    $curlErrno = curl_errno($ch2);
+    $curlError = curl_error($ch2);
+    curl_close($ch2);
+
+    if (!$curlErrno && $httpCode === 200) {
+        $explicitCacheName = null; // logging should reflect fallback path
+    }
+}
+
+if (!$curlErrno && $httpCode === 400) {
+    // Last-resort safety net: retry without file context if Gemini rejects
+    // both cachedContent and Files API file reference payloads.
+    file_put_contents(__DIR__ . '/gemini_usage.log',
+        date('Y-m-d H:i:s') . " | FILE_CONTEXT_BYPASS | $actualModel | HTTP:400 | retrying without file context\n",
+        FILE_APPEND);
+    $noFilePayload = [
+        "contents"          => $contents,
+        "systemInstruction" => $systemInstruction,
+        "generationConfig"  => $generationConfig,
+    ];
+    $ch3 = curl_init($url);
+    curl_setopt($ch3, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch3, CURLOPT_POST, true);
+    curl_setopt($ch3, CURLOPT_POSTFIELDS, json_encode($noFilePayload));
+    curl_setopt($ch3, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    $response = curl_exec($ch3);
+    $httpCode = curl_getinfo($ch3, CURLINFO_HTTP_CODE);
+    $curlErrno = curl_errno($ch3);
+    $curlError = curl_error($ch3);
+    curl_close($ch3);
+    if (!$curlErrno && $httpCode === 200) {
+        $explicitCacheName = null;
+        $fileUri = null;
+    }
+}
+
+if ($curlErrno) {
+    send_error("curl error $curlErrno: $curlError");
+}
 
 // --- 4. USAGE LOGGING (Teacher Dashboard Data) ---
 $responseData = json_decode($response, true);

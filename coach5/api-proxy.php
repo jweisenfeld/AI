@@ -339,6 +339,36 @@ function handle_stream($data, $secretsFile, $cacheNameFile) {
             }
         }
     }
+    if (!$curlErrno && $curlInfo['http_code'] === 400) {
+        // Last-resort safety net: retry with NO external file context at all.
+        // This guarantees students still get a coach response even if file URI
+        // or cached content is invalid.
+        file_put_contents(__DIR__ . '/gemini_usage.log',
+            date('Y-m-d H:i:s') . " | FILE_CONTEXT_BYPASS | $actualModel | HTTP:400 | retrying without file context\n",
+            FILE_APPEND);
+        $noFilePayload = [
+            "contents"          => $contents,
+            "systemInstruction" => $systemInstruction,
+            "generationConfig"  => $generationConfig,
+        ];
+        $chRetry2 = curl_init($url);
+        curl_setopt($chRetry2, CURLOPT_POST,           true);
+        curl_setopt($chRetry2, CURLOPT_POSTFIELDS,     json_encode($noFilePayload));
+        curl_setopt($chRetry2, CURLOPT_HTTPHEADER,     ['Content-Type: application/json']);
+        curl_setopt($chRetry2, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($chRetry2, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($chRetry2, CURLOPT_TIMEOUT,        120);
+        $rawBody   = curl_exec($chRetry2);
+        $curlErrno = curl_errno($chRetry2);
+        $curlError = curl_error($chRetry2);
+        $curlInfo  = curl_getinfo($chRetry2);
+        curl_close($chRetry2);
+
+        if (!$curlErrno && $curlInfo['http_code'] === 200) {
+            $explicitCacheName = null;
+            $fileUri = null;
+        }
+    }
     if ($curlErrno || $curlInfo['http_code'] !== 200) {
         $errMsg = $curlErrno ? "curl error $curlErrno: $curlError"
                              : "Gemini returned HTTP " . $curlInfo['http_code'];
@@ -787,6 +817,33 @@ if (!$curlErrno && $httpCode === 400 && $explicitCacheName !== null && $fileUri 
 
     if (!$curlErrno && $httpCode === 200) {
         $explicitCacheName = null; // logging should reflect fallback path
+    }
+}
+
+if (!$curlErrno && $httpCode === 400) {
+    // Last-resort safety net: retry without file context if Gemini rejects
+    // both cachedContent and Files API file reference payloads.
+    file_put_contents(__DIR__ . '/gemini_usage.log',
+        date('Y-m-d H:i:s') . " | FILE_CONTEXT_BYPASS | $actualModel | HTTP:400 | retrying without file context\n",
+        FILE_APPEND);
+    $noFilePayload = [
+        "contents"          => $contents,
+        "systemInstruction" => $systemInstruction,
+        "generationConfig"  => $generationConfig,
+    ];
+    $ch3 = curl_init($url);
+    curl_setopt($ch3, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch3, CURLOPT_POST, true);
+    curl_setopt($ch3, CURLOPT_POSTFIELDS, json_encode($noFilePayload));
+    curl_setopt($ch3, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    $response = curl_exec($ch3);
+    $httpCode = curl_getinfo($ch3, CURLINFO_HTTP_CODE);
+    $curlErrno = curl_errno($ch3);
+    $curlError = curl_error($ch3);
+    curl_close($ch3);
+    if (!$curlErrno && $httpCode === 200) {
+        $explicitCacheName = null;
+        $fileUri = null;
     }
 }
 

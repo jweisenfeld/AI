@@ -98,8 +98,8 @@
     #verse-ref {
       margin-top: 18px;
       text-align: center;
-      font-size: 0.85rem;
-      color: #5a5a7a;
+      font-size: 1.05rem;
+      color: #8a8aaa;
       font-style: italic;
       letter-spacing: 1px;
       min-height: 1.2em;
@@ -175,7 +175,7 @@
 
     #feedback-theme {
       color: #b0a090;
-      font-size: 0.9rem;
+      font-size: 1.05rem;
       line-height: 1.6;
     }
     #feedback-theme strong { color: #c9a84c; }
@@ -265,7 +265,37 @@ const CHAPTER_THEMES = {
   6: "Children and parents; servants and masters; the armor of God; prayer for boldness; final blessing",
 };
 
+// Verses shorter than 50 chars get merged with the next verse in the same chapter
+// (gives context without dropping any verse entirely).
+function groupShortVerses(raw) {
+  const result = [];
+  let i = 0;
+  while (i < raw.length) {
+    const v = raw[i];
+    if (v.t.length < 50 && i + 1 < raw.length && raw[i + 1].c === v.c) {
+      const next = raw[i + 1];
+      result.push({ chapter: v.c, verseStart: v.v, verseEnd: next.v, text: v.t + ' ' + next.t });
+      i += 2;
+    } else {
+      result.push({ chapter: v.c, verseStart: v.v, verseEnd: null, text: v.t });
+      i++;
+    }
+  }
+  return result;
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 let allVerses = [];
+let deck = [];
+let deckIndex = 0;
 let currentVerse = null;
 let correct = 0;
 let total = 0;
@@ -283,9 +313,9 @@ async function loadEphesians() {
     return;
   }
 
-  allVerses = raw
-    .filter(v => v.t.length >= 40)
-    .map(v => ({ chapter: v.c, verse: v.v, text: v.t }));
+  allVerses = groupShortVerses(raw);
+  deck = shuffle(allVerses);
+  deckIndex = 0;
 
   document.getElementById('progress-bar').style.width = '100%';
   setTimeout(startQuiz, 150);
@@ -312,13 +342,13 @@ function buildGrid() {
 }
 
 function nextVerse() {
-  let pick;
-  do {
-    pick = allVerses[Math.floor(Math.random() * allVerses.length)];
-  } while (allVerses.length > 1 && pick === currentVerse);
-  currentVerse = pick;
+  if (deckIndex >= deck.length) {
+    deck = shuffle(allVerses);
+    deckIndex = 0;
+  }
+  currentVerse = deck[deckIndex++];
 
-  document.getElementById('verse-text').textContent = pick.text;
+  document.getElementById('verse-text').textContent = currentVerse.text;
   document.getElementById('verse-ref').textContent = '';
   document.getElementById('feedback').style.display = 'none';
   document.getElementById('next-btn').style.display = 'none';
@@ -329,14 +359,18 @@ function nextVerse() {
   });
 }
 
+function verseRef(v) {
+  const base = `Ephesians ${v.chapter}:${v.verseStart}`;
+  return v.verseEnd ? `${base}\u2013${v.verseEnd}` : base;
+}
+
 function guess(ch, btn) {
   const answer = currentVerse.chapter;
   total++;
 
   document.querySelectorAll('.ch-btn').forEach(b => { b.disabled = true; });
 
-  document.getElementById('verse-ref').textContent =
-    `Ephesians ${answer}:${currentVerse.verse}`;
+  document.getElementById('verse-ref').textContent = verseRef(currentVerse);
 
   if (ch === answer) {
     correct++;

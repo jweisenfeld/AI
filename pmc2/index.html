@@ -449,8 +449,17 @@
                 }
 
                 if (!reply) {
-                    const errMsg = data.error?.message
+                    const errType = data.error?.type ?? '';
+                    let errMsg = data.error?.message
                         || (typeof data.error === 'string' ? data.error : 'Empty response from Claude.');
+                    // Friendlier messages for common Anthropic API error types
+                    if (errType === 'overloaded_error') {
+                        errMsg = 'Claude is temporarily overloaded. Wait a moment and try again.';
+                    } else if (errType === 'rate_limit_error') {
+                        errMsg = 'Rate limit reached. Wait a few seconds and try again.';
+                    } else if (errType === 'api_error') {
+                        errMsg = 'Anthropic API error. Try again shortly.';
+                    }
                     appendBubble('assistant', '⚠️ ' + errMsg);
                 } else {
                     LAST_RESPONSE_TEXT = reply;

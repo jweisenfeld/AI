@@ -64,21 +64,27 @@ Uses `../.secrets/ohskey.php` (shared with ohs-search). Keys needed:
 3. Upload `index.html`, `api-proxy.php`, `src/` to `psd1.net/rcw-wac/` via cPanel
 4. Verify at `https://psd1.net/rcw-wac/`
 
+## Architecture Clarification — No Live Web Queries
+
+**The frontend never queries leg.wa.gov.** Ingestion crawls it ONCE to populate Supabase.
+After that, all user queries go to Supabase only. The leg.wa.gov links in source cards are
+just citation links that open in a new tab.
+
+```
+INGESTION (one-time, you run manually):
+  ingest.py → crawls leg.wa.gov title-by-title → embeds → stores in Supabase
+
+USER QUERIES (every question):
+  Browser → api-proxy.php → OpenAI (embed) → Supabase (search) → Claude
+  leg.wa.gov is never touched at query time.
+```
+
 ## Ingestion
 
-### Getting the XML
-
-WA Legislature distributes RCW and WAC as XML. Download individual titles from:
-- RCW: `https://apps.leg.wa.gov/rcw/` → navigate to a title → Download
-- WAC: `https://apps.leg.wa.gov/wac/` → navigate to a title → Download
+There is no single downloadable file for the full RCW or WAC. The legislature publishes
+it by title/chapter/section on their website. The ingestion script crawls those pages.
 
 ### Phase 1 (recommended starting point)
-Education-specific titles relevant to PSD:
-- **RCW Title 28A** — Common School Provisions (K-12 education law)
-- **WAC Title 180** — Office of Superintendent of Public Instruction (OSPI rules)
-- **RCW Title 42** — Public Officers & Agencies (public records, meetings)
-
-### Running the ingestion script
 
 ```bash
 cd rcw-wac/ingestion/
@@ -88,26 +94,35 @@ export OPENAI_API_KEY=sk-...
 export SUPABASE_URL=https://qawqovyqnvlcyuxezmrp.supabase.co
 export SUPABASE_ANON_KEY=eyJ...
 
-# Dry run first (parse + chunk, no API calls)
-python ingest.py rcw_title28A.xml --corpus rcw --dry-run
+# ALWAYS dry-run first — verify the HTML parser is extracting real text
+python ingest.py --corpus rcw --titles 28A --dry-run
+python ingest.py --corpus wac --titles 180 --dry-run
 
-# Real ingest
-python ingest.py rcw_title28A.xml --corpus rcw
-python ingest.py wac_title180.xml --corpus wac
+# If dry-run output looks good, run for real
+python ingest.py --corpus rcw --titles 28A        # K-12 education law
+python ingest.py --corpus wac --titles 180        # OSPI administrative rules
+python ingest.py --corpus rcw --titles 42.56      # Public records
 
-# Re-ingest a title (e.g. after law updates)
-python ingest.py rcw_title28A.xml --corpus rcw --clear
+# Re-ingest after law updates
+python ingest.py --corpus rcw --titles 28A --clear
 ```
 
-### Estimated corpus size (Phase 1)
-| Title | Sections | ~Chunks | Embed cost |
-|-------|----------|---------|------------|
-| RCW 28A | ~850 | ~1,000 | ~$0.04 |
-| WAC 180 | ~600 | ~700 | ~$0.03 |
-| RCW 42 | ~400 | ~450 | ~$0.02 |
-| **Total** | **~1,850** | **~2,150** | **~$0.09** |
+### Fixing the HTML parser
 
-Full corpus (all RCW titles + all WAC titles): ~25,000 chunks, ~$1.00 to embed.
+If `--dry-run` shows empty content or garbage, the legislature site changed its HTML structure.
+Open `https://app.leg.wa.gov/RCW/default.aspx?cite=28A.400.010` in your browser, inspect the
+element containing the section text, and update the CSS selectors in `rcw_fetch_section()`
+(look for the list starting with `#contentWrapper`). Add the correct selector there.
+
+### Estimated corpus size (Phase 1)
+| Title | ~Sections | ~Chunks | Crawl time | Embed cost |
+|-------|-----------|---------|------------|------------|
+| RCW 28A | ~850 | ~1,000 | ~7 min | ~$0.04 |
+| WAC 180 | ~600 | ~700 | ~5 min | ~$0.03 |
+| RCW 42.56 | ~80 | ~100 | ~1 min | <$0.01 |
+| **Total** | **~1,530** | **~1,800** | **~13 min** | **~$0.07** |
+
+Full corpus (all ~96 RCW titles + all WAC): ~25,000 chunks, ~2-4 hours crawl, ~$1.00 embed.
 
 ## Model
 
@@ -149,15 +164,17 @@ Sources are emitted **before** text starts so the UI can render citation cards w
 ## CLI Quick Reference
 
 ```bash
-# Parse only — no API calls
-python ingest.py title28A.xml --corpus rcw --dry-run
+# Test parsing (no API calls, no DB writes)
+python ingest.py --corpus rcw --titles 28A --dry-run
 
-# Ingest new title
-python ingest.py title28A.xml --corpus rcw
+# Ingest Phase 1
+python ingest.py --corpus rcw --titles 28A
+python ingest.py --corpus wac --titles 180
 
-# Replace title (e.g. after law update)
-python ingest.py title28A.xml --corpus rcw --clear
+# Replace after law update
+python ingest.py --corpus rcw --titles 28A --clear
 
-# Verify corpus in Supabase
-# Run in SQL Editor: SELECT corpus, title_num, count(*) FROM rcw_wac_chunks GROUP BY 1,2 ORDER BY 1,2;
+# Verify corpus in Supabase SQL Editor:
+# SELECT corpus, title_num, count(*) FROM rcw_wac_chunks GROUP BY 1,2 ORDER BY 1,2;
+# SELECT * FROM rcw_wac_stats();
 ```

@@ -112,7 +112,7 @@ returns table (
     source_url      text,
     similarity      float
 )
-language sql stable as $$
+language sql stable security definer as $$
     with
     -- ── Vector lane ───────────────────────────────────────────────────────────
     vec as (
@@ -187,3 +187,29 @@ returns json language sql security definer as $$
         'zero_hit_queries', (select count(*) from rcw_wac_query_log where result_count = 0)
     );
 $$;
+
+-- ── Row Level Security ────────────────────────────────────────────────────────
+-- Security model:
+--   anon key (PHP proxy)    → can call RPCs, can INSERT to query_log, nothing else
+--   service_role key (ingest.py) → bypasses RLS, full INSERT access to chunks
+--
+-- This means:
+--   - Nobody can dump the chunks table directly via the anon key
+--   - All read access goes through search_rcw_wac() which is SECURITY DEFINER
+--   - The ingest Python script uses the service_role key, kept off the server
+--
+-- Note: search_rcw_wac() is promoted to SECURITY DEFINER so it can read chunks
+-- even though the anon key has no direct SELECT on the table.
+
+alter table public.rcw_wac_chunks    enable row level security;
+alter table public.rcw_wac_query_log enable row level security;
+
+-- rcw_wac_chunks: no direct anon access.
+-- Read goes through search_rcw_wac() (SECURITY DEFINER).
+-- Write goes through ingest.py using service_role key (bypasses RLS).
+
+-- rcw_wac_query_log: anon INSERT only for query logging from the PHP proxy.
+-- No SELECT policy = anon cannot read query history.
+drop policy if exists "allow_insert" on public.rcw_wac_query_log;
+create policy "allow_insert" on public.rcw_wac_query_log
+    for insert to anon with check (true);

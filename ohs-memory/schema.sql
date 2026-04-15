@@ -138,7 +138,7 @@ returns table (
     unit              text,
     notes             text
 )
-language sql stable as $$
+language sql stable security definer as $$
     with
     -- ── Vector lane: cosine similarity ────────────────────────────────────────
     vec as (
@@ -222,7 +222,7 @@ returns table (
     unit              text,
     ingested_at       timestamptz
 )
-language sql stable as $$
+language sql stable security definer as $$
     select id, original_filename, subject, school_year, teacher,
            doc_type, unit, ingested_at
     from documents
@@ -362,3 +362,35 @@ begin
     return jsonb_build_object('id', v_id);
 end;
 $$;
+
+-- ── Row Level Security ────────────────────────────────────────────────────────
+-- Enables RLS on all public tables so the Supabase anon key cannot directly
+-- dump table contents. All legitimate read access goes through the SECURITY
+-- DEFINER RPC functions above (search_ohs_memory, list_ohs_documents,
+-- flightlog_stats), which run as the table owner and bypass RLS.
+--
+-- To apply:  paste this entire file into Supabase SQL Editor → Run
+-- Or run just this section to patch an existing deployment.
+
+alter table public.documents  enable row level security;
+alter table public.chunks     enable row level security;
+alter table public.query_log  enable row level security;
+alter table public.feedback   enable row level security;
+
+-- documents / chunks: no direct anon SELECT.
+-- Access is only through search_ohs_memory() and list_ohs_documents() RPCs
+-- (both SECURITY DEFINER — they bypass RLS on behalf of the caller).
+-- INSERT/UPDATE/DELETE: only via service_role key (used by ingest.py locally).
+
+-- query_log: anon INSERT only (web UI fires a log call after every search).
+-- No SELECT policy = anon cannot read the query history.
+drop policy if exists "allow_insert" on public.query_log;
+create policy "allow_insert" on public.query_log
+    for insert to anon with check (true);
+
+-- feedback: anon INSERT only (thumbs up/down from the web UI).
+-- insert_feedback() is already SECURITY DEFINER, but the direct-insert path
+-- (if ever used) also needs a policy so the row actually lands.
+drop policy if exists "allow_insert" on public.feedback;
+create policy "allow_insert" on public.feedback
+    for insert to anon with check (true);

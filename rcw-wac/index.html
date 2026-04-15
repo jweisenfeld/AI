@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WA Law Assistant — RCW &amp; WAC</title>
+<style>
+  :root {
+    --primary:      #1a3a5c;   /* WA state blue */
+    --primary-dk:   #122840;
+    --accent:       #4a90d9;
+    --user-bg:      #1a3a5c;
+    --user-fg:      #ffffff;
+    --bot-bg:       #f4f7fb;
+    --bot-fg:       #1a1a2e;
+    --source-bg:    #eef4fb;
+    --source-border:#c0d8f0;
+    --rcw-badge:    #1a3a5c;
+    --wac-badge:    #2e6b3e;
+    --sim-color:    #4a90d9;
+    --disclaimer:   #7a8a9a;
+    --border:       #d0dde8;
+    --bg:           #f0f4f8;
+    --shadow:       0 2px 8px rgba(0,0,0,.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Header ────────────────────────────────────────────────────────────── */
+  header {
+    background: var(--primary-dk);
+    color: #fff;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    box-shadow: var(--shadow);
+  }
+  header h1 { font-size: 1.05rem; font-weight: 600; letter-spacing: .01em; }
+  header .subtitle {
+    font-size: .75rem;
+    color: #9ab8d8;
+    margin-top: 1px;
+  }
+  .corpus-toggle {
+    margin-left: auto;
+    display: flex;
+    gap: 4px;
+  }
+  .corpus-toggle button {
+    padding: 4px 10px;
+    border: 1px solid #4a7aaa;
+    background: transparent;
+    color: #9ab8d8;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: .78rem;
+    transition: all .15s;
+  }
+  .corpus-toggle button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+
+  /* ── Messages ───────────────────────────────────────────────────────────── */
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    scroll-behavior: smooth;
+  }
+
+  .message { display: flex; flex-direction: column; max-width: 84%; }
+  .message.user  { align-self: flex-end; align-items: flex-end; }
+  .message.bot   { align-self: flex-start; align-items: flex-start; }
+
+  .bubble {
+    padding: 10px 14px;
+    border-radius: 14px;
+    line-height: 1.55;
+    font-size: .92rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .message.user .bubble  { background: var(--user-bg); color: var(--user-fg); border-radius: 14px 14px 4px 14px; }
+  .message.bot  .bubble  { background: var(--bot-bg);  color: var(--bot-fg);  border-radius: 14px 14px 14px 4px; box-shadow: var(--shadow); }
+
+  /* ── Source cards ───────────────────────────────────────────────────────── */
+  .sources-block {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 100%;
+  }
+  .sources-label {
+    font-size: .72rem;
+    color: #6a7a8a;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 2px;
+  }
+  .source-card {
+    background: var(--source-bg);
+    border: 1px solid var(--source-border);
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: .8rem;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .source-card a {
+    font-weight: 600;
+    color: var(--primary);
+    text-decoration: none;
+  }
+  .source-card a:hover { text-decoration: underline; }
+  .corpus-badge {
+    font-size: .68rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .corpus-badge.rcw { background: var(--rcw-badge); }
+  .corpus-badge.wac { background: var(--wac-badge); }
+  .source-heading { color: #4a5a6a; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sim-badge {
+    font-size: .7rem;
+    color: var(--sim-color);
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  /* ── Footer meta (token badge) ──────────────────────────────────────────── */
+  .meta-badge {
+    font-size: .7rem;
+    color: #8a9aaa;
+    margin-top: 4px;
+    padding-left: 4px;
+  }
+
+  /* ── Welcome state ──────────────────────────────────────────────────────── */
+  .welcome {
+    align-self: center;
+    text-align: center;
+    margin-top: auto;
+    margin-bottom: auto;
+    color: #6a7a8a;
+    padding: 32px 16px;
+  }
+  .welcome .icon { font-size: 2.5rem; margin-bottom: 10px; }
+  .welcome h2 { font-size: 1.1rem; font-weight: 600; color: #3a4a5a; margin-bottom: 8px; }
+  .welcome p  { font-size: .85rem; line-height: 1.5; max-width: 420px; }
+  .welcome .examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 16px;
+  }
+  .example-chip {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 5px 12px;
+    font-size: .8rem;
+    cursor: pointer;
+    color: var(--primary);
+    transition: background .15s;
+  }
+  .example-chip:hover { background: var(--source-bg); }
+
+  /* ── Input area ─────────────────────────────────────────────────────────── */
+  #input-area {
+    padding: 10px 14px;
+    background: #fff;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    flex-shrink: 0;
+  }
+  #query {
+    flex: 1;
+    resize: none;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: .92rem;
+    line-height: 1.45;
+    font-family: inherit;
+    max-height: 120px;
+    overflow-y: auto;
+  }
+  #query:focus { outline: none; border-color: var(--accent); }
+  #send-btn {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-size: .9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+    flex-shrink: 0;
+  }
+  #send-btn:hover:not(:disabled) { background: var(--accent); }
+  #send-btn:disabled { opacity: .5; cursor: default; }
+  .disclaimer {
+    font-size: .68rem;
+    color: var(--disclaimer);
+    text-align: center;
+    padding: 3px 14px 6px;
+    flex-shrink: 0;
+    background: #fff;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>WA Law Assistant</h1>
+    <div class="subtitle">Revised Code of Washington &amp; Washington Administrative Code</div>
+  </div>
+  <div class="corpus-toggle">
+    <button id="btn-both" class="active" data-corpus="both">Both</button>
+    <button id="btn-rcw"  data-corpus="rcw">RCW</button>
+    <button id="btn-wac"  data-corpus="wac">WAC</button>
+  </div>
+</header>
+
+<div id="messages">
+  <div class="welcome" id="welcome">
+    <div class="icon">&#x2696;&#xFE0F;</div>
+    <h2>Ask about Washington State Law</h2>
+    <p>Search the Revised Code of Washington (RCW) and Washington Administrative Code (WAC) using plain language. Answers cite specific sections.</p>
+    <div class="examples">
+      <span class="example-chip">Can a principal search a student's phone?</span>
+      <span class="example-chip">What is the minimum school year length?</span>
+      <span class="example-chip">Teacher certificate renewal requirements</span>
+      <span class="example-chip">Student suspension due process</span>
+      <span class="example-chip">Open public meetings requirements</span>
+      <span class="example-chip">Public records disclosure exemptions</span>
+    </div>
+  </div>
+</div>
+
+<div id="input-area">
+  <textarea id="query" rows="1" placeholder="Ask about Washington State law..."></textarea>
+  <button id="send-btn">Ask</button>
+</div>
+<div class="disclaimer">General legal information only — not legal advice. Consult a licensed attorney for specific situations.</div>
+
+<script>
+const messagesEl = document.getElementById('messages');
+const queryEl    = document.getElementById('query');
+const sendBtn    = document.getElementById('send-btn');
+const welcomeEl  = document.getElementById('welcome');
+
+let history  = [];      // [{role:'user'|'assistant', content:'...'}]
+let corpus   = 'both';  // 'both' | 'rcw' | 'wac'
+
+// ── Corpus toggle ────────────────────────────────────────────────────────────
+document.querySelectorAll('.corpus-toggle button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.corpus-toggle button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    corpus = btn.dataset.corpus;
+  });
+});
+
+// ── Example chips ────────────────────────────────────────────────────────────
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('example-chip')) {
+    queryEl.value = e.target.textContent;
+    queryEl.dispatchEvent(new Event('input'));
+    sendMessage();
+  }
+});
+
+// ── Auto-resize textarea ─────────────────────────────────────────────────────
+queryEl.addEventListener('input', () => {
+  queryEl.style.height = 'auto';
+  queryEl.style.height = Math.min(queryEl.scrollHeight, 120) + 'px';
+});
+
+queryEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+
+sendBtn.addEventListener('click', sendMessage);
+
+// ── DOM helpers ───────────────────────────────────────────────────────────────
+function addMessage(role, text) {
+  if (welcomeEl) welcomeEl.remove();
+  const wrap   = document.createElement('div');
+  wrap.className = `message ${role}`;
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = text;
+  wrap.appendChild(bubble);
+  messagesEl.appendChild(wrap);
+  scrollBottom();
+  return { wrap, bubble };
+}
+
+function scrollBottom() {
+  messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
+}
+
+function renderSources(sources) {
+  if (!sources || sources.length === 0) return null;
+  const block = document.createElement('div');
+  block.className = 'sources-block';
+  const label = document.createElement('div');
+  label.className = 'sources-label';
+  label.textContent = `Sources (${sources.length})`;
+  block.appendChild(label);
+  sources.forEach(s => {
+    const card  = document.createElement('div');
+    card.className = 'source-card';
+
+    const badge = document.createElement('span');
+    badge.className = `corpus-badge ${s.corpus}`;
+    badge.textContent = s.corpus_label;
+
+    const link = document.createElement('a');
+    link.href   = s.source_url;
+    link.target = '_blank';
+    link.rel    = 'noopener noreferrer';
+    link.textContent = s.section_id;
+
+    const heading = document.createElement('span');
+    heading.className = 'source-heading';
+    heading.textContent = s.section_heading || s.chapter_name || '';
+
+    card.appendChild(badge);
+    card.appendChild(link);
+    card.appendChild(heading);
+
+    if (s.similarity_pct !== null && s.similarity_pct !== undefined) {
+      const sim = document.createElement('span');
+      sim.className = 'sim-badge';
+      sim.textContent = `${s.similarity_pct}%`;
+      card.appendChild(sim);
+    }
+
+    block.appendChild(card);
+  });
+  return block;
+}
+
+// ── Main send ─────────────────────────────────────────────────────────────────
+async function sendMessage() {
+  const text = queryEl.value.trim();
+  if (!text || sendBtn.disabled) return;
+
+  queryEl.value = '';
+  queryEl.style.height = 'auto';
+  sendBtn.disabled = true;
+
+  // User bubble
+  addMessage('user', text);
+  history.push({ role: 'user', content: text });
+
+  // Bot bubble (will be filled by stream)
+  const { wrap: botWrap, bubble: botBubble } = addMessage('bot', '');
+  botBubble.textContent = '';
+
+  let fullText    = '';
+  let sourcesRendered = false;
+  let metaDiv     = null;
+
+  try {
+    const resp = await fetch('api-proxy.php?stream=1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query:    text,
+        corpus:   corpus === 'both' ? null : corpus,
+        messages: history.slice(-12),   // last 6 turns
+      }),
+    });
+
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+    const reader = resp.body.getReader();
+    const dec    = new TextDecoder();
+    let   buf    = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+
+      let nl;
+      while ((nl = buf.indexOf('\n')) !== -1) {
+        const line = buf.slice(0, nl).trimEnd();
+        buf = buf.slice(nl + 1);
+
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6);
+        if (raw === '[DONE]') break;
+
+        let evt;
+        try { evt = JSON.parse(raw); } catch { continue; }
+
+        if (evt.error) {
+          botBubble.textContent = 'Error: ' + evt.error;
+          break;
+        }
+
+        // Sources arrive before text starts
+        if (evt.sources && !sourcesRendered) {
+          const srcBlock = renderSources(evt.sources);
+          if (srcBlock) botWrap.appendChild(srcBlock);
+          sourcesRendered = true;
+          scrollBottom();
+        }
+
+        if (evt.text) {
+          fullText += evt.text;
+          botBubble.textContent = fullText;
+          scrollBottom();
+        }
+
+        if (evt.meta) {
+          const { inTokens, outTokens, cachedTokens, resultCount } = evt.meta;
+          if (!metaDiv) {
+            metaDiv = document.createElement('div');
+            metaDiv.className = 'meta-badge';
+            botWrap.appendChild(metaDiv);
+          }
+          const parts = [`${resultCount ?? 0} sections retrieved`, `${outTokens} tok out`];
+          if (inTokens) parts.push(`${inTokens} in`);
+          metaDiv.textContent = parts.join(' · ');
+        }
+      }
+    }
+  } catch (err) {
+    botBubble.textContent = 'Connection error: ' + err.message;
+  }
+
+  if (fullText) {
+    history.push({ role: 'assistant', content: fullText });
+  }
+  sendBtn.disabled = false;
+  queryEl.focus();
+  scrollBottom();
+}
+</script>
+</body>
+</html>

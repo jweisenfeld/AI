@@ -64,6 +64,44 @@ Uses `../.secrets/ohskey.php` (shared with ohs-search). Keys needed:
 3. Upload `index.html`, `api-proxy.php`, `src/` to `psd1.net/rcw-wac/` via cPanel
 4. Verify at `https://psd1.net/rcw-wac/`
 
+## Supabase Project Setup
+
+This project uses its own dedicated Supabase project — separate from OHS Memory.
+Reasons: different audience (public vs. staff-only), different security posture,
+designed for potential handoff to the State of WA or other municipalities.
+
+### Two keys, two purposes
+
+| Key | Where used | Why |
+|-----|-----------|-----|
+| `anon` (publishable) | `api-proxy.php` on the web server | Read-only; calls RPCs + inserts query logs |
+| `service_role` (secret) | `ingest.py` on your local machine | Bypasses RLS to INSERT chunks; never on server |
+
+Find both in: Supabase → Project Settings → API
+
+### New project checklist
+
+1. Create account/project at supabase.com (free tier — separate from OHS Memory)
+2. Enable the `vector` extension: Database → Extensions → search "vector" → Enable
+3. Run `ingestion/schema.sql` in the SQL Editor
+4. Copy `anon` key → into `rcwkey.php` in your `.secrets/` folder on the server
+5. Copy `service_role` key → into a local `.env` file for running `ingest.py`
+6. Never commit either key to git
+
+### Secrets file for PHP (`~/.secrets/rcwkey.php` on the server)
+
+```php
+<?php
+return [
+    'ANTHROPIC_API_KEY' => 'sk-ant-...',
+    'OPENAI_API_KEY'    => 'sk-...',
+    'SUPABASE_URL'      => 'https://yourproject.supabase.co',
+    'SUPABASE_ANON_KEY' => 'eyJ...',   // anon key only — not service_role
+];
+```
+
+Update `api-proxy.php` line that loads secrets: change `ohskey.php` → `rcwkey.php`.
+
 ## Architecture Clarification — No Live Web Queries
 
 **The frontend never queries leg.wa.gov.** Ingestion crawls it ONCE to populate Supabase.

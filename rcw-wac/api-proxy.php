@@ -11,8 +11,8 @@
  *   data: {"meta": {...}}           ← token counts
  *   data: [DONE]
  *
- * Secrets: ../.secrets/ohskey.php   (shared with ohs-search)
- * Keys:    ANTHROPIC_API_KEY, OPENAI_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY
+ * Secrets: ../.secrets/rcwkey.php   (separate from ohs-search — new Supabase project)
+ * Keys:    ANTHROPIC_API_KEY, OPENAI_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY (anon only)
  */
 
 set_time_limit(120);
@@ -30,7 +30,7 @@ use RcwWac\SupabaseException;
 // ── Secrets ───────────────────────────────────────────────────────────────────
 
 $accountRoot = dirname($_SERVER['DOCUMENT_ROOT']);
-$secretsFile = $accountRoot . '/.secrets/ohskey.php';
+$secretsFile = $accountRoot . '/.secrets/rcwkey.php';
 
 function load_secrets(string $path): array {
     if (!file_exists($path)) return [];

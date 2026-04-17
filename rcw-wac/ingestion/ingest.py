@@ -27,9 +27,11 @@ Usage:
     python ingest.py --scrape --corpus rcw --titles 28A --clear
 
 Environment variables:
-    OPENAI_API_KEY      — for text-embedding-3-small
-    SUPABASE_URL        — https://your-project.supabase.co
-    SUPABASE_ANON_KEY   — Supabase anon/service key
+    OPENAI_API_KEY       — for text-embedding-3-small
+    SUPABASE_URL         — https://your-project.supabase.co
+    SUPABASE_SERVICE_KEY — service_role key from Supabase → Project Settings → API
+                           (NOT the anon key; service key bypasses RLS for inserts)
+                           Keep this local. Never put it on the web server.
 """
 
 import argparse
@@ -43,8 +45,12 @@ from typing import Generator
 import requests
 import tiktoken
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 from openai import OpenAI
 from supabase import create_client
+
+# Load .env from the same directory as this script (rcw-wac/ingestion/.env)
+load_dotenv(Path(__file__).parent / '.env')
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -514,6 +520,8 @@ def insert_chunks(sb, chunks: list[dict], embeddings: list[list[float]]) -> int:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
+    global CRAWL_DELAY_SEC   # must be declared before first use in this function
+
     parser = argparse.ArgumentParser(
         description='Scrape WA Legislature website → embed → store in Supabase.\n'
                     'Run once to build the database; queries go to Supabase, not leg.wa.gov.',
@@ -534,19 +542,23 @@ def main():
                         help=f'Seconds between HTTP requests (default {CRAWL_DELAY_SEC})')
     args = parser.parse_args()
 
-    global CRAWL_DELAY_SEC
     CRAWL_DELAY_SEC = args.delay
 
     filter_titles = [t.strip() for t in args.titles.split(',')] if args.titles else None
 
     openai_key   = os.environ.get('OPENAI_API_KEY', '').strip()
     supabase_url = os.environ.get('SUPABASE_URL', '').strip()
-    supabase_key = os.environ.get('SUPABASE_ANON_KEY', '').strip()
+    # Ingestion requires the SERVICE ROLE key (bypasses RLS to INSERT chunks).
+    # Never use the anon key here — with RLS enabled it cannot insert rows.
+    # Keep the service key off the web server; ingest.py runs locally only.
+    supabase_key = os.environ.get('SUPABASE_SERVICE_KEY', '').strip()
 
     if not args.dry_run:
         if not openai_key:   sys.exit('ERROR: OPENAI_API_KEY not set.')
         if not supabase_url: sys.exit('ERROR: SUPABASE_URL not set.')
-        if not supabase_key: sys.exit('ERROR: SUPABASE_ANON_KEY not set.')
+        if not supabase_key: sys.exit('ERROR: SUPABASE_SERVICE_KEY not set.\n'
+                                      'Find it in Supabase → Project Settings → API → service_role key.\n'
+                                      'Keep it local. Never put it in the PHP proxy or commit it to git.')
 
     oa = OpenAI(api_key=openai_key) if not args.dry_run else None
     sb = create_client(supabase_url, supabase_key) if not args.dry_run else None

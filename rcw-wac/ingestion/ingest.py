@@ -677,7 +677,7 @@ USC_CHAPTER_SECTIONS: dict[tuple[str, str], list[str]] = {
         '1431','1432','1433','1434','1435','1436','1437','1438','1439',
         '1440','1441','1442','1443','1444',
         '1450','1451',
-        '1461','1462','1463','1464','1465','1466','1467',
+        '1461','1462','1463','1464','1465','1466',
         '1470','1471','1472','1473','1474',
         '1481','1482',
     ],
@@ -726,10 +726,12 @@ def usc_fetch_section(title_num: str, section_num: str,
         h = soup.select_one(selector)
         if h:
             heading = h.get_text(' ', strip=True)
-            # Strip leading "§ 1415" or "20 U.S.C. § 1415" citation prefix
+            # Strip "§ 1415" prefix
             heading = re.sub(r'^§\s*\d+\w*\.?\s*', '', heading).strip()
-            heading = re.sub(r'^\d+\s+U\.?\s*S\.?\s*C\.?\s*§\s*\d+\w*\.?\s*', '',
-                             heading, flags=re.I).strip()
+            # Strip "20 U.S. Code § 1415 - " or "20 U.S.C. § 1415 - " prefix
+            heading = re.sub(
+                r'^\d+\s+U\.S\.(?:\s+Code|C\.?)\s*§\s*\d+\w*\.?\s*[-–—]\s*',
+                '', heading, flags=re.I).strip()
             if heading:
                 break
 
@@ -745,6 +747,11 @@ def usc_fetch_section(title_num: str, section_num: str,
             if len(content) >= 30:
                 break
 
+    # Strip Cornell LII page-chrome that bleeds into text when broad selectors match
+    content = re.sub(r'Quick search by citation:.*?Go!', '', content, flags=re.S | re.I)
+    content = re.sub(r'U\.S\. Code\s+Notes\s+Authorities.*?(?=\n|$)', '', content, flags=re.I)
+    content = re.sub(r'\bprev\s*\|\s*next\b', '', content, flags=re.I)
+    content = re.sub(r'^\s*Authorities \(CFR\).*$', '', content, flags=re.M | re.I)
     content = re.sub(r'\s{3,}', '\n', content).strip()
     if not content or len(content) < 30:
         return None

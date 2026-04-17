@@ -598,6 +598,18 @@ def main():
     oa = OpenAI(api_key=openai_key) if not args.dry_run else None
     sb = create_client(supabase_url, supabase_key) if not args.dry_run else None
 
+    # ── Clear existing rows upfront (before crawl) ────────────────────────────
+    if args.clear and not args.dry_run:
+        titles_to_clear = filter_titles or []
+        if titles_to_clear:
+            for t in titles_to_clear:
+                sb.table('rcw_wac_chunks').delete() \
+                  .eq('corpus', args.corpus).eq('title_num', t).execute()
+            print(f'Cleared existing {args.corpus.upper()} rows for titles: {titles_to_clear}')
+        else:
+            sb.table('rcw_wac_chunks').delete().eq('corpus', args.corpus).execute()
+            print(f'Cleared all existing {args.corpus.upper()} rows.')
+
     # ── Crawl ────────────────────────────────────────────────────────────────
     print(f'Crawling {args.corpus.upper()}' +
           (f' titles: {filter_titles}' if filter_titles else ' (full corpus)'))
@@ -619,7 +631,7 @@ def main():
         # Stream inserts: embed + insert in batches during crawl to save memory
         # and survive interruption (already-inserted chunks are deduped on restart).
         if not args.dry_run and len(all_chunks) >= 500:
-            _flush_chunks(all_chunks, oa, sb, args.clear, section_count == len(all_chunks))
+            _flush_chunks(all_chunks, oa, sb)
             all_chunks = []
 
     print(f'\nCrawl complete: {section_count} sections → {len(all_chunks)} remaining chunks')
@@ -646,7 +658,7 @@ def main():
         return
 
     if all_chunks:
-        _flush_chunks(all_chunks, oa, sb, args.clear, done=True)
+        _flush_chunks(all_chunks, oa, sb)
 
     print('\nIngestion complete.')
     if sb:
@@ -657,18 +669,9 @@ def main():
                   f'{d.get("wac_chunks",0)} WAC chunks')
 
 
-def _flush_chunks(chunks: list[dict], oa, sb, clear_first: bool, done: bool):
-    """Dedup, embed, and insert a batch of chunks."""
-    if clear_first and done:
-        title_nums = list({c['title_num'] for c in chunks})
-        corpus     = chunks[0]['corpus']
-        for t in title_nums:
-            sb.table('rcw_wac_chunks').delete() \
-              .eq('corpus', corpus).eq('title_num', t).execute()
-        existing_hashes: set[str] = set()
-    else:
-        existing_hashes = fetch_existing_hashes(sb)
-
+def _flush_chunks(chunks: list[dict], oa, sb):
+    """Embed and upsert a batch of chunks. Dedup by content_hash to skip unchanged rows."""
+    existing_hashes = fetch_existing_hashes(sb)
     new_chunks = [c for c in chunks if c['content_hash'] not in existing_hashes]
     if not new_chunks:
         return

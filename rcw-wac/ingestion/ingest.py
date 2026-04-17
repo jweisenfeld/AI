@@ -520,6 +520,8 @@ def insert_chunks(sb, chunks: list[dict], embeddings: list[list[float]]) -> int:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
+    global CRAWL_DELAY_SEC   # must be declared before first use in this function
+
     parser = argparse.ArgumentParser(
         description='Scrape WA Legislature website → embed → store in Supabase.\n'
                     'Run once to build the database; queries go to Supabase, not leg.wa.gov.',
@@ -540,7 +542,6 @@ def main():
                         help=f'Seconds between HTTP requests (default {CRAWL_DELAY_SEC})')
     args = parser.parse_args()
 
-    global CRAWL_DELAY_SEC
     CRAWL_DELAY_SEC = args.delay
 
     filter_titles = [t.strip() for t in args.titles.split(',')] if args.titles else None

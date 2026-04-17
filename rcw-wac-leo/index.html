@@ -267,6 +267,160 @@
     flex-shrink: 0;
     background: #fff;
   }
+
+  /* ── About button ───────────────────────────────────────────────────────── */
+  #about-btn {
+    margin-left: 8px;
+    padding: 4px 10px;
+    border: 1px solid #3a5a7a;
+    background: transparent;
+    color: #8aaccc;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: .75rem;
+    transition: all .15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  #about-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── About modal ────────────────────────────────────────────────────────── */
+  #about-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.55);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  #about-overlay.open { display: flex; }
+  #about-modal {
+    background: #fff;
+    border-radius: 12px;
+    max-width: 680px;
+    width: 100%;
+    max-height: 90dvh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0,0,0,.25);
+    overflow: hidden;
+  }
+  .about-header {
+    background: var(--primary);
+    color: #fff;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid var(--accent);
+    flex-shrink: 0;
+  }
+  .about-header h2 { font-size: 1rem; font-weight: 700; }
+  #about-close {
+    background: none; border: none; color: #8aaccc;
+    font-size: 1.3rem; cursor: pointer; line-height: 1;
+    padding: 0 4px;
+  }
+  #about-close:hover { color: #fff; }
+  #about-body {
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .about-section h3 {
+    font-size: .8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--primary-md);
+    margin-bottom: 10px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  /* pipeline */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: .8rem;
+  }
+  .pipe-step {
+    background: var(--source-bg);
+    border: 1px solid var(--source-border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    text-align: center;
+    min-width: 110px;
+  }
+  .pipe-step strong { display: block; font-size: .72rem; color: var(--primary-md); margin-bottom: 2px; }
+  .pipe-step span { color: #5a6a7a; font-size: .71rem; }
+  .pipe-arrow { color: var(--accent); font-weight: 700; font-size: 1rem; }
+  /* stats grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 8px;
+  }
+  .stat-card {
+    border: 1px solid var(--source-border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    text-align: center;
+  }
+  .stat-card .stat-label {
+    font-size: .67rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .07em;
+    color: #6a7a8a; margin-bottom: 4px;
+  }
+  .stat-card .stat-num {
+    font-size: 1.4rem; font-weight: 700; color: var(--primary);
+    line-height: 1.1;
+  }
+  .stat-card .stat-sub { font-size: .67rem; color: #8a9aaa; margin-top: 2px; }
+  .stat-card.rcw-card { border-color: var(--rcw-badge); }
+  .stat-card.wac-card { border-color: var(--wac-badge); }
+  .stat-card.usc-card { border-color: var(--usc-badge); }
+  .stat-card.cfr-card { border-color: var(--cfr-badge); }
+  /* prompt box */
+  .prompt-wrap {
+    position: relative;
+  }
+  .prompt-box {
+    background: #f4f7fb;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-family: monospace;
+    font-size: .76rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    max-height: 260px;
+    overflow-y: auto;
+    color: #2a3a4a;
+  }
+  #copy-prompt-btn {
+    position: absolute;
+    top: 8px; right: 8px;
+    padding: 3px 10px;
+    font-size: .72rem;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: .8;
+    transition: opacity .15s;
+  }
+  #copy-prompt-btn:hover { opacity: 1; }
+  /* tech notes */
+  .tech-notes { font-size: .79rem; color: #4a5a6a; line-height: 1.6; }
+  .tech-notes dt { font-weight: 700; color: var(--primary-md); float: left; min-width: 130px; }
+  .tech-notes dd { margin-left: 130px; margin-bottom: 5px; }
+  .stats-loading { color: #8a9aaa; font-size: .82rem; font-style: italic; }
 </style>
 </head>
 <body>
@@ -284,7 +438,82 @@
     <button data-corpus="wac"    >WAC</button>
     <button data-corpus="federal">Federal</button>
   </div>
+  <button id="about-btn" title="About this tool">About</button>
 </header>
+
+<!-- ── About Modal ─────────────────────────────────────────────────────────── -->
+<div id="about-overlay" role="dialog" aria-modal="true" aria-labelledby="about-title">
+  <div id="about-modal">
+    <div class="about-header">
+      <h2 id="about-title">🛡️ About LEO Legal Reference</h2>
+      <button id="about-close" aria-label="Close">✕</button>
+    </div>
+    <div id="about-body">
+
+      <div class="about-section">
+        <h3>How It Works — Query Pipeline</h3>
+        <div class="pipeline">
+          <div class="pipe-step">
+            <strong>Your Question</strong>
+            <span>plain language</span>
+          </div>
+          <span class="pipe-arrow">→</span>
+          <div class="pipe-step">
+            <strong>OpenAI Embed</strong>
+            <span>text-embedding-3-small<br>1536 dimensions</span>
+          </div>
+          <span class="pipe-arrow">→</span>
+          <div class="pipe-step">
+            <strong>Supabase Search</strong>
+            <span>vector + BM25 hybrid<br>top 8 sections</span>
+          </div>
+          <span class="pipe-arrow">→</span>
+          <div class="pipe-step">
+            <strong>Claude Haiku</strong>
+            <span>synthesis + citations<br>streaming SSE</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="about-section">
+        <h3>Database — Live Section Counts</h3>
+        <div id="stats-area" class="stats-loading">Loading database stats…</div>
+      </div>
+
+      <div class="about-section">
+        <h3>System Prompt</h3>
+        <p style="font-size:.78rem;color:#5a6a7a;margin-bottom:8px;">The exact instructions sent to Claude before every query (with <code>{CONTEXT}</code> replaced by the retrieved sections at runtime).</p>
+        <div class="prompt-wrap">
+          <div class="prompt-box" id="prompt-box">Loading…</div>
+          <button id="copy-prompt-btn">Copy</button>
+        </div>
+      </div>
+
+      <div class="about-section">
+        <h3>Technical Notes</h3>
+        <dl class="tech-notes">
+          <dt>Inference model</dt>
+          <dd>Claude Haiku 4.5 (<code>claude-haiku-4-5-20251001</code>) — fast, cheap RAG synthesis</dd>
+          <dt>Embedding model</dt>
+          <dd>OpenAI <code>text-embedding-3-small</code> — 1536 dimensions, used at ingest and at query time</dd>
+          <dt>Chunk size</dt>
+          <dd>~800 tokens per section chunk (single RCW/WAC/USC/CFR section)</dd>
+          <dt>Retrieval</dt>
+          <dd>Top 8 results via Reciprocal Rank Fusion (k=60) of vector cosine + BM25 full-text lanes</dd>
+          <dt>Max output</dt>
+          <dd>1,500 tokens per response</dd>
+          <dt>Corpus sources</dt>
+          <dd>RCW (leg.wa.gov XML), WAC (leg.wa.gov XML), USC (Cornell LII), CFR (eCFR.gov XML)</dd>
+          <dt>Vector store</dt>
+          <dd>Supabase + pgvector, HNSW index (m=16, ef_construction=64)</dd>
+          <dt>Project repo</dt>
+          <dd>jweisenfeld/AI — <code>rcw-wac-leo/</code> (UI) · <code>rcw-wac/</code> (shared proxy + ingestion)</dd>
+        </dl>
+      </div>
+
+    </div>
+  </div>
+</div>
 
 <div id="messages">
   <div class="welcome" id="welcome">
@@ -345,6 +574,103 @@ queryEl.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
 sendBtn.addEventListener('click', sendMessage);
+
+// ── About modal ───────────────────────────────────────────────────────────────
+const aboutOverlay = document.getElementById('about-overlay');
+const aboutBtn     = document.getElementById('about-btn');
+const aboutClose   = document.getElementById('about-close');
+const statsArea    = document.getElementById('stats-area');
+const promptBox    = document.getElementById('prompt-box');
+const copyPromptBtn = document.getElementById('copy-prompt-btn');
+
+let aboutLoaded = false;
+
+function openAbout() {
+  aboutOverlay.classList.add('open');
+  if (!aboutLoaded) { loadAboutData(); aboutLoaded = true; }
+}
+function closeAbout() { aboutOverlay.classList.remove('open'); }
+
+aboutBtn.addEventListener('click', openAbout);
+aboutClose.addEventListener('click', closeAbout);
+aboutOverlay.addEventListener('click', e => { if (e.target === aboutOverlay) closeAbout(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAbout(); });
+
+async function loadAboutData() {
+  // Fetch DB stats
+  try {
+    const resp = await fetch('api-proxy.php?stats=1');
+    const rows = await resp.json();
+    if (rows.error) throw new Error(rows.error);
+
+    const order  = ['rcw','wac','usc','cfr'];
+    const labels = { rcw:'RCW', wac:'WAC', usc:'USC', cfr:'CFR' };
+    const descs  = {
+      rcw: 'Revised Code of WA',
+      wac: 'WA Admin Code',
+      usc: 'US Code',
+      cfr: 'Code of Federal Regs',
+    };
+
+    // rows is an array; build lookup by corpus
+    const byCorpus = {};
+    (Array.isArray(rows) ? rows : []).forEach(r => {
+      byCorpus[r.corpus] = r;
+    });
+
+    const grid = document.createElement('div');
+    grid.className = 'stats-grid';
+
+    order.forEach(c => {
+      const r = byCorpus[c] || {};
+      const card = document.createElement('div');
+      card.className = `stat-card ${c}-card`;
+      const chunks   = (r.chunks   ?? r.chunk_count   ?? '—').toLocaleString?.() ?? (r.chunks ?? '—');
+      const sections = (r.sections ?? r.section_count ?? r.section_ids ?? '—');
+      const sectStr  = typeof sections === 'number' ? sections.toLocaleString() : sections;
+      card.innerHTML = `
+        <div class="stat-label">${labels[c]}</div>
+        <div class="stat-num">${typeof chunks === 'number' ? chunks.toLocaleString() : chunks}</div>
+        <div class="stat-sub">${sectStr !== '—' ? sectStr + ' sections' : descs[c]}</div>`;
+      grid.appendChild(card);
+    });
+
+    // total
+    const total = Object.values(byCorpus).reduce((s, r) => s + (r.chunks ?? r.chunk_count ?? 0), 0);
+    const totalCard = document.createElement('div');
+    totalCard.className = 'stat-card';
+    totalCard.style.gridColumn = '1 / -1';
+    totalCard.innerHTML = `
+      <div class="stat-label">Total chunks in database</div>
+      <div class="stat-num" style="font-size:1.1rem">${total.toLocaleString()}</div>
+      <div class="stat-sub">each chunk ≈ one law section</div>`;
+    grid.appendChild(totalCard);
+
+    statsArea.replaceWith(grid);
+  } catch (err) {
+    statsArea.textContent = 'Could not load stats: ' + err.message;
+    statsArea.style.color = '#c0392b';
+  }
+
+  // Fetch system prompt
+  try {
+    const resp = await fetch('api-proxy.php?prompt=1');
+    const data = await resp.json();
+    promptBox.textContent = data.prompt ?? '(not available)';
+  } catch (err) {
+    promptBox.textContent = 'Could not load system prompt: ' + err.message;
+  }
+}
+
+copyPromptBtn.addEventListener('click', () => {
+  const text = promptBox.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    copyPromptBtn.textContent = 'Copied!';
+    setTimeout(() => { copyPromptBtn.textContent = 'Copy'; }, 1800);
+  }).catch(() => {
+    copyPromptBtn.textContent = 'Error';
+  });
+});
 
 // ── DOM helpers ───────────────────────────────────────────────────────────────
 function removeWelcome() {

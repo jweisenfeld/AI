@@ -111,6 +111,37 @@ function sse_error(string $msg): void {
 
 $data = json_decode(file_get_contents('php://input'), true) ?? [];
 
+// ?stats=1  — live DB counts per corpus (calls rcw_wac_stats() RPC)
+if (isset($_GET['stats'])) {
+    header('Content-Type: application/json');
+    $secrets = load_secrets($secretsFile);
+    $url = rtrim($secrets['SUPABASE_URL'] ?? '', '/') . '/rest/v1/rpc/rcw_wac_stats';
+    $ch  = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 10,
+        CURLOPT_HTTPHEADER     => [
+            'Content-Type: application/json',
+            'apikey: '               . ($secrets['SUPABASE_ANON_KEY'] ?? ''),
+            'Authorization: Bearer ' . ($secrets['SUPABASE_ANON_KEY'] ?? ''),
+        ],
+        CURLOPT_POSTFIELDS => '{}',
+    ]);
+    $result   = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    echo ($result && $httpCode === 200) ? $result : json_encode(['error' => "HTTP $httpCode"]);
+    exit;
+}
+
+// ?prompt=1 — return the system prompt template as JSON
+if (isset($_GET['prompt'])) {
+    header('Content-Type: application/json');
+    echo json_encode(['prompt' => SYSTEM_PROMPT]);
+    exit;
+}
+
 if (isset($_GET['stream']) && $_GET['stream'] === 'test') {
     start_sse();
     foreach (['LEO', 'reference', 'streaming', 'OK!'] as $w) {

@@ -506,67 +506,67 @@ def crawl_wac(filter_titles: list[str] | None = None,
 # --titles 34 --chapters 300  →  34 CFR Part 300 (IDEA regulations)
 # section_id format: '34 CFR § 300.1'
 
-CFR_XML_API = 'https://www.ecfr.gov/api/versioned'
-
-
 def cfr_fetch_title_xml(title_num: str) -> str | None:
-    """Download eCFR full-title XML. Tries today's date then known-good fallback dates."""
+    """Download eCFR full-title XML. Tries eCFR versioner API, then govinfo.gov fallback."""
     from datetime import date
     today = date.today().strftime('%Y-%m-%d')
-    for d in [today, '2025-01-01', '2024-10-01', '2024-01-01']:
-        url = f'{CFR_XML_API}/{d}/title-{title_num}.xml'
+    # eCFR versioner API: /api/versioner/v1/full/{date}/title-{n}.xml
+    # Today's date may not have a published version; try progressively older dates.
+    for d in [today, '2025-04-01', '2025-01-01', '2024-10-01', '2024-01-01']:
+        url = f'https://www.ecfr.gov/api/versioner/v1/full/{d}/title-{title_num}.xml'
         xml = fetch(url)
         if xml and len(xml) > 5000:
             return xml
+    # Fallback: GPO govinfo.gov bulk eCFR XML (updated nightly, reliable plain HTTP)
+    url = f'https://www.govinfo.gov/bulkdata/ECFR/title-{title_num}/ECFR-title{title_num}.xml'
+    xml = fetch(url)
+    if xml and len(xml) > 5000:
+        return xml
     return None
 
 
 def cfr_parse_part(xml: str, title_num: str, part_num: str,
                    title_name: str, part_name: str) -> list[dict]:
-    """Parse all sections from one CFR part out of the full-title XML."""
+    """
+    Parse all sections from one CFR part.
+    Handles two XML formats:
+      eCFR versioner: DIV5[TYPE=PART N=300] > DIV8[TYPE=SECTION N=300.1]
+      govinfo.gov:    PART[N=300] > SECTION > SECTNO + SUBJECT + P
+    """
     soup = BeautifulSoup(xml, 'lxml-xml')
 
-    # eCFR XML: parts are DIV5 with TYPE="PART" and N=part number
+    # ── Locate the PART element (eCFR format first) ───────────────────────────
     part = (
         soup.find('DIV5', attrs={'N': part_num, 'TYPE': 'PART'}) or
         soup.find('DIV5', attrs={'N': part_num})
     )
     if not part:
-        # Fallback: find any DIV whose HEAD contains "PART {part_num}"
         for div in soup.find_all(re.compile(r'^DIV\d+$')):
             head = div.find('HEAD')
             if head and re.search(rf'\bPART\s+{re.escape(part_num)}\b', head.get_text()):
                 part = div
                 break
 
+    # govinfo.gov format: <PART N="300"> or search by EAR/HD text
+    if not part:
+        part = soup.find('PART', attrs={'N': part_num})
+    if not part:
+        for p in soup.find_all('PART'):
+            ear = p.find('EAR')
+            hd  = p.find('HD')
+            if (ear and f'Pt. {part_num}' in ear.get_text()) or \
+               (hd  and f'PART {part_num}' in hd.get_text()):
+                part = p
+                break
+
     if not part:
         return []
 
-    sections = []
-    for sec in part.find_all('DIV8'):
-        sec_n = sec.get('N', '')
-        if not sec_n:
-            continue
-
-        head = sec.find('HEAD')
-        heading = head.get_text(' ', strip=True) if head else ''
-        # Strip leading "§ 300.1" citation from heading
-        heading = re.sub(r'^§\s*[\d\.]+\w*\.?\s*', '', heading).strip()
-
-        paras = [p.get_text(' ', strip=True) for p in sec.find_all(['P', 'FP'])
-                 if p.get_text(strip=True)]
-        content = '\n'.join(paras).strip()
-        content = re.sub(r'\s{3,}', '\n', content)
-
-        if not content or len(content) < 30:
-            continue
-
+    def _make_row(sec_n: str, heading: str, content: str) -> dict:
         section_id = f'{title_num} CFR § {sec_n}'
         if not heading:
             heading = _heading_from_content(section_id, content)
-
-        source_url = f'{CFR_BASE}/title-{title_num}/part-{part_num}/section-{sec_n}'
-        sections.append({
+        return {
             'corpus':          'cfr',
             'title_num':       title_num,
             'title_name':      title_name,
@@ -576,8 +576,44 @@ def cfr_parse_part(xml: str, title_num: str, part_num: str,
             'section_id':      section_id,
             'section_heading': heading,
             'content':         content,
-            'source_url':      source_url,
-        })
+            'source_url':      f'{CFR_BASE}/title-{title_num}/part-{part_num}/section-{sec_n}',
+        }
+
+    sections = []
+
+    # ── eCFR versioner: DIV8 elements ─────────────────────────────────────────
+    for sec in part.find_all('DIV8'):
+        sec_n = sec.get('N', '')
+        if not sec_n:
+            continue
+        head    = sec.find('HEAD')
+        heading = head.get_text(' ', strip=True) if head else ''
+        heading = re.sub(r'^§\s*[\d\.]+\w*\.?\s*', '', heading).strip()
+        paras   = [p.get_text(' ', strip=True) for p in sec.find_all(['P', 'FP'])
+                   if p.get_text(strip=True)]
+        content = re.sub(r'\s{3,}', '\n', '\n'.join(paras).strip())
+        if content and len(content) >= 30:
+            sections.append(_make_row(sec_n, heading, content))
+
+    if sections:
+        return sections
+
+    # ── govinfo.gov: SECTION > SECTNO + SUBJECT + P ───────────────────────────
+    for sec in part.find_all('SECTION'):
+        sectno_tag = sec.find('SECTNO')
+        if not sectno_tag:
+            continue
+        m = re.search(r'§\s*([\d\.]+\w*)', sectno_tag.get_text())
+        if not m:
+            continue
+        sec_n       = m.group(1)
+        subject_tag = sec.find('SUBJECT')
+        heading     = subject_tag.get_text(' ', strip=True) if subject_tag else ''
+        paras       = [p.get_text(' ', strip=True) for p in sec.find_all(['P', 'FP'])
+                       if p.get_text(strip=True)]
+        content     = re.sub(r'\s{3,}', '\n', '\n'.join(paras).strip())
+        if content and len(content) >= 30:
+            sections.append(_make_row(sec_n, heading, content))
 
     return sections
 
@@ -630,7 +666,21 @@ def crawl_cfr(filter_titles: list[str] | None = None,
 
 USC_CHAPTER_SECTIONS: dict[tuple[str, str], list[str]] = {
     # IDEA — Individuals with Disabilities Education Act, 20 USC Chapter 33
-    ('20', '33'): [str(n) for n in range(1400, 1483)],
+    # Sparse numbering by subchapter — not every integer in 1400–1482 exists:
+    #   Subchapter I  (General):         §§ 1400–1409
+    #   Subchapter II (All children):    §§ 1411–1419  (no 1410, no 1420–1430)
+    #   Subchapter III (Infants/toddlers): §§ 1431–1444
+    #   Subchapter IV (National activities): §§ 1450–1451, 1461–1467, 1470–1474, 1481–1482
+    ('20', '33'): [
+        '1400','1401','1402','1403','1404','1405','1406','1407','1408','1409',
+        '1411','1412','1413','1414','1415','1416','1417','1418','1419',
+        '1431','1432','1433','1434','1435','1436','1437','1438','1439',
+        '1440','1441','1442','1443','1444',
+        '1450','1451',
+        '1461','1462','1463','1464','1465','1466','1467',
+        '1470','1471','1472','1473','1474',
+        '1481','1482',
+    ],
 }
 
 

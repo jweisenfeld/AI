@@ -283,11 +283,15 @@ def rcw_fetch_section(cite: str, title_num: str, title_name: str,
     }
 
 
-def crawl_rcw(filter_titles: list[str] | None = None) -> Generator[dict, None, None]:
+def crawl_rcw(filter_titles: list[str] | None = None,
+              filter_chapters: list[str] | None = None) -> Generator[dict, None, None]:
     """
     Generator that yields section dicts by crawling the RCW site.
     Traverses: title list → chapters → sections → section text.
     """
+    # If chapter filter given without title filter, derive titles automatically
+    if filter_chapters and not filter_titles:
+        filter_titles = list({c.rsplit('.', 1)[0] for c in filter_chapters})
     titles = rcw_list_titles(filter_titles)
     if not titles:
         print('ERROR: could not fetch RCW title list.', file=sys.stderr)
@@ -306,8 +310,9 @@ def crawl_rcw(filter_titles: list[str] | None = None) -> Generator[dict, None, N
             print(f'    WARNING: no chapters found for Title {t_num}')
             continue
 
-        print(f'    {len(chapters)} chapters')
-        for chap in chapters:
+        filtered = [c for c in chapters if not filter_chapters or c['num'] in filter_chapters]
+        print(f'    {len(chapters)} chapters ({len(filtered)} after chapter filter)')
+        for chap in filtered:
             c_num  = chap['num']
             c_name = chap['name']
 
@@ -447,7 +452,11 @@ def wac_fetch_section(cite: str, title_num: str, title_name: str,
     }
 
 
-def crawl_wac(filter_titles: list[str] | None = None) -> Generator[dict, None, None]:
+def crawl_wac(filter_titles: list[str] | None = None,
+              filter_chapters: list[str] | None = None) -> Generator[dict, None, None]:
+    # If chapter filter given without title filter, derive titles automatically
+    if filter_chapters and not filter_titles:
+        filter_titles = list({c.split('-')[0] for c in filter_chapters})
     titles = wac_list_titles(filter_titles)
     if not titles:
         print('ERROR: could not fetch WAC title list.', file=sys.stderr)
@@ -466,8 +475,9 @@ def crawl_wac(filter_titles: list[str] | None = None) -> Generator[dict, None, N
             print(f'    WARNING: no chapters found for WAC Title {t_num}')
             continue
 
-        print(f'    {len(chapters)} chapters')
-        for chap in chapters:
+        filtered = [c for c in chapters if not filter_chapters or c['num'] in filter_chapters]
+        print(f'    {len(chapters)} chapters ({len(filtered)} after chapter filter)')
+        for chap in filtered:
             c_num  = chap['num']
             c_name = chap['name']
 
@@ -565,8 +575,10 @@ def main():
     parser.add_argument('--corpus', required=True, choices=['rcw', 'wac'],
                         help='Which code to crawl')
     parser.add_argument('--titles', metavar='28A,42.56,180',
-                        help='Comma-separated title numbers to limit the crawl '
-                             '(recommended for Phase 1). Omit for full corpus.')
+                        help='Comma-separated title numbers to limit the crawl. Omit for full corpus.')
+    parser.add_argument('--chapters', metavar='392-172A,28A.400',
+                        help='Comma-separated chapter numbers (title auto-derived if --titles omitted). '
+                             'Example: --chapters 392-172A  ingests only WAC special ed rules.')
     parser.add_argument('--dry-run', action='store_true',
                         help='Crawl and parse without embedding or inserting. '
                              'Use this first to verify selectors are working.')
@@ -579,7 +591,8 @@ def main():
 
     CRAWL_DELAY_SEC = args.delay
 
-    filter_titles = [t.strip() for t in args.titles.split(',')] if args.titles else None
+    filter_titles   = [t.strip() for t in args.titles.split(',')]   if args.titles   else None
+    filter_chapters = [c.strip() for c in args.chapters.split(',')] if args.chapters else None
 
     openai_key   = os.environ.get('OPENAI_API_KEY', '').strip()
     supabase_url = os.environ.get('SUPABASE_URL', '').strip()
@@ -616,7 +629,8 @@ def main():
     if args.dry_run:
         print('DRY RUN — no embedding or DB writes.')
 
-    crawler = crawl_rcw(filter_titles) if args.corpus == 'rcw' else crawl_wac(filter_titles)
+    crawler = (crawl_rcw(filter_titles, filter_chapters) if args.corpus == 'rcw'
+               else crawl_wac(filter_titles, filter_chapters))
 
     all_chunks: list[dict] = []
     section_count = 0

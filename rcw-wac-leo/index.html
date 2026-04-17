@@ -3,28 +3,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WA Law Assistant — RCW, WAC &amp; Federal Law</title>
+<title>LEO Legal Reference — Washington State Law</title>
 <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
 <style>
   :root {
-    --primary:      #1a3a5c;   /* WA state blue */
-    --primary-dk:   #122840;
-    --accent:       #4a90d9;
-    --user-bg:      #1a3a5c;
+    --primary:      #0d2035;
+    --primary-md:   #1a3a5c;
+    --accent:       #c9a227;   /* badge gold */
+    --accent-dk:    #a07f18;
+    --user-bg:      #0d2035;
     --user-fg:      #ffffff;
     --bot-bg:       #f4f7fb;
     --bot-fg:       #1a1a2e;
-    --source-bg:    #eef4fb;
-    --source-border:#c0d8f0;
+    --source-bg:    #eef2f8;
+    --source-border:#c0cfd8;
     --rcw-badge:    #1a3a5c;
     --wac-badge:    #2e6b3e;
     --usc-badge:    #7b2d2d;
     --cfr-badge:    #5a3472;
-    --sim-color:    #4a90d9;
+    --sim-color:    #c9a227;
     --disclaimer:   #7a8a9a;
-    --border:       #d0dde8;
-    --bg:           #f0f4f8;
-    --shadow:       0 2px 8px rgba(0,0,0,.10);
+    --border:       #ccd6e0;
+    --bg:           #edf1f5;
+    --shadow:       0 2px 8px rgba(0,0,0,.12);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -37,43 +38,57 @@
     overflow: hidden;
   }
 
-  /* ── Header ────────────────────────────────────────────────────────────── */
+  /* ── Header ─────────────────────────────────────────────────────────────── */
   header {
-    background: var(--primary-dk);
+    background: var(--primary);
     color: #fff;
     padding: 10px 16px;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
     flex-shrink: 0;
     box-shadow: var(--shadow);
+    border-bottom: 2px solid var(--accent);
   }
-  header h1 { font-size: 1.05rem; font-weight: 600; letter-spacing: .01em; }
+  .header-badge {
+    font-size: 1.6rem;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  header h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: .02em; }
   header .subtitle {
-    font-size: .75rem;
-    color: #9ab8d8;
-    margin-top: 1px;
+    font-size: .72rem;
+    color: #8aaccc;
+    margin-top: 2px;
+    letter-spacing: .04em;
   }
   .corpus-toggle {
     margin-left: auto;
     display: flex;
     gap: 4px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
   .corpus-toggle button {
     padding: 4px 10px;
-    border: 1px solid #4a7aaa;
+    border: 1px solid #3a5a7a;
     background: transparent;
-    color: #9ab8d8;
+    color: #8aaccc;
     border-radius: 4px;
     cursor: pointer;
-    font-size: .78rem;
+    font-size: .75rem;
     transition: all .15s;
+    white-space: nowrap;
   }
   .corpus-toggle button.active {
     background: var(--accent);
     border-color: var(--accent);
-    color: #fff;
-    font-weight: 600;
+    color: #0d2035;
+    font-weight: 700;
+  }
+  .corpus-toggle button:hover:not(.active) {
+    border-color: var(--accent);
+    color: var(--accent);
   }
 
   /* ── Messages ───────────────────────────────────────────────────────────── */
@@ -87,37 +102,36 @@
     scroll-behavior: smooth;
   }
 
-  .message { display: flex; flex-direction: column; max-width: 84%; }
+  .message { display: flex; flex-direction: column; max-width: 86%; }
   .message.user  { align-self: flex-end; align-items: flex-end; }
   .message.bot   { align-self: flex-start; align-items: flex-start; }
 
-  /* ── Markdown rendering inside bot bubbles ──────────────────────────────── */
+  /* ── Markdown ────────────────────────────────────────────────────────────── */
   .bubble.markdown { white-space: normal; }
   .bubble.markdown p          { margin: 0 0 .6em; }
   .bubble.markdown p:last-child { margin-bottom: 0; }
   .bubble.markdown h1,.bubble.markdown h2,.bubble.markdown h3 {
-    margin: .8em 0 .3em; font-weight: 600; line-height: 1.3;
+    margin: .8em 0 .3em; font-weight: 700; line-height: 1.3;
   }
-  .bubble.markdown h1 { font-size: 1.15em; }
-  .bubble.markdown h2 { font-size: 1.05em; }
+  .bubble.markdown h1 { font-size: 1.1em; }
+  .bubble.markdown h2 { font-size: 1.0em; }
   .bubble.markdown h3 { font-size: .95em; }
-  .bubble.markdown ul,.bubble.markdown ol { margin: .4em 0 .6em 1.4em; padding: 0; }
-  .bubble.markdown li { margin-bottom: .2em; }
+  .bubble.markdown ul,.bubble.markdown ol { margin: .4em 0 .6em 1.4em; }
+  .bubble.markdown li { margin-bottom: .25em; }
   .bubble.markdown code {
     background: rgba(0,0,0,.08); border-radius: 3px;
-    padding: 1px 5px; font-family: monospace; font-size: .9em;
+    padding: 1px 5px; font-family: monospace; font-size: .88em;
   }
   .bubble.markdown pre {
     background: rgba(0,0,0,.06); border-radius: 6px;
     padding: 10px 12px; overflow-x: auto; margin: .5em 0;
   }
   .bubble.markdown pre code { background: none; padding: 0; }
-  .bubble.markdown a { color: var(--accent); }
-  .bubble.markdown strong { font-weight: 600; }
-  .bubble.markdown hr { border: none; border-top: 1px solid #ccc; margin: .8em 0; }
+  .bubble.markdown a { color: var(--primary-md); }
+  .bubble.markdown strong { font-weight: 700; }
   .bubble.markdown blockquote {
     border-left: 3px solid var(--accent); margin: .5em 0;
-    padding-left: .8em; color: #555;
+    padding-left: .8em; color: #556;
   }
 
   .bubble {
@@ -127,101 +141,87 @@
     font-size: .92rem;
     word-break: break-word;
   }
-  .message.user .bubble  { background: var(--user-bg); color: var(--user-fg); border-radius: 14px 14px 4px 14px; white-space: pre-wrap; }
-  .message.bot  .bubble  { background: var(--bot-bg);  color: var(--bot-fg);  border-radius: 14px 14px 14px 4px; box-shadow: var(--shadow); }
+  .message.user .bubble {
+    background: var(--user-bg);
+    color: var(--user-fg);
+    border-radius: 14px 14px 4px 14px;
+    white-space: pre-wrap;
+  }
+  .message.bot .bubble {
+    background: var(--bot-bg);
+    color: var(--bot-fg);
+    border-radius: 14px 14px 14px 4px;
+    box-shadow: var(--shadow);
+  }
 
   /* ── Source cards ───────────────────────────────────────────────────────── */
-  .sources-block {
-    margin-top: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    max-width: 100%;
-  }
+  .sources-block { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
   .sources-label {
-    font-size: .72rem;
-    color: #6a7a8a;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    margin-bottom: 2px;
+    font-size: .7rem; color: #6a7a8a;
+    text-transform: uppercase; letter-spacing: .07em; margin-bottom: 2px;
   }
   .source-card {
     background: var(--source-bg);
     border: 1px solid var(--source-border);
-    border-radius: 8px;
-    padding: 7px 10px;
-    font-size: .8rem;
+    border-radius: 7px;
+    padding: 6px 10px;
+    font-size: .79rem;
     display: flex;
     align-items: baseline;
     gap: 8px;
     flex-wrap: wrap;
   }
-  .source-card a {
-    font-weight: 600;
-    color: var(--primary);
-    text-decoration: none;
-  }
+  .source-card a { font-weight: 700; color: var(--primary-md); text-decoration: none; }
   .source-card a:hover { text-decoration: underline; }
   .corpus-badge {
-    font-size: .68rem;
-    font-weight: 700;
-    padding: 1px 6px;
-    border-radius: 3px;
-    color: #fff;
-    flex-shrink: 0;
+    font-size: .67rem; font-weight: 700;
+    padding: 1px 6px; border-radius: 3px;
+    color: #fff; flex-shrink: 0;
   }
   .corpus-badge.rcw { background: var(--rcw-badge); }
   .corpus-badge.wac { background: var(--wac-badge); }
   .corpus-badge.usc { background: var(--usc-badge); }
   .corpus-badge.cfr { background: var(--cfr-badge); }
-  .source-heading { color: #4a5a6a; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sim-badge {
-    font-size: .7rem;
-    color: var(--sim-color);
-    font-weight: 600;
-    flex-shrink: 0;
+  .source-heading {
+    color: #4a5a6a; flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
+  .sim-badge { font-size: .69rem; color: var(--sim-color); font-weight: 700; flex-shrink: 0; }
 
-  /* ── Footer meta (token badge) ──────────────────────────────────────────── */
-  .meta-badge {
-    font-size: .7rem;
-    color: #8a9aaa;
-    margin-top: 4px;
-    padding-left: 4px;
-  }
+  /* ── Token meta ─────────────────────────────────────────────────────────── */
+  .meta-badge { font-size: .69rem; color: #8a9aaa; margin-top: 4px; padding-left: 4px; }
 
-  /* ── Welcome state ──────────────────────────────────────────────────────── */
+  /* ── Welcome ────────────────────────────────────────────────────────────── */
   .welcome {
     align-self: center;
     text-align: center;
-    margin-top: auto;
-    margin-bottom: auto;
-    color: #6a7a8a;
+    margin: auto;
+    color: #5a6a7a;
     padding: 32px 16px;
+    max-width: 520px;
   }
-  .welcome .icon { font-size: 2.5rem; margin-bottom: 10px; }
-  .welcome h2 { font-size: 1.1rem; font-weight: 600; color: #3a4a5a; margin-bottom: 8px; }
-  .welcome p  { font-size: .85rem; line-height: 1.5; max-width: 420px; }
-  .welcome .examples {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    justify-content: center;
-    margin-top: 16px;
-  }
+  .welcome .shield { font-size: 2.8rem; margin-bottom: 10px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.15)); }
+  .welcome h2 { font-size: 1.15rem; font-weight: 700; color: var(--primary); margin-bottom: 6px; }
+  .welcome .tagline { font-size: .85rem; color: #7a8a9a; margin-bottom: 16px; line-height: 1.5; }
+  .welcome .examples { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; }
   .example-chip {
     background: #fff;
     border: 1px solid var(--border);
     border-radius: 16px;
-    padding: 5px 12px;
-    font-size: .8rem;
+    padding: 5px 13px;
+    font-size: .78rem;
     cursor: pointer;
-    color: var(--primary);
-    transition: background .15s;
+    color: var(--primary-md);
+    transition: all .15s;
+    text-align: left;
   }
-  .example-chip:hover { background: var(--source-bg); }
+  .example-chip:hover {
+    background: var(--source-bg);
+    border-color: var(--accent);
+    color: var(--primary);
+  }
 
-  /* ── Input area ─────────────────────────────────────────────────────────── */
+  /* ── Input ──────────────────────────────────────────────────────────────── */
   #input-area {
     padding: 10px 14px;
     background: #fff;
@@ -245,111 +245,441 @@
   }
   #query:focus { outline: none; border-color: var(--accent); }
   #send-btn {
-    background: var(--primary);
-    color: #fff;
+    background: var(--accent);
+    color: #0d2035;
     border: none;
     border-radius: 10px;
-    padding: 8px 16px;
+    padding: 8px 18px;
     font-size: .9rem;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
     transition: background .15s;
     flex-shrink: 0;
   }
-  #send-btn:hover:not(:disabled) { background: var(--accent); }
-  #send-btn:disabled { opacity: .5; cursor: default; }
+  #send-btn:hover:not(:disabled) { background: var(--accent-dk); }
+  #send-btn:disabled { opacity: .45; cursor: default; }
+
   .disclaimer {
-    font-size: .68rem;
+    font-size: .67rem;
     color: var(--disclaimer);
     text-align: center;
     padding: 3px 14px 6px;
     flex-shrink: 0;
     background: #fff;
   }
+
+  /* ── About button ───────────────────────────────────────────────────────── */
+  #about-btn {
+    margin-left: 8px;
+    padding: 4px 10px;
+    border: 1px solid #3a5a7a;
+    background: transparent;
+    color: #8aaccc;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: .75rem;
+    transition: all .15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  #about-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── About modal ────────────────────────────────────────────────────────── */
+  #about-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.55);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  #about-overlay.open { display: flex; }
+  #about-modal {
+    background: #fff;
+    border-radius: 12px;
+    max-width: 680px;
+    width: 100%;
+    max-height: 90dvh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0,0,0,.25);
+    overflow: hidden;
+  }
+  .about-header {
+    background: var(--primary);
+    color: #fff;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid var(--accent);
+    flex-shrink: 0;
+  }
+  .about-header h2 { font-size: 1rem; font-weight: 700; }
+  #about-close {
+    background: none; border: none; color: #8aaccc;
+    font-size: 1.3rem; cursor: pointer; line-height: 1;
+    padding: 0 4px;
+  }
+  #about-close:hover { color: #fff; }
+  #about-body {
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .about-section h3 {
+    font-size: .8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--primary-md);
+    margin-bottom: 10px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  /* pipeline */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: .8rem;
+  }
+  .pipe-step {
+    background: var(--source-bg);
+    border: 1px solid var(--source-border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    text-align: center;
+    min-width: 110px;
+  }
+  .pipe-step strong { display: block; font-size: .72rem; color: var(--primary-md); margin-bottom: 2px; }
+  .pipe-step span { color: #5a6a7a; font-size: .71rem; }
+  .pipe-arrow { color: var(--accent); font-weight: 700; font-size: 1rem; }
+  /* stats grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 8px;
+  }
+  .stat-card {
+    border: 1px solid var(--source-border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    text-align: center;
+  }
+  .stat-card .stat-label {
+    font-size: .67rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .07em;
+    color: #6a7a8a; margin-bottom: 4px;
+  }
+  .stat-card .stat-num {
+    font-size: 1.4rem; font-weight: 700; color: var(--primary);
+    line-height: 1.1;
+  }
+  .stat-card .stat-sub { font-size: .67rem; color: #8a9aaa; margin-top: 2px; }
+  .stat-card.rcw-card { border-color: var(--rcw-badge); }
+  .stat-card.wac-card { border-color: var(--wac-badge); }
+  .stat-card.usc-card { border-color: var(--usc-badge); }
+  .stat-card.cfr-card { border-color: var(--cfr-badge); }
+  /* prompt box */
+  .prompt-wrap {
+    position: relative;
+  }
+  .prompt-box {
+    background: #f4f7fb;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-family: monospace;
+    font-size: .76rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    max-height: 260px;
+    overflow-y: auto;
+    color: #2a3a4a;
+  }
+  #copy-prompt-btn {
+    position: absolute;
+    top: 8px; right: 8px;
+    padding: 3px 10px;
+    font-size: .72rem;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: .8;
+    transition: opacity .15s;
+  }
+  #copy-prompt-btn:hover { opacity: 1; }
+  /* tech notes */
+  .tech-notes { font-size: .79rem; color: #4a5a6a; line-height: 1.6; }
+  .tech-notes dt { font-weight: 700; color: var(--primary-md); float: left; min-width: 130px; }
+  .tech-notes dd { margin-left: 130px; margin-bottom: 5px; }
+  .stats-loading { color: #8a9aaa; font-size: .82rem; font-style: italic; }
 </style>
 </head>
 <body>
 
 <header>
+  <div class="header-badge">🛡️</div>
   <div>
-    <h1>WA Law Assistant</h1>
-    <div class="subtitle">RCW · WAC · Federal (USC &amp; CFR)</div>
+    <h1>LEO Legal Reference</h1>
+    <div class="subtitle">RCW · WAC · USC · CFR — Washington &amp; Federal Law</div>
   </div>
   <div class="corpus-toggle">
-    <button id="btn-both"    class="active" data-corpus="both">All</button>
-    <button id="btn-state"   data-corpus="state">State</button>
-    <button id="btn-rcw"     data-corpus="rcw">RCW</button>
-    <button id="btn-wac"     data-corpus="wac">WAC</button>
-    <button id="btn-federal" data-corpus="federal">Federal</button>
-    <button id="btn-usc"     data-corpus="usc">USC</button>
-    <button id="btn-cfr"     data-corpus="cfr">CFR</button>
+    <button data-corpus="null"    class="active">All</button>
+    <button data-corpus="state"  >State</button>
+    <button data-corpus="rcw"    >RCW</button>
+    <button data-corpus="wac"    >WAC</button>
+    <button data-corpus="federal">Federal</button>
   </div>
+  <button id="about-btn" title="About this tool">About</button>
 </header>
+
+<!-- ── About Modal ─────────────────────────────────────────────────────────── -->
+<div id="about-overlay" role="dialog" aria-modal="true" aria-labelledby="about-title">
+  <div id="about-modal">
+    <div class="about-header">
+      <h2 id="about-title">🛡️ About LEO Legal Reference</h2>
+      <button id="about-close" aria-label="Close">✕</button>
+    </div>
+    <div id="about-body">
+
+      <div class="about-section">
+        <h3>How It Works — Query Pipeline</h3>
+        <div class="pipeline">
+          <div class="pipe-step">
+            <strong>Your Question</strong>
+            <span>plain language</span>
+          </div>
+          <span class="pipe-arrow">→</span>
+          <div class="pipe-step">
+            <strong>OpenAI Embed</strong>
+            <span>text-embedding-3-small<br>1536 dimensions</span>
+          </div>
+          <span class="pipe-arrow">→</span>
+          <div class="pipe-step">
+            <strong>Supabase Search</strong>
+            <span>vector + BM25 hybrid<br>top 8 sections</span>
+          </div>
+          <span class="pipe-arrow">→</span>
+          <div class="pipe-step">
+            <strong>Claude Haiku</strong>
+            <span>synthesis + citations<br>streaming SSE</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="about-section">
+        <h3>Database — Live Section Counts</h3>
+        <div id="stats-area" class="stats-loading">Loading database stats…</div>
+      </div>
+
+      <div class="about-section">
+        <h3>System Prompt</h3>
+        <p style="font-size:.78rem;color:#5a6a7a;margin-bottom:8px;">The exact instructions sent to Claude before every query (with <code>{CONTEXT}</code> replaced by the retrieved sections at runtime).</p>
+        <div class="prompt-wrap">
+          <div class="prompt-box" id="prompt-box">Loading…</div>
+          <button id="copy-prompt-btn">Copy</button>
+        </div>
+      </div>
+
+      <div class="about-section">
+        <h3>Technical Notes</h3>
+        <dl class="tech-notes">
+          <dt>Inference model</dt>
+          <dd>Claude Haiku 4.5 (<code>claude-haiku-4-5-20251001</code>) — fast, cheap RAG synthesis</dd>
+          <dt>Embedding model</dt>
+          <dd>OpenAI <code>text-embedding-3-small</code> — 1536 dimensions, used at ingest and at query time</dd>
+          <dt>Chunk size</dt>
+          <dd>~800 tokens per section chunk (single RCW/WAC/USC/CFR section)</dd>
+          <dt>Retrieval</dt>
+          <dd>Top 8 results via Reciprocal Rank Fusion (k=60) of vector cosine + BM25 full-text lanes</dd>
+          <dt>Max output</dt>
+          <dd>1,500 tokens per response</dd>
+          <dt>Corpus sources</dt>
+          <dd>RCW (leg.wa.gov XML), WAC (leg.wa.gov XML), USC (Cornell LII), CFR (eCFR.gov XML)</dd>
+          <dt>Vector store</dt>
+          <dd>Supabase + pgvector, HNSW index (m=16, ef_construction=64)</dd>
+          <dt>Project repo</dt>
+          <dd>jweisenfeld/AI — <code>rcw-wac-leo/</code> (UI) · <code>rcw-wac/</code> (shared proxy + ingestion)</dd>
+        </dl>
+      </div>
+
+    </div>
+  </div>
+</div>
 
 <div id="messages">
   <div class="welcome" id="welcome">
-    <div class="icon">&#x2696;&#xFE0F;</div>
-    <h2>Ask about Washington &amp; Federal Law</h2>
-    <p>Search RCW, WAC, the U.S. Code, and Code of Federal Regulations using plain language. Answers cite specific sections.</p>
+    <div class="shield">🛡️</div>
+    <h2>Washington Law for Law Enforcement</h2>
+    <p class="tagline">Ask plain-language questions about Washington State and federal law. Answers cite specific RCW/WAC sections with links to the official source.</p>
     <div class="examples">
-      <span class="example-chip">What are IEP paraeducator requirements under IDEA?</span>
-      <span class="example-chip">Student suspension due process</span>
-      <span class="example-chip">What is the minimum school year length?</span>
-      <span class="example-chip">Teacher certificate renewal requirements</span>
-      <span class="example-chip">34 CFR 300 vs WAC 392-172A — how do they interact?</span>
-      <span class="example-chip">Public records disclosure exemptions</span>
+      <span class="example-chip">When is deadly force lawful under Washington law?</span>
+      <span class="example-chip">De-escalation requirements before using force</span>
+      <span class="example-chip">Duty to intervene — what does RCW 10.120.020 require?</span>
+      <span class="example-chip">Warrantless arrest authority under RCW 10.31</span>
+      <span class="example-chip">DV mandatory arrest — what triggers it?</span>
+      <span class="example-chip">CJTC officer certification requirements</span>
+      <span class="example-chip">First degree assault — elements of the offense</span>
+      <span class="example-chip">Public records exemptions for law enforcement</span>
     </div>
   </div>
 </div>
 
 <div id="input-area">
-  <textarea id="query" rows="1" placeholder="Ask about Washington State law..."></textarea>
+  <textarea id="query" rows="1" placeholder="Ask about Washington law for law enforcement…"></textarea>
   <button id="send-btn">Ask</button>
 </div>
-<div class="disclaimer">General legal information only — not legal advice. Consult a licensed attorney for specific situations.</div>
+<div class="disclaimer">General legal information only — not legal advice. Consult your department legal advisor, city attorney, or prosecutor for specific situations.</div>
 
 <script>
 const messagesEl = document.getElementById('messages');
 const queryEl    = document.getElementById('query');
 const sendBtn    = document.getElementById('send-btn');
-const welcomeEl  = document.getElementById('welcome');
 
-let history  = [];      // [{role:'user'|'assistant', content:'...'}]
-let corpus   = 'both';  // 'both'|'state'|'federal'|'rcw'|'wac'|'usc'|'cfr'
+let history = [];
+let corpus  = null;   // null = all corpora
 
-// ── Corpus toggle ────────────────────────────────────────────────────────────
+// ── Corpus toggle ─────────────────────────────────────────────────────────────
 document.querySelectorAll('.corpus-toggle button').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.corpus-toggle button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    corpus = btn.dataset.corpus;
+    corpus = btn.dataset.corpus === 'null' ? null : btn.dataset.corpus;
   });
 });
 
-// ── Example chips ────────────────────────────────────────────────────────────
+// ── Example chips ─────────────────────────────────────────────────────────────
 document.addEventListener('click', e => {
   if (e.target.classList.contains('example-chip')) {
-    queryEl.value = e.target.textContent;
+    queryEl.value = e.target.textContent.trim();
     queryEl.dispatchEvent(new Event('input'));
     sendMessage();
   }
 });
 
-// ── Auto-resize textarea ─────────────────────────────────────────────────────
+// ── Auto-resize textarea ──────────────────────────────────────────────────────
 queryEl.addEventListener('input', () => {
   queryEl.style.height = 'auto';
   queryEl.style.height = Math.min(queryEl.scrollHeight, 120) + 'px';
 });
-
 queryEl.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
-
 sendBtn.addEventListener('click', sendMessage);
 
+// ── About modal ───────────────────────────────────────────────────────────────
+const aboutOverlay = document.getElementById('about-overlay');
+const aboutBtn     = document.getElementById('about-btn');
+const aboutClose   = document.getElementById('about-close');
+const statsArea    = document.getElementById('stats-area');
+const promptBox    = document.getElementById('prompt-box');
+const copyPromptBtn = document.getElementById('copy-prompt-btn');
+
+let aboutLoaded = false;
+
+function openAbout() {
+  aboutOverlay.classList.add('open');
+  if (!aboutLoaded) { loadAboutData(); aboutLoaded = true; }
+}
+function closeAbout() { aboutOverlay.classList.remove('open'); }
+
+aboutBtn.addEventListener('click', openAbout);
+aboutClose.addEventListener('click', closeAbout);
+aboutOverlay.addEventListener('click', e => { if (e.target === aboutOverlay) closeAbout(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAbout(); });
+
+async function loadAboutData() {
+  // Fetch DB stats
+  try {
+    const resp = await fetch('api-proxy.php?stats=1');
+    const rows = await resp.json();
+    if (rows.error) throw new Error(rows.error);
+
+    const order  = ['rcw','wac','usc','cfr'];
+    const labels = { rcw:'RCW', wac:'WAC', usc:'USC', cfr:'CFR' };
+    const descs  = {
+      rcw: 'Revised Code of WA',
+      wac: 'WA Admin Code',
+      usc: 'US Code',
+      cfr: 'Code of Federal Regs',
+    };
+
+    // rows is an array; build lookup by corpus
+    const byCorpus = {};
+    (Array.isArray(rows) ? rows : []).forEach(r => {
+      byCorpus[r.corpus] = r;
+    });
+
+    const grid = document.createElement('div');
+    grid.className = 'stats-grid';
+
+    order.forEach(c => {
+      const r = byCorpus[c] || {};
+      const card = document.createElement('div');
+      card.className = `stat-card ${c}-card`;
+      const chunks   = (r.chunks   ?? r.chunk_count   ?? '—').toLocaleString?.() ?? (r.chunks ?? '—');
+      const sections = (r.sections ?? r.section_count ?? r.section_ids ?? '—');
+      const sectStr  = typeof sections === 'number' ? sections.toLocaleString() : sections;
+      card.innerHTML = `
+        <div class="stat-label">${labels[c]}</div>
+        <div class="stat-num">${typeof chunks === 'number' ? chunks.toLocaleString() : chunks}</div>
+        <div class="stat-sub">${sectStr !== '—' ? sectStr + ' sections' : descs[c]}</div>`;
+      grid.appendChild(card);
+    });
+
+    // total
+    const total = Object.values(byCorpus).reduce((s, r) => s + (r.chunks ?? r.chunk_count ?? 0), 0);
+    const totalCard = document.createElement('div');
+    totalCard.className = 'stat-card';
+    totalCard.style.gridColumn = '1 / -1';
+    totalCard.innerHTML = `
+      <div class="stat-label">Total chunks in database</div>
+      <div class="stat-num" style="font-size:1.1rem">${total.toLocaleString()}</div>
+      <div class="stat-sub">each chunk ≈ one law section</div>`;
+    grid.appendChild(totalCard);
+
+    statsArea.replaceWith(grid);
+  } catch (err) {
+    statsArea.textContent = 'Could not load stats: ' + err.message;
+    statsArea.style.color = '#c0392b';
+  }
+
+  // Fetch system prompt
+  try {
+    const resp = await fetch('api-proxy.php?prompt=1');
+    const data = await resp.json();
+    promptBox.textContent = data.prompt ?? '(not available)';
+  } catch (err) {
+    promptBox.textContent = 'Could not load system prompt: ' + err.message;
+  }
+}
+
+copyPromptBtn.addEventListener('click', () => {
+  const text = promptBox.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    copyPromptBtn.textContent = 'Copied!';
+    setTimeout(() => { copyPromptBtn.textContent = 'Copy'; }, 1800);
+  }).catch(() => {
+    copyPromptBtn.textContent = 'Error';
+  });
+});
+
 // ── DOM helpers ───────────────────────────────────────────────────────────────
+function removeWelcome() {
+  const w = document.getElementById('welcome');
+  if (w) w.remove();
+}
+
 function addMessage(role, text) {
-  if (welcomeEl) welcomeEl.remove();
+  removeWelcome();
   const wrap   = document.createElement('div');
   wrap.className = `message ${role}`;
   const bubble = document.createElement('div');
@@ -366,7 +696,7 @@ function scrollBottom() {
 }
 
 function renderSources(sources) {
-  if (!sources || sources.length === 0) return null;
+  if (!sources?.length) return null;
   const block = document.createElement('div');
   block.className = 'sources-block';
   const label = document.createElement('div');
@@ -374,7 +704,7 @@ function renderSources(sources) {
   label.textContent = `Sources (${sources.length})`;
   block.appendChild(label);
   sources.forEach(s => {
-    const card  = document.createElement('div');
+    const card = document.createElement('div');
     card.className = 'source-card';
 
     const badge = document.createElement('span');
@@ -395,19 +725,18 @@ function renderSources(sources) {
     card.appendChild(link);
     card.appendChild(heading);
 
-    if (s.similarity_pct !== null && s.similarity_pct !== undefined) {
+    if (s.similarity_pct != null) {
       const sim = document.createElement('span');
       sim.className = 'sim-badge';
       sim.textContent = `${s.similarity_pct}%`;
       card.appendChild(sim);
     }
-
     block.appendChild(card);
   });
   return block;
 }
 
-// ── Main send ─────────────────────────────────────────────────────────────────
+// ── Send ──────────────────────────────────────────────────────────────────────
 async function sendMessage() {
   const text = queryEl.value.trim();
   if (!text || sendBtn.disabled) return;
@@ -416,18 +745,15 @@ async function sendMessage() {
   queryEl.style.height = 'auto';
   sendBtn.disabled = true;
 
-  // User bubble
   addMessage('user', text);
   history.push({ role: 'user', content: text });
 
-  // Bot bubble (will be filled by stream)
   const { wrap: botWrap, bubble: botBubble } = addMessage('bot', '');
-  botBubble.textContent = '';
   botBubble.classList.add('markdown');
 
-  let fullText    = '';
+  let fullText = '';
   let sourcesRendered = false;
-  let metaDiv     = null;
+  let metaDiv = null;
 
   try {
     const resp = await fetch('api-proxy.php?stream=1', {
@@ -435,8 +761,8 @@ async function sendMessage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         query:    text,
-        corpus:   corpus === 'both' ? null : corpus,  // null=all; 'state','federal' handled by RPC
-        messages: history.slice(-12),   // last 6 turns
+        corpus:   corpus,
+        messages: history.slice(-12),
       }),
     });
 
@@ -444,7 +770,7 @@ async function sendMessage() {
 
     const reader = resp.body.getReader();
     const dec    = new TextDecoder();
-    let   buf    = '';
+    let buf = '';
 
     while (true) {
       const { done, value } = await reader.read();
@@ -455,7 +781,6 @@ async function sendMessage() {
       while ((nl = buf.indexOf('\n')) !== -1) {
         const line = buf.slice(0, nl).trimEnd();
         buf = buf.slice(nl + 1);
-
         if (!line.startsWith('data: ')) continue;
         const raw = line.slice(6);
         if (raw === '[DONE]') break;
@@ -463,15 +788,11 @@ async function sendMessage() {
         let evt;
         try { evt = JSON.parse(raw); } catch { continue; }
 
-        if (evt.error) {
-          botBubble.textContent = 'Error: ' + evt.error;
-          break;
-        }
+        if (evt.error) { botBubble.textContent = 'Error: ' + evt.error; break; }
 
-        // Sources arrive before text starts
         if (evt.sources && !sourcesRendered) {
-          const srcBlock = renderSources(evt.sources);
-          if (srcBlock) botWrap.appendChild(srcBlock);
+          const block = renderSources(evt.sources);
+          if (block) botWrap.appendChild(block);
           sourcesRendered = true;
           scrollBottom();
         }
@@ -483,13 +804,13 @@ async function sendMessage() {
         }
 
         if (evt.meta) {
-          const { inTokens, outTokens, cachedTokens, resultCount } = evt.meta;
+          const { inTokens, outTokens, resultCount } = evt.meta;
           if (!metaDiv) {
             metaDiv = document.createElement('div');
             metaDiv.className = 'meta-badge';
             botWrap.appendChild(metaDiv);
           }
-          const parts = [`${resultCount ?? 0} sections retrieved`, `${outTokens} tok out`];
+          const parts = [`${resultCount ?? 0} sections`, `${outTokens} tok`];
           if (inTokens) parts.push(`${inTokens} in`);
           metaDiv.textContent = parts.join(' · ');
         }
@@ -499,9 +820,7 @@ async function sendMessage() {
     botBubble.textContent = 'Connection error: ' + err.message;
   }
 
-  if (fullText) {
-    history.push({ role: 'assistant', content: fullText });
-  }
+  if (fullText) history.push({ role: 'assistant', content: fullText });
   sendBtn.disabled = false;
   queryEl.focus();
   scrollBottom();

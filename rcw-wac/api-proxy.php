@@ -133,7 +133,7 @@ start_sse();
 // Validate input
 $query        = trim($data['query']   ?? $data['messages'][array_key_last($data['messages'] ?? [])]['content'] ?? '');
 $corpusRaw    = $data['corpus'] ?? 'both';
-$corpus       = in_array($corpusRaw, ['rcw', 'wac'], true) ? $corpusRaw : null;
+$corpus       = in_array($corpusRaw, ['rcw', 'wac', 'usc', 'cfr', 'state', 'federal'], true) ? $corpusRaw : null;
 $messages     = $data['messages']     ?? [];
 
 if (!$query) {

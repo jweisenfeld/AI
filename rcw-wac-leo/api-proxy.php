@@ -1,18 +1,12 @@
 <?php
 /**
- * RCW/WAC Legal RAG — Streaming Proxy
+ * LEO Legal Reference — Streaming Proxy
+ *
+ * Derivative of rcw-wac/api-proxy.php. System prompt tuned for law enforcement.
+ * Uses the same Supabase backend and RcwWacProxy class from rcw-wac/src/.
  *
  * Request:  POST api-proxy.php?stream=1
- * Body:     { "query": "...", "corpus": "rcw|wac|both", "messages": [...] }
- *
- * SSE event sequence:
- *   data: {"sources": [...]}        ← retrieved law sections (before Claude starts)
- *   data: {"text": "..."}           ← streamed Claude response delta
- *   data: {"meta": {...}}           ← token counts
- *   data: [DONE]
- *
- * Secrets: ../.secrets/rcwkey.php   (separate from ohs-search — new Supabase project)
- * Keys:    ANTHROPIC_API_KEY, OPENAI_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY (anon only)
+ * Body:     { "query": "...", "corpus": "rcw|wac|state|federal|both", "messages": [...] }
  */
 
 set_time_limit(120);
@@ -22,7 +16,8 @@ header('Access-Control-Allow-Headers: Content-Type');
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') { exit; }
 
-require_once __DIR__ . '/src/RcwWacProxy.php';
+// Shared proxy class lives in the sibling rcw-wac folder
+require_once __DIR__ . '/../rcw-wac/src/RcwWacProxy.php';
 use RcwWac\RcwWacProxy;
 use RcwWac\EmbeddingException;
 use RcwWac\SupabaseException;
@@ -36,7 +31,6 @@ function load_secrets(string $path): array {
     if (!file_exists($path)) return [];
     $result = require $path;
     if (is_array($result)) return $result;
-    // Variable-style secrets file: $OPENAI_API_KEY = '...' etc.
     return [
         'OPENAI_API_KEY'    => $OPENAI_API_KEY    ?? '',
         'SUPABASE_URL'      => $SUPABASE_URL       ?? '',
@@ -48,31 +42,41 @@ function load_secrets(string $path): array {
 // ── System prompt ─────────────────────────────────────────────────────────────
 
 define('SYSTEM_PROMPT', <<<'PROMPT'
-You are a legal reference assistant covering Washington State law and relevant federal law. You help people understand:
+You are a legal reference assistant for Washington State law enforcement officers, supervisors, and administrators. You help users understand Washington and federal law as it applies to law enforcement.
 
-- RCW  — Revised Code of Washington (state statute, enacted by the Legislature)
-- WAC  — Washington Administrative Code (state agency rules under legislative authority)
-- USC  — United States Code (federal statute, enacted by Congress)
-- CFR  — Code of Federal Regulations (federal agency rules under Congressional authority)
+Sources covered:
+- RCW  — Revised Code of Washington (state statute enacted by the Legislature)
+- WAC  — Washington Administrative Code (state agency rules)
+- USC  — United States Code (federal statute enacted by Congress)
+- CFR  — Code of Federal Regulations (federal agency rules)
 
-The legal hierarchy: federal law supersedes state law. For special education, IDEA (20 USC Ch. 33) and its regulations (34 CFR Part 300) set the floor; WAC 392-172A and RCW 28A.155 implement those requirements in Washington and may add to them.
+Key areas in this database:
+- Use of force: RCW 10.116 (use of force standards), RCW 10.120 (officer intervention and de-escalation), RCW 9A.16 (lawful use of force defenses)
+- Criminal procedure: RCW Title 10 (arrest, search and seizure, warrants, bail)
+- Criminal code: RCW Title 9A (Washington Criminal Code — assault, theft, weapons, etc.), RCW Title 9
+- Officer authority and duties: RCW 10.31 (arrest authority), RCW 10.31.100 (domestic violence mandatory arrest)
+- Officer certification: RCW 43.101, WAC 139 (CJTC — training and certification requirements)
+- Municipal police authority: RCW Title 35A (code cities — applicable to Pasco), RCW Title 36 (counties)
+- Traffic enforcement: RCW Title 46
+- Public records: RCW 42.56 (disclosure obligations and exemptions for law enforcement records)
 
 When answering:
-- Cite every specific section you draw from (e.g., "RCW 28A.400.010", "WAC 392-172A-03300", "34 CFR § 300.8", "20 USC § 1415").
-- Distinguish the source type: state statute (RCW), state rule (WAC), federal statute (USC), federal rule (CFR).
-- When federal and state sections both apply, explain how they interact — federal sets the floor, state may add requirements.
-- Write in plain language; translate legal jargon for a general audience.
-- If a section only partially answers the question, say what you found and note the gap.
-- Do not guess or speculate about sections not provided.
+- Cite every specific section you draw from (e.g., "RCW 10.116.020", "WAC 139-12-030").
+- Distinguish statute (RCW/USC) from administrative rule (WAC/CFR).
+- For use-of-force questions, apply the RCW 10.116/10.120 framework from the 2021 Washington police reform laws.
+- When federal constitutional standards apply (4th, 5th, 14th Amendment), note them even if the specific case law is not in the retrieved sections.
+- Write in plain language; define legal terms on first use.
+- If a retrieved section only partially answers the question, say so and identify what is missing.
+- Do not speculate about sections not provided in the context.
 
-IMPORTANT: This tool provides general legal information only. It is not legal advice. For specific legal situations, consult a licensed attorney.
+IMPORTANT: This tool provides general legal information only — not legal advice. For specific operational or legal situations, officers should consult their department legal advisor, city attorney, or the prosecuting attorney's office.
 
-The following law sections were retrieved as relevant to the user's question:
+The following law sections were retrieved as relevant to the question:
 
 {CONTEXT}
 PROMPT);
 
-define('MAX_OUTPUT_TOKENS', 1200);
+define('MAX_OUTPUT_TOKENS', 1500);
 
 // ── Stream handler ────────────────────────────────────────────────────────────
 
@@ -107,15 +111,12 @@ function sse_error(string $msg): void {
 
 $data = json_decode(file_get_contents('php://input'), true) ?? [];
 
-// ?stream=test — streaming sanity check (no API calls)
 if (isset($_GET['stream']) && $_GET['stream'] === 'test') {
     start_sse();
-    $words = ['RCW/WAC', 'streaming', 'is', 'working!'];
-    foreach ($words as $w) {
-        sleep(1);
-        sse(['text' => $w . ' ']);
+    foreach (['LEO', 'reference', 'streaming', 'OK!'] as $w) {
+        sleep(1); sse(['text' => $w . ' ']);
     }
-    sse(['meta' => ['inTokens' => 0, 'outTokens' => count($words), 'cachedTokens' => 0]]);
+    sse(['meta' => ['inTokens' => 0, 'outTokens' => 4, 'cachedTokens' => 0]]);
     echo "data: [DONE]\n\n"; flush();
     exit;
 }
@@ -130,28 +131,18 @@ if (!isset($_GET['stream']) || $_GET['stream'] !== '1') {
 
 start_sse();
 
-// Validate input
-$query        = trim($data['query']   ?? $data['messages'][array_key_last($data['messages'] ?? [])]['content'] ?? '');
-$corpusRaw    = $data['corpus'] ?? 'both';
-$corpus       = in_array($corpusRaw, ['rcw', 'wac', 'usc', 'cfr', 'state', 'federal'], true) ? $corpusRaw : null;
-$messages     = $data['messages']     ?? [];
+$query     = trim($data['query'] ?? $data['messages'][array_key_last($data['messages'] ?? [])]['content'] ?? '');
+$corpusRaw = $data['corpus'] ?? null;
+$corpus    = in_array($corpusRaw, ['rcw', 'wac', 'usc', 'cfr', 'state', 'federal'], true) ? $corpusRaw : null;
+$messages  = $data['messages'] ?? [];
 
-if (!$query) {
-    sse_error('No query provided.'); exit;
-}
+if (!$query) { sse_error('No query provided.'); exit; }
 
-// Load secrets
 $secrets = load_secrets($secretsFile);
-if (empty($secrets['ANTHROPIC_API_KEY'])) {
-    sse_error('ANTHROPIC_API_KEY missing.'); exit;
-}
-if (empty($secrets['OPENAI_API_KEY'])) {
-    sse_error('OPENAI_API_KEY missing.'); exit;
-}
+if (empty($secrets['ANTHROPIC_API_KEY'])) { sse_error('ANTHROPIC_API_KEY missing.'); exit; }
+if (empty($secrets['OPENAI_API_KEY']))    { sse_error('OPENAI_API_KEY missing.');    exit; }
 
 $proxy = new RcwWacProxy($secrets);
-
-// ── Step 1 + 2: Embed + Search (synchronous, before streaming) ───────────────
 
 try {
     $embedding = $proxy->getEmbedding($query);
@@ -169,20 +160,15 @@ $built   = $proxy->buildContext($results);
 $context = $built['context'];
 $sources = $built['sources'];
 
-// Emit sources immediately (before Claude starts) so the UI can render them
 sse(['sources' => $sources]);
 
-// Log query (fire-and-forget — errors silently ignored)
 try { $proxy->logQuery($query, $corpus, count($results)); } catch (\Throwable $e) {}
-
-// ── Step 3: Build Claude messages ────────────────────────────────────────────
 
 $systemText = str_replace('{CONTEXT}',
     $context ?: '(No matching sections found — answer from general knowledge if possible, but note the gap.)',
     SYSTEM_PROMPT
 );
 
-// Build messages for Claude: inject context only on the first user turn
 $claudeMessages = [];
 $contextInjected = false;
 
@@ -194,9 +180,7 @@ foreach ($messages as $msg) {
     } elseif (is_array($msg['content'] ?? null)) {
         foreach ($msg['content'] as $block) { $text .= $block['text'] ?? ''; }
     }
-
     if ($role === 'user' && !$contextInjected) {
-        // The system prompt already has the context; just send the user question
         $claudeMessages[] = ['role' => 'user', 'content' => $text];
         $contextInjected  = true;
     } else {
@@ -204,96 +188,74 @@ foreach ($messages as $msg) {
     }
 }
 
-// Fallback: if messages array was empty, use the query directly
 if (empty($claudeMessages)) {
     $claudeMessages[] = ['role' => 'user', 'content' => $query];
 }
 
 $payload = json_encode([
-    'model'      => 'claude-haiku-4-5-20251001',   // fast + cheap for RAG synthesis
+    'model'      => 'claude-haiku-4-5-20251001',
     'max_tokens' => MAX_OUTPUT_TOKENS,
     'stream'     => true,
     'system'     => [['type' => 'text', 'text' => $systemText]],
     'messages'   => $claudeMessages,
 ], JSON_UNESCAPED_UNICODE);
 
-// ── Step 4: Stream Claude ─────────────────────────────────────────────────────
+// ── Stream Claude ─────────────────────────────────────────────────────────────
 
-$st = [
-    'buf'       => '',
-    'inTok'     => 0,
-    'outTok'    => 0,
-    'cacheRead' => 0,
-    'cacheWrite'=> 0,
-    'httpCode'  => 0,
-    'errBody'   => '',
-];
+$st = ['buf' => '', 'inTok' => 0, 'outTok' => 0, 'cacheRead' => 0, 'cacheWrite' => 0,
+       'httpCode' => 0, 'errBody' => ''];
 
 $ch = curl_init('https://api.anthropic.com/v1/messages');
-curl_setopt($ch, CURLOPT_POST,       true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-curl_setopt($ch, CURLOPT_HTTPHEADER, [
+curl_setopt($ch, CURLOPT_POST,           true);
+curl_setopt($ch, CURLOPT_POSTFIELDS,     $payload);
+curl_setopt($ch, CURLOPT_HTTPHEADER,     [
     'Content-Type: application/json',
     'x-api-key: '         . $secrets['ANTHROPIC_API_KEY'],
     'anthropic-version: 2023-06-01',
 ]);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);   // must be false for write callback
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
 curl_setopt($ch, CURLOPT_TIMEOUT,        90);
 
-// Heartbeat to prevent LiteSpeed idle timeout during slow TTFB
 curl_setopt($ch, CURLOPT_NOPROGRESS, false);
 curl_setopt($ch, CURLOPT_PROGRESSFUNCTION, function (...$_) {
     static $last = 0;
     $now = microtime(true);
-    if ($now - $last > 4.0) {
-        echo ": hb\n\n";
-        @ob_flush(); flush();
-        $last = $now;
-    }
+    if ($now - $last > 4.0) { echo ": hb\n\n"; @ob_flush(); flush(); $last = $now; }
     return 0;
 });
 
 curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($ch, $header) use (&$st) {
-    if (preg_match('/HTTP\/\S+\s+(\d+)/', $header, $m)) {
-        $st['httpCode'] = (int)$m[1];
-    }
+    if (preg_match('/HTTP\/\S+\s+(\d+)/', $header, $m)) { $st['httpCode'] = (int)$m[1]; }
     return strlen($header);
 });
 
 curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($ch, $chunk) use (&$st) {
     if ($st['httpCode'] !== 0 && $st['httpCode'] !== 200) {
-        $st['errBody'] .= $chunk;
-        return strlen($chunk);
+        $st['errBody'] .= $chunk; return strlen($chunk);
     }
-
     $st['buf'] .= $chunk;
     while (($nl = strpos($st['buf'], "\n")) !== false) {
-        $line      = rtrim(substr($st['buf'], 0, $nl), "\r");
+        $line = rtrim(substr($st['buf'], 0, $nl), "\r");
         $st['buf'] = substr($st['buf'], $nl + 1);
-
         if (strncmp($line, 'data: ', 6) !== 0) continue;
         $event = json_decode(substr($line, 6), true);
         if ($event === null) continue;
-
         switch ($event['type'] ?? '') {
             case 'message_start':
                 $u = $event['message']['usage'] ?? [];
-                $st['inTok']     = (int)($u['input_tokens']               ?? 0);
-                $st['cacheRead'] = (int)($u['cache_read_input_tokens']    ?? 0);
+                $st['inTok']     = (int)($u['input_tokens']                ?? 0);
+                $st['cacheRead'] = (int)($u['cache_read_input_tokens']     ?? 0);
                 $st['cacheWrite']= (int)($u['cache_creation_input_tokens'] ?? 0);
                 break;
-
             case 'content_block_delta':
                 if (($event['delta']['type'] ?? '') === 'text_delta') {
                     $txt = $event['delta']['text'] ?? '';
                     if ($txt !== '') { sse(['text' => $txt]); }
                 }
                 break;
-
             case 'message_delta':
                 $st['outTok'] = (int)($event['usage']['output_tokens'] ?? 0);
                 break;
-
             case 'error':
                 sse(['error' => $event['error']['message'] ?? 'Claude error']);
                 break;

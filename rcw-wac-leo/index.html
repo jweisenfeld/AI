@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LEO Legal Reference — Washington State Law</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+<style>
+  :root {
+    --primary:      #0d2035;
+    --primary-md:   #1a3a5c;
+    --accent:       #c9a227;   /* badge gold */
+    --accent-dk:    #a07f18;
+    --user-bg:      #0d2035;
+    --user-fg:      #ffffff;
+    --bot-bg:       #f4f7fb;
+    --bot-fg:       #1a1a2e;
+    --source-bg:    #eef2f8;
+    --source-border:#c0cfd8;
+    --rcw-badge:    #1a3a5c;
+    --wac-badge:    #2e6b3e;
+    --usc-badge:    #7b2d2d;
+    --cfr-badge:    #5a3472;
+    --sim-color:    #c9a227;
+    --disclaimer:   #7a8a9a;
+    --border:       #ccd6e0;
+    --bg:           #edf1f5;
+    --shadow:       0 2px 8px rgba(0,0,0,.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Header ─────────────────────────────────────────────────────────────── */
+  header {
+    background: var(--primary);
+    color: #fff;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+    box-shadow: var(--shadow);
+    border-bottom: 2px solid var(--accent);
+  }
+  .header-badge {
+    font-size: 1.6rem;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  header h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: .02em; }
+  header .subtitle {
+    font-size: .72rem;
+    color: #8aaccc;
+    margin-top: 2px;
+    letter-spacing: .04em;
+  }
+  .corpus-toggle {
+    margin-left: auto;
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .corpus-toggle button {
+    padding: 4px 10px;
+    border: 1px solid #3a5a7a;
+    background: transparent;
+    color: #8aaccc;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: .75rem;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .corpus-toggle button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #0d2035;
+    font-weight: 700;
+  }
+  .corpus-toggle button:hover:not(.active) {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ── Messages ───────────────────────────────────────────────────────────── */
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    scroll-behavior: smooth;
+  }
+
+  .message { display: flex; flex-direction: column; max-width: 86%; }
+  .message.user  { align-self: flex-end; align-items: flex-end; }
+  .message.bot   { align-self: flex-start; align-items: flex-start; }
+
+  /* ── Markdown ────────────────────────────────────────────────────────────── */
+  .bubble.markdown { white-space: normal; }
+  .bubble.markdown p          { margin: 0 0 .6em; }
+  .bubble.markdown p:last-child { margin-bottom: 0; }
+  .bubble.markdown h1,.bubble.markdown h2,.bubble.markdown h3 {
+    margin: .8em 0 .3em; font-weight: 700; line-height: 1.3;
+  }
+  .bubble.markdown h1 { font-size: 1.1em; }
+  .bubble.markdown h2 { font-size: 1.0em; }
+  .bubble.markdown h3 { font-size: .95em; }
+  .bubble.markdown ul,.bubble.markdown ol { margin: .4em 0 .6em 1.4em; }
+  .bubble.markdown li { margin-bottom: .25em; }
+  .bubble.markdown code {
+    background: rgba(0,0,0,.08); border-radius: 3px;
+    padding: 1px 5px; font-family: monospace; font-size: .88em;
+  }
+  .bubble.markdown pre {
+    background: rgba(0,0,0,.06); border-radius: 6px;
+    padding: 10px 12px; overflow-x: auto; margin: .5em 0;
+  }
+  .bubble.markdown pre code { background: none; padding: 0; }
+  .bubble.markdown a { color: var(--primary-md); }
+  .bubble.markdown strong { font-weight: 700; }
+  .bubble.markdown blockquote {
+    border-left: 3px solid var(--accent); margin: .5em 0;
+    padding-left: .8em; color: #556;
+  }
+
+  .bubble {
+    padding: 10px 14px;
+    border-radius: 14px;
+    line-height: 1.55;
+    font-size: .92rem;
+    word-break: break-word;
+  }
+  .message.user .bubble {
+    background: var(--user-bg);
+    color: var(--user-fg);
+    border-radius: 14px 14px 4px 14px;
+    white-space: pre-wrap;
+  }
+  .message.bot .bubble {
+    background: var(--bot-bg);
+    color: var(--bot-fg);
+    border-radius: 14px 14px 14px 4px;
+    box-shadow: var(--shadow);
+  }
+
+  /* ── Source cards ───────────────────────────────────────────────────────── */
+  .sources-block { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
+  .sources-label {
+    font-size: .7rem; color: #6a7a8a;
+    text-transform: uppercase; letter-spacing: .07em; margin-bottom: 2px;
+  }
+  .source-card {
+    background: var(--source-bg);
+    border: 1px solid var(--source-border);
+    border-radius: 7px;
+    padding: 6px 10px;
+    font-size: .79rem;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .source-card a { font-weight: 700; color: var(--primary-md); text-decoration: none; }
+  .source-card a:hover { text-decoration: underline; }
+  .corpus-badge {
+    font-size: .67rem; font-weight: 700;
+    padding: 1px 6px; border-radius: 3px;
+    color: #fff; flex-shrink: 0;
+  }
+  .corpus-badge.rcw { background: var(--rcw-badge); }
+  .corpus-badge.wac { background: var(--wac-badge); }
+  .corpus-badge.usc { background: var(--usc-badge); }
+  .corpus-badge.cfr { background: var(--cfr-badge); }
+  .source-heading {
+    color: #4a5a6a; flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sim-badge { font-size: .69rem; color: var(--sim-color); font-weight: 700; flex-shrink: 0; }
+
+  /* ── Token meta ─────────────────────────────────────────────────────────── */
+  .meta-badge { font-size: .69rem; color: #8a9aaa; margin-top: 4px; padding-left: 4px; }
+
+  /* ── Welcome ────────────────────────────────────────────────────────────── */
+  .welcome {
+    align-self: center;
+    text-align: center;
+    margin: auto;
+    color: #5a6a7a;
+    padding: 32px 16px;
+    max-width: 520px;
+  }
+  .welcome .shield { font-size: 2.8rem; margin-bottom: 10px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.15)); }
+  .welcome h2 { font-size: 1.15rem; font-weight: 700; color: var(--primary); margin-bottom: 6px; }
+  .welcome .tagline { font-size: .85rem; color: #7a8a9a; margin-bottom: 16px; line-height: 1.5; }
+  .welcome .examples { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; }
+  .example-chip {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 5px 13px;
+    font-size: .78rem;
+    cursor: pointer;
+    color: var(--primary-md);
+    transition: all .15s;
+    text-align: left;
+  }
+  .example-chip:hover {
+    background: var(--source-bg);
+    border-color: var(--accent);
+    color: var(--primary);
+  }
+
+  /* ── Input ──────────────────────────────────────────────────────────────── */
+  #input-area {
+    padding: 10px 14px;
+    background: #fff;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    flex-shrink: 0;
+  }
+  #query {
+    flex: 1;
+    resize: none;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: .92rem;
+    line-height: 1.45;
+    font-family: inherit;
+    max-height: 120px;
+    overflow-y: auto;
+  }
+  #query:focus { outline: none; border-color: var(--accent); }
+  #send-btn {
+    background: var(--accent);
+    color: #0d2035;
+    border: none;
+    border-radius: 10px;
+    padding: 8px 18px;
+    font-size: .9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s;
+    flex-shrink: 0;
+  }
+  #send-btn:hover:not(:disabled) { background: var(--accent-dk); }
+  #send-btn:disabled { opacity: .45; cursor: default; }
+
+  .disclaimer {
+    font-size: .67rem;
+    color: var(--disclaimer);
+    text-align: center;
+    padding: 3px 14px 6px;
+    flex-shrink: 0;
+    background: #fff;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-badge">🛡️</div>
+  <div>
+    <h1>LEO Legal Reference</h1>
+    <div class="subtitle">RCW · WAC · USC · CFR — Washington &amp; Federal Law</div>
+  </div>
+  <div class="corpus-toggle">
+    <button data-corpus="null"    class="active">All</button>
+    <button data-corpus="state"  >State</button>
+    <button data-corpus="rcw"    >RCW</button>
+    <button data-corpus="wac"    >WAC</button>
+    <button data-corpus="federal">Federal</button>
+  </div>
+</header>
+
+<div id="messages">
+  <div class="welcome" id="welcome">
+    <div class="shield">🛡️</div>
+    <h2>Washington Law for Law Enforcement</h2>
+    <p class="tagline">Ask plain-language questions about Washington State and federal law. Answers cite specific RCW/WAC sections with links to the official source.</p>
+    <div class="examples">
+      <span class="example-chip">When is deadly force lawful under Washington law?</span>
+      <span class="example-chip">De-escalation requirements before using force</span>
+      <span class="example-chip">Duty to intervene — what does RCW 10.120.020 require?</span>
+      <span class="example-chip">Warrantless arrest authority under RCW 10.31</span>
+      <span class="example-chip">DV mandatory arrest — what triggers it?</span>
+      <span class="example-chip">CJTC officer certification requirements</span>
+      <span class="example-chip">First degree assault — elements of the offense</span>
+      <span class="example-chip">Public records exemptions for law enforcement</span>
+    </div>
+  </div>
+</div>
+
+<div id="input-area">
+  <textarea id="query" rows="1" placeholder="Ask about Washington law for law enforcement…"></textarea>
+  <button id="send-btn">Ask</button>
+</div>
+<div class="disclaimer">General legal information only — not legal advice. Consult your department legal advisor, city attorney, or prosecutor for specific situations.</div>
+
+<script>
+const messagesEl = document.getElementById('messages');
+const queryEl    = document.getElementById('query');
+const sendBtn    = document.getElementById('send-btn');
+
+let history = [];
+let corpus  = null;   // null = all corpora
+
+// ── Corpus toggle ─────────────────────────────────────────────────────────────
+document.querySelectorAll('.corpus-toggle button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.corpus-toggle button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    corpus = btn.dataset.corpus === 'null' ? null : btn.dataset.corpus;
+  });
+});
+
+// ── Example chips ─────────────────────────────────────────────────────────────
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('example-chip')) {
+    queryEl.value = e.target.textContent.trim();
+    queryEl.dispatchEvent(new Event('input'));
+    sendMessage();
+  }
+});
+
+// ── Auto-resize textarea ──────────────────────────────────────────────────────
+queryEl.addEventListener('input', () => {
+  queryEl.style.height = 'auto';
+  queryEl.style.height = Math.min(queryEl.scrollHeight, 120) + 'px';
+});
+queryEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+sendBtn.addEventListener('click', sendMessage);
+
+// ── DOM helpers ───────────────────────────────────────────────────────────────
+function removeWelcome() {
+  const w = document.getElementById('welcome');
+  if (w) w.remove();
+}
+
+function addMessage(role, text) {
+  removeWelcome();
+  const wrap   = document.createElement('div');
+  wrap.className = `message ${role}`;
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = text;
+  wrap.appendChild(bubble);
+  messagesEl.appendChild(wrap);
+  scrollBottom();
+  return { wrap, bubble };
+}
+
+function scrollBottom() {
+  messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
+}
+
+function renderSources(sources) {
+  if (!sources?.length) return null;
+  const block = document.createElement('div');
+  block.className = 'sources-block';
+  const label = document.createElement('div');
+  label.className = 'sources-label';
+  label.textContent = `Sources (${sources.length})`;
+  block.appendChild(label);
+  sources.forEach(s => {
+    const card = document.createElement('div');
+    card.className = 'source-card';
+
+    const badge = document.createElement('span');
+    badge.className = `corpus-badge ${s.corpus}`;
+    badge.textContent = s.corpus_label;
+
+    const link = document.createElement('a');
+    link.href   = s.source_url;
+    link.target = '_blank';
+    link.rel    = 'noopener noreferrer';
+    link.textContent = s.section_id;
+
+    const heading = document.createElement('span');
+    heading.className = 'source-heading';
+    heading.textContent = s.section_heading || s.chapter_name || '';
+
+    card.appendChild(badge);
+    card.appendChild(link);
+    card.appendChild(heading);
+
+    if (s.similarity_pct != null) {
+      const sim = document.createElement('span');
+      sim.className = 'sim-badge';
+      sim.textContent = `${s.similarity_pct}%`;
+      card.appendChild(sim);
+    }
+    block.appendChild(card);
+  });
+  return block;
+}
+
+// ── Send ──────────────────────────────────────────────────────────────────────
+async function sendMessage() {
+  const text = queryEl.value.trim();
+  if (!text || sendBtn.disabled) return;
+
+  queryEl.value = '';
+  queryEl.style.height = 'auto';
+  sendBtn.disabled = true;
+
+  addMessage('user', text);
+  history.push({ role: 'user', content: text });
+
+  const { wrap: botWrap, bubble: botBubble } = addMessage('bot', '');
+  botBubble.classList.add('markdown');
+
+  let fullText = '';
+  let sourcesRendered = false;
+  let metaDiv = null;
+
+  try {
+    const resp = await fetch('api-proxy.php?stream=1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query:    text,
+        corpus:   corpus,
+        messages: history.slice(-12),
+      }),
+    });
+
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+    const reader = resp.body.getReader();
+    const dec    = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+
+      let nl;
+      while ((nl = buf.indexOf('\n')) !== -1) {
+        const line = buf.slice(0, nl).trimEnd();
+        buf = buf.slice(nl + 1);
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6);
+        if (raw === '[DONE]') break;
+
+        let evt;
+        try { evt = JSON.parse(raw); } catch { continue; }
+
+        if (evt.error) { botBubble.textContent = 'Error: ' + evt.error; break; }
+
+        if (evt.sources && !sourcesRendered) {
+          const block = renderSources(evt.sources);
+          if (block) botWrap.appendChild(block);
+          sourcesRendered = true;
+          scrollBottom();
+        }
+
+        if (evt.text) {
+          fullText += evt.text;
+          botBubble.innerHTML = marked.parse(fullText);
+          scrollBottom();
+        }
+
+        if (evt.meta) {
+          const { inTokens, outTokens, resultCount } = evt.meta;
+          if (!metaDiv) {
+            metaDiv = document.createElement('div');
+            metaDiv.className = 'meta-badge';
+            botWrap.appendChild(metaDiv);
+          }
+          const parts = [`${resultCount ?? 0} sections`, `${outTokens} tok`];
+          if (inTokens) parts.push(`${inTokens} in`);
+          metaDiv.textContent = parts.join(' · ');
+        }
+      }
+    }
+  } catch (err) {
+    botBubble.textContent = 'Connection error: ' + err.message;
+  }
+
+  if (fullText) history.push({ role: 'assistant', content: fullText });
+  sendBtn.disabled = false;
+  queryEl.focus();
+  scrollBottom();
+}
+</script>
+</body>
+</html>

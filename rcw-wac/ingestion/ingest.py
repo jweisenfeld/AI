@@ -490,91 +490,102 @@ def crawl_wac(filter_titles: list[str] | None = None,
                     yield section
 
 
-# ── CFR crawler (eCFR website) ────────────────────────────────────────────────
+# ── CFR crawler (eCFR XML API) ────────────────────────────────────────────────
 #
-# eCFR URL hierarchy:
-#   /current/title-34/part-300          → full part page (all sections)
-#   /current/title-34/part-300/section-300.1 → individual section
+# eCFR provides a versioned XML API — the website is React-rendered so plain
+# HTTP requests only get empty HTML.  Download the full-title XML once, then
+# parse the requested part out of it (no per-section HTTP requests needed).
+#
+# XML structure (SGML-style DIV elements):
+#   DIV1  TYPE=TITLE
+#   └─ DIV5 TYPE=PART N="300"
+#      └─ DIV8 TYPE=SECTION N="300.1"
+#         ├─ HEAD  (section heading)
+#         └─ P / FP  (paragraph text)
 #
 # --titles 34 --chapters 300  →  34 CFR Part 300 (IDEA regulations)
 # section_id format: '34 CFR § 300.1'
-#
-# If --dry-run shows 0 sections, eCFR changed its URL structure.
-# Open the part URL in a browser and update cfr_list_sections() selectors.
 
-def cfr_list_sections(title_num: str, part_num: str) -> list[str]:
-    """Return section numbers for a CFR title/part from eCFR."""
-    url = f'{CFR_BASE}/title-{title_num}/part-{part_num}'
-    html = fetch(url)
-    if not html:
+CFR_XML_API = 'https://www.ecfr.gov/api/versioned'
+
+
+def cfr_fetch_title_xml(title_num: str) -> str | None:
+    """Download eCFR full-title XML. Tries today's date then known-good fallback dates."""
+    from datetime import date
+    today = date.today().strftime('%Y-%m-%d')
+    for d in [today, '2025-01-01', '2024-10-01', '2024-01-01']:
+        url = f'{CFR_XML_API}/{d}/title-{title_num}.xml'
+        xml = fetch(url)
+        if xml and len(xml) > 5000:
+            return xml
+    return None
+
+
+def cfr_parse_part(xml: str, title_num: str, part_num: str,
+                   title_name: str, part_name: str) -> list[dict]:
+    """Parse all sections from one CFR part out of the full-title XML."""
+    soup = BeautifulSoup(xml, 'lxml-xml')
+
+    # eCFR XML: parts are DIV5 with TYPE="PART" and N=part number
+    part = (
+        soup.find('DIV5', attrs={'N': part_num, 'TYPE': 'PART'}) or
+        soup.find('DIV5', attrs={'N': part_num})
+    )
+    if not part:
+        # Fallback: find any DIV whose HEAD contains "PART {part_num}"
+        for div in soup.find_all(re.compile(r'^DIV\d+$')):
+            head = div.find('HEAD')
+            if head and re.search(rf'\bPART\s+{re.escape(part_num)}\b', head.get_text()):
+                part = div
+                break
+
+    if not part:
         return []
-    soup = BeautifulSoup(html, 'html.parser')
-    # eCFR section links: href ends with /section-300.1 or /section-300.1a
-    pattern = re.compile(r'/section-(\d+\.\d+\w*)$', re.I)
-    seen: set[str] = set()
-    sections: list[str] = []
-    for a in soup.find_all('a', href=pattern):
-        m = pattern.search(a['href'])
-        if m:
-            num = m.group(1)
-            if num not in seen:
-                seen.add(num)
-                sections.append(num)
+
+    sections = []
+    for sec in part.find_all('DIV8'):
+        sec_n = sec.get('N', '')
+        if not sec_n:
+            continue
+
+        head = sec.find('HEAD')
+        heading = head.get_text(' ', strip=True) if head else ''
+        # Strip leading "§ 300.1" citation from heading
+        heading = re.sub(r'^§\s*[\d\.]+\w*\.?\s*', '', heading).strip()
+
+        paras = [p.get_text(' ', strip=True) for p in sec.find_all(['P', 'FP'])
+                 if p.get_text(strip=True)]
+        content = '\n'.join(paras).strip()
+        content = re.sub(r'\s{3,}', '\n', content)
+
+        if not content or len(content) < 30:
+            continue
+
+        section_id = f'{title_num} CFR § {sec_n}'
+        if not heading:
+            heading = _heading_from_content(section_id, content)
+
+        source_url = f'{CFR_BASE}/title-{title_num}/part-{part_num}/section-{sec_n}'
+        sections.append({
+            'corpus':          'cfr',
+            'title_num':       title_num,
+            'title_name':      title_name,
+            'chapter_num':     part_num,
+            'chapter_name':    part_name,
+            'section_num':     sec_n,
+            'section_id':      section_id,
+            'section_heading': heading,
+            'content':         content,
+            'source_url':      source_url,
+        })
+
     return sections
-
-
-def cfr_fetch_section(title_num: str, part_num: str, section_num: str,
-                       title_name: str, part_name: str) -> dict | None:
-    """Fetch one CFR section from eCFR."""
-    url = f'{CFR_BASE}/title-{title_num}/part-{part_num}/section-{section_num}'
-    html = fetch(url)
-    if not html:
-        return None
-    soup = BeautifulSoup(html, 'html.parser')
-
-    heading = ''
-    # eCFR wraps section headings in various tags depending on version
-    for selector in ('h4.section-head', 'h3.section-head', 'h4', 'h3'):
-        h = soup.select_one(selector)
-        if h:
-            heading = h.get_text(' ', strip=True)
-            heading = re.sub(r'^§\s*[\d\.]+\w*\s+', '', heading).strip()
-            break
-
-    content = ''
-    for selector in ('.section-content', '.section-body', 'div[class*="section"]',
-                     '#content', 'main article', 'main'):
-        div = soup.select_one(selector)
-        if div:
-            content = div.get_text('\n', strip=True)
-            break
-
-    content = re.sub(r'\s{3,}', '\n', content).strip()
-    if not content or len(content) < 30:
-        return None
-
-    section_id = f'{title_num} CFR § {section_num}'
-    if not heading:
-        heading = _heading_from_content(section_id, content)
-
-    return {
-        'corpus':          'cfr',
-        'title_num':       title_num,
-        'title_name':      title_name,
-        'chapter_num':     part_num,
-        'chapter_name':    part_name,
-        'section_num':     section_num,
-        'section_id':      section_id,
-        'section_heading': heading,
-        'content':         content,
-        'source_url':      url,
-    }
 
 
 def crawl_cfr(filter_titles: list[str] | None = None,
               filter_chapters: list[str] | None = None) -> Generator[dict, None, None]:
     """
-    Crawl CFR parts from eCFR website.
+    Crawl CFR parts from the eCFR versioned XML API.
     Requires --titles (CFR title number, e.g. 34) and --chapters (part number, e.g. 300).
     Example: --corpus cfr --titles 34 --chapters 300
     """
@@ -589,16 +600,19 @@ def crawl_cfr(filter_titles: list[str] | None = None,
 
     for title_num in filter_titles:
         title_name = f'CFR Title {title_num}'
+        print(f'\n  Downloading CFR Title {title_num} XML (may take 10–30 s)...')
+        xml = cfr_fetch_title_xml(title_num)
+        if not xml:
+            print(f'  ERROR: Could not fetch CFR Title {title_num} XML', file=sys.stderr)
+            continue
+        print(f'  XML downloaded ({len(xml):,} bytes).')
+
         for part_num in filter_chapters:
             part_name = f'Part {part_num}'
             print(f'\n  CFR Title {title_num} Part {part_num}')
-            sections = cfr_list_sections(title_num, part_num)
+            sections = cfr_parse_part(xml, title_num, part_num, title_name, part_name)
             print(f'    {len(sections)} sections')
-            for sec_num in sections:
-                section = cfr_fetch_section(title_num, part_num, sec_num,
-                                            title_name, part_name)
-                if section:
-                    yield section
+            yield from sections
 
 
 # ── USC crawler (Cornell LII) ─────────────────────────────────────────────────
@@ -609,25 +623,41 @@ def crawl_cfr(filter_titles: list[str] | None = None,
 #
 # --titles 20 --chapters 33  →  20 USC Chapter 33 (IDEA statute)
 # section_id format: '20 USC § 1415'
+#
+# Cornell LII chapter pages organize sections under subchapters, so direct
+# section links may not appear on the chapter listing page.  USC_CHAPTER_SECTIONS
+# provides known ranges as a fallback for important chapters.
+
+USC_CHAPTER_SECTIONS: dict[tuple[str, str], list[str]] = {
+    # IDEA — Individuals with Disabilities Education Act, 20 USC Chapter 33
+    ('20', '33'): [str(n) for n in range(1400, 1483)],
+}
+
 
 def usc_list_sections(title_num: str, chapter_num: str) -> list[str]:
     """Return section numbers for a USC title/chapter from Cornell LII."""
     url = f'{USC_BASE}/{title_num}/chapter-{chapter_num}'
     html = fetch(url)
-    if not html:
-        return []
-    soup = BeautifulSoup(html, 'html.parser')
-    # Section links: /uscode/text/20/1415 or /uscode/text/20/1415a
-    pattern = re.compile(r'^/uscode/text/' + re.escape(title_num) + r'/(\d+\w*)$', re.I)
-    seen: set[str] = set()
     sections: list[str] = []
-    for a in soup.find_all('a', href=pattern):
-        m = pattern.search(a['href'])
-        if m:
-            num = m.group(1)
-            if num not in seen:
-                seen.add(num)
-                sections.append(num)
+
+    if html:
+        soup = BeautifulSoup(html, 'html.parser')
+        pattern = re.compile(r'^/uscode/text/' + re.escape(title_num) + r'/(\d+\w*)$', re.I)
+        seen: set[str] = set()
+        for a in soup.find_all('a', href=pattern):
+            m = pattern.search(a['href'])
+            if m:
+                num = m.group(1)
+                if num not in seen:
+                    seen.add(num)
+                    sections.append(num)
+
+    if not sections:
+        key = (title_num, chapter_num)
+        if key in USC_CHAPTER_SECTIONS:
+            print(f'  (Using known section range for {title_num} USC Chapter {chapter_num})')
+            sections = USC_CHAPTER_SECTIONS[key]
+
     return sections
 
 
@@ -641,20 +671,29 @@ def usc_fetch_section(title_num: str, section_num: str,
     soup = BeautifulSoup(html, 'html.parser')
 
     heading = ''
-    for selector in ('h2.usc-title-head', '.lii-heading h2', 'h2', 'h3'):
+    for selector in ('h1.lii-title', 'h2.usc-title-head', '.lii-heading h2',
+                     '#main-content h1', 'h1', 'h2', 'h3'):
         h = soup.select_one(selector)
         if h:
             heading = h.get_text(' ', strip=True)
+            # Strip leading "§ 1415" or "20 U.S.C. § 1415" citation prefix
             heading = re.sub(r'^§\s*\d+\w*\.?\s*', '', heading).strip()
-            break
+            heading = re.sub(r'^\d+\s+U\.?\s*S\.?\s*C\.?\s*§\s*\d+\w*\.?\s*', '',
+                             heading, flags=re.I).strip()
+            if heading:
+                break
 
     content = ''
-    for selector in ('#main-text', '.primary-content', 'article.lii-content',
-                     'article', 'main'):
+    for selector in ('#main-text', '.primary-content', '#primary-content',
+                     '#main-content .col-sm-9', '#content .col-sm-9',
+                     'article.lii-content', '#main-content', 'article', 'main'):
         div = soup.select_one(selector)
         if div:
+            for nav in div.find_all(['nav', 'aside']):
+                nav.decompose()
             content = div.get_text('\n', strip=True)
-            break
+            if len(content) >= 30:
+                break
 
     content = re.sub(r'\s{3,}', '\n', content).strip()
     if not content or len(content) < 30:

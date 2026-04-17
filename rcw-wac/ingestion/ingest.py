@@ -64,7 +64,7 @@ EMBEDDING_MODEL  = 'text-embedding-3-small'
 MAX_CHUNK_TOKENS = 800
 OVERLAP_TOKENS   = 100
 EMBED_BATCH_SIZE = 100
-INSERT_BATCH     = 250
+INSERT_BATCH     = 25    # small batches — Supabase HNSW index update times out on large batches
 
 # Polite crawl delay — the legislature server is publicly funded; be a good citizen
 CRAWL_DELAY_SEC  = 0.4   # seconds between HTTP requests
@@ -952,6 +952,10 @@ def main():
         'usc': crawl_usc,
     }[args.corpus](filter_titles, filter_chapters)
 
+    # Fetch existing hashes once — avoids a full-table SELECT on every flush
+    # (that SELECT gets slower as the table grows to thousands of rows).
+    existing_hashes: set[str] = fetch_existing_hashes(sb) if sb else set()
+
     all_chunks: list[dict] = []
     section_count = 0
 
@@ -962,10 +966,10 @@ def main():
         print(f'  {section["section_id"]} ({len(chunks)} chunk(s), {section_count} sections so far)',
               end='\r', flush=True)
 
-        # Stream inserts: embed + insert in batches during crawl to save memory
-        # and survive interruption (already-inserted chunks are deduped on restart).
-        if not args.dry_run and len(all_chunks) >= 500:
-            _flush_chunks(all_chunks, oa, sb)
+        # Stream inserts in small batches to stay under Supabase statement timeout.
+        if not args.dry_run and len(all_chunks) >= 200:
+            new_hashes = _flush_chunks(all_chunks, oa, sb, existing_hashes)
+            existing_hashes.update(new_hashes)
             all_chunks = []
 
     print(f'\nCrawl complete: {section_count} sections → {len(all_chunks)} remaining chunks')
@@ -992,7 +996,7 @@ def main():
         return
 
     if all_chunks:
-        _flush_chunks(all_chunks, oa, sb)
+        _flush_chunks(all_chunks, oa, sb, existing_hashes)
 
     print('\nIngestion complete.')
     if sb:
@@ -1003,16 +1007,16 @@ def main():
                   f'{d.get("wac_chunks",0)} WAC chunks')
 
 
-def _flush_chunks(chunks: list[dict], oa, sb):
-    """Embed and upsert a batch of chunks. Dedup by content_hash to skip unchanged rows."""
-    existing_hashes = fetch_existing_hashes(sb)
+def _flush_chunks(chunks: list[dict], oa, sb, existing_hashes: set[str]) -> set[str]:
+    """Embed and upsert new chunks. Returns hashes of chunks that were inserted."""
     new_chunks = [c for c in chunks if c['content_hash'] not in existing_hashes]
     if not new_chunks:
-        return
+        return set()
 
     print(f'\nEmbedding {len(new_chunks)} chunks...')
     embeddings = embed_texts(oa, [c['content'] for c in new_chunks])
     insert_chunks(sb, new_chunks, embeddings)
+    return {c['content_hash'] for c in new_chunks}
 
 
 if __name__ == '__main__':

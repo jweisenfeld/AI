@@ -545,7 +545,7 @@ def insert_chunks(sb, chunks: list[dict], embeddings: list[list[float]]) -> int:
             'content_hash':    c['content_hash'],
             'embedding':       emb,
         } for c, emb in zip(batch, batch_embs)]
-        sb.table('rcw_wac_chunks').insert(rows).execute()
+        sb.table('rcw_wac_chunks').upsert(rows, on_conflict='section_id,chunk_index').execute()
         inserted += len(rows)
         print(f'  Inserted {inserted}/{len(chunks)} rows...', end='\r', flush=True)
     print()

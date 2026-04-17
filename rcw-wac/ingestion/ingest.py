@@ -45,8 +45,12 @@ from typing import Generator
 import requests
 import tiktoken
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 from openai import OpenAI
 from supabase import create_client
+
+# Load .env from the same directory as this script (rcw-wac/ingestion/.env)
+load_dotenv(Path(__file__).parent / '.env')
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 

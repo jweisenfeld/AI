@@ -612,31 +612,25 @@ async function loadAboutData() {
       cfr: 'Code of Federal Regs',
     };
 
-    // rows is an array; build lookup by corpus
-    const byCorpus = {};
-    (Array.isArray(rows) ? rows : []).forEach(r => {
-      byCorpus[r.corpus] = r;
-    });
+    // stats() returns a single flat row: {rcw_chunks, wac_chunks, usc_chunks, cfr_chunks, ...}
+    const r = Array.isArray(rows) ? rows[0] : rows;
 
     const grid = document.createElement('div');
     grid.className = 'stats-grid';
 
     order.forEach(c => {
-      const r = byCorpus[c] || {};
-      const card = document.createElement('div');
+      const card   = document.createElement('div');
       card.className = `stat-card ${c}-card`;
-      const chunks   = (r.chunks   ?? r.chunk_count   ?? '—').toLocaleString?.() ?? (r.chunks ?? '—');
-      const sections = (r.sections ?? r.section_count ?? r.section_ids ?? '—');
-      const sectStr  = typeof sections === 'number' ? sections.toLocaleString() : sections;
+      const chunks = r[`${c}_chunks`] ?? '—';
+      const titles = r[`${c}_titles`] ?? null;
       card.innerHTML = `
         <div class="stat-label">${labels[c]}</div>
         <div class="stat-num">${typeof chunks === 'number' ? chunks.toLocaleString() : chunks}</div>
-        <div class="stat-sub">${sectStr !== '—' ? sectStr + ' sections' : descs[c]}</div>`;
+        <div class="stat-sub">${titles !== null ? titles + ' titles' : descs[c]}</div>`;
       grid.appendChild(card);
     });
 
-    // total
-    const total = Object.values(byCorpus).reduce((s, r) => s + (r.chunks ?? r.chunk_count ?? 0), 0);
+    const total = r.total_chunks ?? 0;
     const totalCard = document.createElement('div');
     totalCard.className = 'stat-card';
     totalCard.style.gridColumn = '1 / -1';

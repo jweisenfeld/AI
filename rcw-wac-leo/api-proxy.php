@@ -142,6 +142,34 @@ if (isset($_GET['prompt'])) {
     exit;
 }
 
+// ?catalog=rcw|wac|usc|cfr — titles/chapters ingested for that corpus
+if (isset($_GET['catalog'])) {
+    header('Content-Type: application/json');
+    $corp = $_GET['catalog'];
+    if (!in_array($corp, ['rcw','wac','usc','cfr'], true)) {
+        echo json_encode(['error' => 'Invalid corpus']); exit;
+    }
+    $secrets = load_secrets($secretsFile);
+    $url = rtrim($secrets['SUPABASE_URL'] ?? '', '/') . '/rest/v1/rpc/rcw_wac_catalog';
+    $ch  = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 15,
+        CURLOPT_HTTPHEADER     => [
+            'Content-Type: application/json',
+            'apikey: '               . ($secrets['SUPABASE_ANON_KEY'] ?? ''),
+            'Authorization: Bearer ' . ($secrets['SUPABASE_ANON_KEY'] ?? ''),
+        ],
+        CURLOPT_POSTFIELDS => json_encode(['filter_corpus' => $corp]),
+    ]);
+    $result   = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    echo ($result && $httpCode === 200) ? $result : json_encode(['error' => "HTTP $httpCode"]);
+    exit;
+}
+
 if (isset($_GET['stream']) && $_GET['stream'] === 'test') {
     start_sse();
     foreach (['LEO', 'reference', 'streaming', 'OK!'] as $w) {

@@ -421,6 +421,75 @@
   .tech-notes dt { font-weight: 700; color: var(--primary-md); float: left; min-width: 130px; }
   .tech-notes dd { margin-left: 130px; margin-bottom: 5px; }
   .stats-loading { color: #8a9aaa; font-size: .82rem; font-style: italic; }
+
+  /* ── Stat cards clickable ───────────────────────────────────────────────── */
+  .stat-card.clickable { cursor: pointer; transition: box-shadow .15s, transform .1s; }
+  .stat-card.clickable:hover { box-shadow: 0 3px 12px rgba(0,0,0,.15); transform: translateY(-1px); }
+
+  /* ── Catalog modal ──────────────────────────────────────────────────────── */
+  #catalog-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.55);
+    z-index: 1100;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  #catalog-overlay.open { display: flex; }
+  #catalog-modal {
+    background: #fff;
+    border-radius: 12px;
+    max-width: 580px;
+    width: 100%;
+    max-height: 85dvh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0,0,0,.25);
+    overflow: hidden;
+  }
+  .catalog-header {
+    background: var(--primary);
+    color: #fff;
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid var(--accent);
+    flex-shrink: 0;
+  }
+  .catalog-header h2 { font-size: .95rem; font-weight: 700; }
+  #catalog-close {
+    background: none; border: none; color: #8aaccc;
+    font-size: 1.3rem; cursor: pointer; line-height: 1; padding: 0 4px;
+  }
+  #catalog-close:hover { color: #fff; }
+  #catalog-body {
+    overflow-y: auto;
+    padding: 14px 18px;
+    font-size: .82rem;
+  }
+  .cat-title-block { margin-bottom: 14px; }
+  .cat-title-header {
+    font-weight: 700;
+    color: var(--primary);
+    font-size: .83rem;
+    padding: 5px 0 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+  .cat-chapter {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 3px 6px;
+    border-radius: 4px;
+  }
+  .cat-chapter:hover { background: var(--source-bg); }
+  .cat-chap-num  { color: var(--primary-md); font-weight: 700; flex-shrink: 0; min-width: 90px; }
+  .cat-chap-name { color: #3a4a5a; flex: 1; }
+  .cat-chap-ct   { color: #8a9aaa; font-size: .72rem; flex-shrink: 0; }
+  .cat-summary   { font-size: .75rem; color: #8a9aaa; margin-bottom: 10px; }
 </style>
 </head>
 <body>
@@ -515,6 +584,17 @@
   </div>
 </div>
 
+<!-- ── Catalog Modal ───────────────────────────────────────────────────────── -->
+<div id="catalog-overlay" role="dialog" aria-modal="true">
+  <div id="catalog-modal">
+    <div class="catalog-header">
+      <h2 id="catalog-title">Ingested Sections</h2>
+      <button id="catalog-close" aria-label="Close">✕</button>
+    </div>
+    <div id="catalog-body"></div>
+  </div>
+</div>
+
 <div id="messages">
   <div class="welcome" id="welcome">
     <div class="shield">🛡️</div>
@@ -526,9 +606,9 @@
       <span class="example-chip">Duty to intervene — what does RCW 10.120.020 require?</span>
       <span class="example-chip">Warrantless arrest authority under RCW 10.31</span>
       <span class="example-chip">DV mandatory arrest — what triggers it?</span>
-      <span class="example-chip">CJTC officer certification requirements</span>
-      <span class="example-chip">First degree assault — elements of the offense</span>
       <span class="example-chip">Public records exemptions for law enforcement</span>
+      <span class="example-chip">¿Cuándo puede la policía registrar un vehículo sin orden judicial?</span>
+      <span class="example-chip">Un menor sirviendo alcohol en una fiesta privada — ¿qué RCW aplica?</span>
     </div>
   </div>
 </div>
@@ -620,7 +700,9 @@ async function loadAboutData() {
 
     order.forEach(c => {
       const card   = document.createElement('div');
-      card.className = `stat-card ${c}-card`;
+      card.className = `stat-card ${c}-card clickable`;
+      card.dataset.corpus = c;
+      card.title = `Click to browse ingested ${labels[c]} titles & chapters`;
       const chunks = r[`${c}_chunks`] ?? '—';
       const titles = r[`${c}_titles`] ?? null;
       card.innerHTML = `
@@ -666,6 +748,105 @@ copyPromptBtn.addEventListener('click', () => {
   });
 });
 
+// ── Catalog modal ─────────────────────────────────────────────────────────────
+const catalogOverlay = document.getElementById('catalog-overlay');
+const catalogTitle   = document.getElementById('catalog-title');
+const catalogBody    = document.getElementById('catalog-body');
+const catalogClose   = document.getElementById('catalog-close');
+
+const corpusLabels = { rcw:'RCW', wac:'WAC', usc:'USC', cfr:'CFR' };
+const catalogCache = {};
+
+function openCatalog(corpus) {
+  catalogTitle.textContent = `${corpusLabels[corpus] ?? corpus.toUpperCase()} — Ingested Titles & Chapters`;
+  catalogBody.innerHTML = '<div style="padding:20px;color:#8a9aaa;font-style:italic">Loading…</div>';
+  catalogOverlay.classList.add('open');
+  loadCatalog(corpus);
+}
+function closeCatalog() { catalogOverlay.classList.remove('open'); }
+
+catalogClose.addEventListener('click', closeCatalog);
+catalogOverlay.addEventListener('click', e => { if (e.target === catalogOverlay) closeCatalog(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCatalog(); });
+
+async function loadCatalog(corpus) {
+  if (catalogCache[corpus]) { renderCatalog(catalogCache[corpus]); return; }
+  try {
+    const resp = await fetch(`api-proxy.php?catalog=${corpus}`);
+    const rows = await resp.json();
+    if (rows.error) throw new Error(rows.error);
+    catalogCache[corpus] = rows;
+    renderCatalog(rows);
+  } catch (err) {
+    catalogBody.innerHTML = `<div style="padding:20px;color:#c0392b">Error: ${err.message}</div>`;
+  }
+}
+
+function renderCatalog(rows) {
+  if (!rows.length) {
+    catalogBody.innerHTML = '<div style="padding:20px;color:#8a9aaa">No sections ingested yet.</div>';
+    return;
+  }
+
+  // Group by title
+  const titleMap = new Map();
+  let totalChunks = 0;
+  rows.forEach(r => {
+    const key = r.title_num ?? '';
+    if (!titleMap.has(key)) titleMap.set(key, { title_name: r.title_name ?? '', chapters: [] });
+    titleMap.get(key).chapters.push(r);
+    totalChunks += Number(r.chunk_count ?? 0);
+  });
+
+  const summary = document.createElement('div');
+  summary.className = 'cat-summary';
+  summary.textContent = `${titleMap.size} title${titleMap.size !== 1 ? 's' : ''} · ${rows.length} chapter${rows.length !== 1 ? 's' : ''} · ${totalChunks.toLocaleString()} chunks`;
+
+  const container = document.createElement('div');
+  titleMap.forEach(({ title_name, chapters }, titleNum) => {
+    const block = document.createElement('div');
+    block.className = 'cat-title-block';
+
+    const header = document.createElement('div');
+    header.className = 'cat-title-header';
+    // title_name is often "Title 10" — skip it if it's just a restatement of title_num
+    const genericTitle = `Title ${titleNum}`;
+    const realTitleName = (title_name && title_name !== genericTitle) ? title_name : '';
+    header.textContent = titleNum
+      ? (realTitleName ? `${genericTitle} — ${realTitleName}` : genericTitle)
+      : (title_name || 'Untitled');
+    block.appendChild(header);
+
+    chapters.forEach(c => {
+      const row = document.createElement('div');
+      row.className = 'cat-chapter';
+      // chapter_name often equals chapter_num — suppress it when redundant
+      const chapName = (c.chapter_name && c.chapter_name !== c.chapter_num) ? c.chapter_name : '';
+      row.innerHTML = `
+        <span class="cat-chap-num">${c.chapter_num ?? '—'}</span>
+        <span class="cat-chap-name">${chapName}</span>
+        <span class="cat-chap-ct">${Number(c.chunk_count).toLocaleString()} chunks</span>`;
+      block.appendChild(row);
+    });
+    container.appendChild(block);
+  });
+
+  catalogBody.innerHTML = '';
+  catalogBody.appendChild(summary);
+  catalogBody.appendChild(container);
+}
+
+// Make About stat cards open the catalog
+document.addEventListener('click', e => {
+  const card = e.target.closest('.stat-card.clickable');
+  if (card?.dataset.corpus) openCatalog(card.dataset.corpus);
+
+  // Also trigger from corpus badges on source cards in chat
+  if (e.target.classList.contains('corpus-badge') && e.target.dataset.corpus) {
+    openCatalog(e.target.dataset.corpus);
+  }
+});
+
 // ── DOM helpers ───────────────────────────────────────────────────────────────
 function removeWelcome() {
   const w = document.getElementById('welcome');
@@ -703,6 +884,9 @@ function renderSources(sources) {
 
     const badge = document.createElement('span');
     badge.className = `corpus-badge ${s.corpus}`;
+    badge.dataset.corpus = s.corpus;
+    badge.title = `Browse all ingested ${s.corpus_label} sections`;
+    badge.style.cursor = 'pointer';
     badge.textContent = s.corpus_label;
 
     const link = document.createElement('a');

@@ -53,33 +53,35 @@ def get_supabase():
     return create_client(url, key)
 
 
+def _paginated_select(sb, corpus: str, col: str, title_num: str | None = None) -> list[str]:
+    """Fetch one column for a corpus (and optional title) with automatic pagination."""
+    PAGE = 1000
+    offset = 0
+    values: list[str] = []
+    while True:
+        q = sb.table('rcw_wac_chunks').select(col).eq('corpus', corpus)
+        if title_num:
+            q = q.eq('title_num', title_num)
+        rows = q.range(offset, offset + PAGE - 1).execute().data or []
+        values.extend(r[col] for r in rows)
+        if len(rows) < PAGE:
+            break
+        offset += PAGE
+    return values
+
+
 def db_chapter_counts(sb, corpus: str, title_num: str) -> dict[str, int]:
     """Return {chapter_num: chunk_count} for a corpus/title currently in DB."""
-    result = (
-        sb.table('rcw_wac_chunks')
-          .select('chapter_num')
-          .eq('corpus', corpus)
-          .eq('title_num', title_num)
-          .execute()
-    )
     counts: dict[str, int] = {}
-    for row in (result.data or []):
-        c = row['chapter_num']
+    for c in _paginated_select(sb, corpus, 'chapter_num', title_num):
         counts[c] = counts.get(c, 0) + 1
     return counts
 
 
 def db_title_counts(sb, corpus: str) -> dict[str, int]:
     """Return {title_num: chunk_count} for an entire corpus."""
-    result = (
-        sb.table('rcw_wac_chunks')
-          .select('title_num')
-          .eq('corpus', corpus)
-          .execute()
-    )
     counts: dict[str, int] = {}
-    for row in (result.data or []):
-        t = row['title_num']
+    for t in _paginated_select(sb, corpus, 'title_num'):
         counts[t] = counts.get(t, 0) + 1
     return counts
 

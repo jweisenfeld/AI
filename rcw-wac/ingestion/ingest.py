@@ -64,7 +64,7 @@ EMBEDDING_MODEL  = 'text-embedding-3-small'
 MAX_CHUNK_TOKENS = 800
 OVERLAP_TOKENS   = 100
 EMBED_BATCH_SIZE = 100
-INSERT_BATCH     = 25    # small batches — Supabase HNSW index update times out on large batches
+INSERT_BATCH     = 10    # small batches — HNSW index update time grows with table size
 
 # Polite crawl delay — the legislature server is publicly funded; be a good citizen
 CRAWL_DELAY_SEC  = 0.4   # seconds between HTTP requests

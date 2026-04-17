@@ -157,7 +157,11 @@ class RcwWacProxy
         foreach ($results as $i => $r) {
             $sectionId   = $r['section_id']      ?? '';
             $heading     = $r['section_heading'] ?? '';
-            $corpusLabel = strtoupper($r['corpus'] ?? '');
+            $corpusLabel = match($r['corpus'] ?? '') {
+                'rcw' => 'RCW', 'wac' => 'WAC',
+                'usc' => 'USC', 'cfr' => 'CFR',
+                default => strtoupper($r['corpus'] ?? ''),
+            };
             $titleName   = $r['title_name']   ?? '';
             $chapterName = $r['chapter_name'] ?? '';
             $content     = $r['content']      ?? '';

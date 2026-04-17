@@ -851,6 +851,7 @@ def fetch_existing_hashes(sb) -> set[str]:
 
 
 def insert_chunks(sb, chunks: list[dict], embeddings: list[list[float]]) -> int:
+    import time
     inserted = 0
     for i in range(0, len(chunks), INSERT_BATCH):
         batch      = chunks[i:i + INSERT_BATCH]
@@ -871,7 +872,16 @@ def insert_chunks(sb, chunks: list[dict], embeddings: list[list[float]]) -> int:
             'content_hash':    c['content_hash'],
             'embedding':       emb,
         } for c, emb in zip(batch, batch_embs)]
-        sb.table('rcw_wac_chunks').upsert(rows, on_conflict='section_id,chunk_index').execute()
+        for attempt in range(5):
+            try:
+                sb.table('rcw_wac_chunks').upsert(rows, on_conflict='section_id,chunk_index').execute()
+                break
+            except Exception as e:
+                if attempt == 4:
+                    raise
+                wait = 2 ** attempt   # 1s, 2s, 4s, 8s
+                print(f'\n  Insert failed ({e}), retrying in {wait}s...')
+                time.sleep(wait)
         inserted += len(rows)
         print(f'  Inserted {inserted}/{len(chunks)} rows...', end='\r', flush=True)
     print()

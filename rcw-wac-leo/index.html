@@ -809,15 +809,22 @@ function renderCatalog(rows) {
 
     const header = document.createElement('div');
     header.className = 'cat-title-header';
-    header.textContent = titleNum ? `Title ${titleNum}${title_name ? ' — ' + title_name : ''}` : (title_name || 'Untitled');
+    // title_name is often "Title 10" — skip it if it's just a restatement of title_num
+    const genericTitle = `Title ${titleNum}`;
+    const realTitleName = (title_name && title_name !== genericTitle) ? title_name : '';
+    header.textContent = titleNum
+      ? (realTitleName ? `${genericTitle} — ${realTitleName}` : genericTitle)
+      : (title_name || 'Untitled');
     block.appendChild(header);
 
     chapters.forEach(c => {
       const row = document.createElement('div');
       row.className = 'cat-chapter';
+      // chapter_name often equals chapter_num — suppress it when redundant
+      const chapName = (c.chapter_name && c.chapter_name !== c.chapter_num) ? c.chapter_name : '';
       row.innerHTML = `
         <span class="cat-chap-num">${c.chapter_num ?? '—'}</span>
-        <span class="cat-chap-name">${c.chapter_name ?? ''}</span>
+        <span class="cat-chap-name">${chapName}</span>
         <span class="cat-chap-ct">${Number(c.chunk_count).toLocaleString()} chunks</span>`;
       block.appendChild(row);
     });

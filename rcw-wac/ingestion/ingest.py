@@ -97,6 +97,11 @@ SESSION.headers['User-Agent'] = (
     '(educational use; contact: see psd1.net)'
 )
 
+def _strip_pdf_links(text: str) -> str:
+    """Remove 'PDF RCW/WAC X.X.X' download-link artifacts from scraped text."""
+    return re.sub(r'\bPDF\s+(?:RCW|WAC)\s+[\d][.\dA-Za-z\-]*\s*', '', text, flags=re.I).strip()
+
+
 def fetch(url: str, params: dict | None = None, retries: int = 3) -> str | None:
     """Fetch a URL, return text or None on permanent failure."""
     for attempt in range(retries):
@@ -214,7 +219,7 @@ def rcw_fetch_section(cite: str, title_num: str, title_name: str,
         h = soup.find(tag)
         if h:
             heading = h.get_text(' ', strip=True)
-            # Remove citation prefix ("RCW 28A.400.010") from heading text
+            heading = _strip_pdf_links(heading)
             heading = re.sub(r'^RCW\s+[\d\.]+\s*[-—]\s*', '', heading).strip()
             break
 
@@ -234,6 +239,7 @@ def rcw_fetch_section(cite: str, title_num: str, title_name: str,
             paragraphs = [p.get_text(' ', strip=True) for p in main.find_all('p') if p.get_text(strip=True)]
             content = '\n'.join(paragraphs)
 
+    content = _strip_pdf_links(content)
     content = re.sub(r'\s{3,}', '\n', content).strip()
     content = re.sub(r'^\[.*?\]\s*', '', content)   # strip bracketed notes at start
 
@@ -377,6 +383,7 @@ def wac_fetch_section(cite: str, title_num: str, title_name: str,
         h = soup.find(tag)
         if h:
             heading = h.get_text(' ', strip=True)
+            heading = _strip_pdf_links(heading)
             heading = re.sub(r'^WAC\s+[\d\-]+\s*[-—]\s*', '', heading).strip()
             break
 
@@ -394,6 +401,7 @@ def wac_fetch_section(cite: str, title_num: str, title_name: str,
             paragraphs = [p.get_text(' ', strip=True) for p in main.find_all('p') if p.get_text(strip=True)]
             content = '\n'.join(paragraphs)
 
+    content = _strip_pdf_links(content)
     content = re.sub(r'\s{3,}', '\n', content).strip()
     if not content or len(content) < 30:
         return None

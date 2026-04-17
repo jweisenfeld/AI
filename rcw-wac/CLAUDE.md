@@ -36,8 +36,9 @@ Round-trip time: ~1s for embed+search, then streaming starts immediately.
 
 ## Database
 
-Same Supabase project as OHS Memory (`qawqovyqnvlcyuxezmrp.supabase.co`).
-New tables: `rcw_wac_chunks`, `rcw_wac_query_log`.
+Dedicated Supabase project: `ogcmyupxiykyngzeftwy.supabase.co`
+(separate from OHS Memory — different audience, different security posture)
+Tables: `rcw_wac_chunks`, `rcw_wac_query_log`.
 
 **`rcw_wac_chunks`** — one row per text chunk:
 - `corpus`: `'rcw'` | `'wac'`
@@ -51,11 +52,11 @@ Filter params: `filter_corpus`, `filter_title`, `min_similarity`.
 
 ## Secrets
 
-Uses `../.secrets/ohskey.php` (shared with ohs-search). Keys needed:
+Uses `../.secrets/rcwkey.php` (its own file, NOT ohskey.php). Keys needed:
 - `ANTHROPIC_API_KEY`
 - `OPENAI_API_KEY`
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
+- `SUPABASE_URL`       — https://ogcmyupxiykyngzeftwy.supabase.co
+- `SUPABASE_ANON_KEY`  — legacy `eyJ...` JWT anon key (NOT the new sb_publishable_ key)
 
 ## Deployment
 

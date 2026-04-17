@@ -1,12 +1,11 @@
 -- ============================================================
 -- RCW/WAC Legal RAG — Database Schema
 --
--- Lives in the SAME Supabase project as OHS Memory.
--- Tables are prefixed rcw_ to avoid name collisions.
+-- Dedicated Supabase project (separate from OHS Memory).
+-- Project: rcw-wac (ogcmyupxiykyngzeftwy.supabase.co)
 --
 -- Usage:
 --   Supabase SQL Editor: paste entire file, click Run
---   psql: psql $DATABASE_URL -f schema.sql
 -- ============================================================
 
 -- ── Extensions (already enabled by OHS Memory, included for safety) ──────────

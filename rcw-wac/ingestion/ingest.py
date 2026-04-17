@@ -298,6 +298,7 @@ def crawl_rcw(filter_titles: list[str] | None = None) -> Generator[dict, None, N
     for title in titles:
         t_num  = title['num']
         t_name = re.sub(r'^Title\s+\S+\s*[-—]\s*', '', title['name']).strip() or title['name']
+        t_name = ' '.join(t_name.split())
         print(f'\n  Title {t_num}: {t_name}')
 
         chapters = rcw_list_chapters(t_num)
@@ -457,6 +458,7 @@ def crawl_wac(filter_titles: list[str] | None = None) -> Generator[dict, None, N
     for title in titles:
         t_num  = title['num']
         t_name = re.sub(r'^Title\s+\S+\s*[-—]\s*', '', title['name']).strip() or title['name']
+        t_name = ' '.join(t_name.split())
         print(f'\n  Title {t_num}: {t_name}')
 
         chapters = wac_list_chapters(t_num)

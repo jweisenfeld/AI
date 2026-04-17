@@ -1003,8 +1003,12 @@ def main():
         stats = sb.rpc('rcw_wac_stats', {}).execute()
         if stats.data:
             d = stats.data
-            print(f'  Corpus totals: {d.get("rcw_chunks",0)} RCW chunks, '
-                  f'{d.get("wac_chunks",0)} WAC chunks')
+            print(f'  Corpus totals: '
+                  f'{d.get("rcw_chunks",0):,} RCW  '
+                  f'{d.get("wac_chunks",0):,} WAC  '
+                  f'{d.get("usc_chunks",0):,} USC  '
+                  f'{d.get("cfr_chunks",0):,} CFR  '
+                  f'({d.get("total_chunks",0):,} total)')
 
 
 def _flush_chunks(chunks: list[dict], oa, sb, existing_hashes: set[str]) -> set[str]:

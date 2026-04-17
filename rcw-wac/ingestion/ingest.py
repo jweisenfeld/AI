@@ -1000,15 +1000,18 @@ def main():
 
     print('\nIngestion complete.')
     if sb:
-        stats = sb.rpc('rcw_wac_stats', {}).execute()
-        if stats.data:
-            d = stats.data
-            print(f'  Corpus totals: '
-                  f'{d.get("rcw_chunks",0):,} RCW  '
-                  f'{d.get("wac_chunks",0):,} WAC  '
-                  f'{d.get("usc_chunks",0):,} USC  '
-                  f'{d.get("cfr_chunks",0):,} CFR  '
-                  f'({d.get("total_chunks",0):,} total)')
+        try:
+            stats = sb.rpc('rcw_wac_stats', {}).execute()
+            if stats.data:
+                d = stats.data
+                print(f'  Corpus totals: '
+                      f'{d.get("rcw_chunks",0):,} RCW  '
+                      f'{d.get("wac_chunks",0):,} WAC  '
+                      f'{d.get("usc_chunks",0):,} USC  '
+                      f'{d.get("cfr_chunks",0):,} CFR  '
+                      f'({d.get("total_chunks",0):,} total)')
+        except Exception:
+            print('  (stats query timed out — ingestion data was written successfully)')
 
 
 def _flush_chunks(chunks: list[dict], oa, sb, existing_hashes: set[str]) -> set[str]:

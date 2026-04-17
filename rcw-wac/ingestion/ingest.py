@@ -364,7 +364,7 @@ def wac_list_chapters(title_num: str) -> list[dict]:
     soup = BeautifulSoup(html, 'html.parser')
 
     chapters = []
-    pattern = re.compile(r'cite=' + re.escape(title_num) + r'-\d+$', re.I)
+    pattern = re.compile(r'cite=' + re.escape(title_num) + r'-\d+[A-Za-z]?$', re.I)
     for a in soup.find_all('a', href=pattern):
         href = a.get('href', '')
         cite = re.search(r'cite=([^&]+)', href)

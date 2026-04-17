@@ -14,17 +14,17 @@ The leg.wa.gov links in the UI are just citation links that open in a new tab.
 
 Usage:
     # Recommended Phase 1 — education law + public records
-    python ingest.py --scrape --corpus rcw --titles 28A,42.56
-    python ingest.py --scrape --corpus wac --titles 180
+    python ingest.py --corpus rcw --titles 28A,42.56
+    python ingest.py --corpus wac --titles 180
 
     # Dry run — crawl and parse without embedding or inserting
-    python ingest.py --scrape --corpus rcw --titles 28A --dry-run
+    python ingest.py --corpus rcw --titles 28A --dry-run
 
     # All RCW (slow — ~15,000 sections, takes 2-4 hours with polite rate limiting)
-    python ingest.py --scrape --corpus rcw
+    python ingest.py --corpus rcw
 
     # Re-ingest a title after law updates
-    python ingest.py --scrape --corpus rcw --titles 28A --clear
+    python ingest.py --corpus rcw --titles 28A --clear
 
 Environment variables:
     OPENAI_API_KEY       — for text-embedding-3-small
@@ -100,6 +100,24 @@ SESSION.headers['User-Agent'] = (
 def _strip_pdf_links(text: str) -> str:
     """Remove 'PDF RCW/WAC X.X.X' download-link artifacts from scraped text."""
     return re.sub(r'\bPDF\s+(?:RCW|WAC)\s+[\d][.\dA-Za-z\-]*\s*', '', text, flags=re.I).strip()
+
+
+def _heading_from_content(section_id: str, content: str) -> str:
+    """
+    Extract section heading from the start of content when the h-tag had no title text.
+    WA Legislature embeds the cite + heading at the start of each section body:
+      'WAC 180-08-001  Purpose and authority. (1) ...'
+      'RCW 28A.150.010 Public schools. Public schools means ...'
+    """
+    text = content
+    # Strip section_id from start (WAC pages repeat the full cite; RCW sometimes does too)
+    cite = re.sub(r'^(?:RCW|WAC)\s+', '', section_id)   # bare number: '180-08-001'
+    text = re.sub(r'^(?:(?:RCW|WAC)\s+)?' + re.escape(cite) + r'\s+', '', text).strip()
+    # Grab text up to the first numbered paragraph marker, period+space, or newline
+    m = re.match(r'^(.{3,150}?)(?=\s*\(\d+\)|\.\s|\n|$)', text)
+    if m:
+        return m.group(1).rstrip('. ').strip()
+    return ''
 
 
 def fetch(url: str, params: dict | None = None, retries: int = 3) -> str | None:
@@ -245,6 +263,9 @@ def rcw_fetch_section(cite: str, title_num: str, title_name: str,
 
     if not content or len(content) < 30:
         return None
+
+    if not heading:
+        heading = _heading_from_content(f'RCW {cite}', content)
 
     sec_num = cite.rsplit('.', 1)[-1] if '.' in cite else cite
 
@@ -405,6 +426,9 @@ def wac_fetch_section(cite: str, title_num: str, title_name: str,
     content = re.sub(r'\s{3,}', '\n', content).strip()
     if not content or len(content) < 30:
         return None
+
+    if not heading:
+        heading = _heading_from_content(f'WAC {cite}', content)
 
     sec_num = cite.rsplit('-', 1)[-1] if '-' in cite else cite
 

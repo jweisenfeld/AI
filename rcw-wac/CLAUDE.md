@@ -62,7 +62,7 @@ Uses `../.secrets/rcwkey.php` (its own file, NOT ohskey.php). Keys needed:
 
 1. Run `ingestion/schema.sql` in Supabase SQL Editor
 2. Ingest law XML files (see Ingestion section below)
-3. Upload `index.html`, `api-proxy.php`, `src/` to `psd1.net/rcw-wac/` via cPanel
+3. Upload `index.html`, `api-proxy.php`, `src/`, `.htaccess` to `psd1.net/rcw-wac/` via cPanel
 4. Verify at `https://psd1.net/rcw-wac/`
 
 ## Supabase Project Setup
@@ -184,6 +184,16 @@ data: [DONE]
 ```
 
 Sources are emitted **before** text starts so the UI can render citation cards while Claude types.
+
+## Server Notes
+
+**LiteSpeed gzip compression** must be disabled for SSE streaming to work. The `.htaccess` file
+handles this. If you ever move to a different host, add equivalent config. Symptom when broken:
+garbled binary output when visiting `api-proxy.php` directly, and chat responses appear only after
+a long delay (all at once instead of streaming).
+
+**Supabase anon key format**: Use the legacy `eyJ...` JWT key, not the newer `sb_publishable_...`
+format. The new format has origin restrictions that block server-side PHP curl requests.
 
 ## Known Limitations / Future Work
 

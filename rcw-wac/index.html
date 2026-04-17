@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WA Law Assistant — RCW &amp; WAC</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
 <style>
   :root {
     --primary:      #1a3a5c;   /* WA state blue */
@@ -88,15 +89,43 @@
   .message.user  { align-self: flex-end; align-items: flex-end; }
   .message.bot   { align-self: flex-start; align-items: flex-start; }
 
+  /* ── Markdown rendering inside bot bubbles ──────────────────────────────── */
+  .bubble.markdown { white-space: normal; }
+  .bubble.markdown p          { margin: 0 0 .6em; }
+  .bubble.markdown p:last-child { margin-bottom: 0; }
+  .bubble.markdown h1,.bubble.markdown h2,.bubble.markdown h3 {
+    margin: .8em 0 .3em; font-weight: 600; line-height: 1.3;
+  }
+  .bubble.markdown h1 { font-size: 1.15em; }
+  .bubble.markdown h2 { font-size: 1.05em; }
+  .bubble.markdown h3 { font-size: .95em; }
+  .bubble.markdown ul,.bubble.markdown ol { margin: .4em 0 .6em 1.4em; padding: 0; }
+  .bubble.markdown li { margin-bottom: .2em; }
+  .bubble.markdown code {
+    background: rgba(0,0,0,.08); border-radius: 3px;
+    padding: 1px 5px; font-family: monospace; font-size: .9em;
+  }
+  .bubble.markdown pre {
+    background: rgba(0,0,0,.06); border-radius: 6px;
+    padding: 10px 12px; overflow-x: auto; margin: .5em 0;
+  }
+  .bubble.markdown pre code { background: none; padding: 0; }
+  .bubble.markdown a { color: var(--accent); }
+  .bubble.markdown strong { font-weight: 600; }
+  .bubble.markdown hr { border: none; border-top: 1px solid #ccc; margin: .8em 0; }
+  .bubble.markdown blockquote {
+    border-left: 3px solid var(--accent); margin: .5em 0;
+    padding-left: .8em; color: #555;
+  }
+
   .bubble {
     padding: 10px 14px;
     border-radius: 14px;
     line-height: 1.55;
     font-size: .92rem;
-    white-space: pre-wrap;
     word-break: break-word;
   }
-  .message.user .bubble  { background: var(--user-bg); color: var(--user-fg); border-radius: 14px 14px 4px 14px; }
+  .message.user .bubble  { background: var(--user-bg); color: var(--user-fg); border-radius: 14px 14px 4px 14px; white-space: pre-wrap; }
   .message.bot  .bubble  { background: var(--bot-bg);  color: var(--bot-fg);  border-radius: 14px 14px 14px 4px; box-shadow: var(--shadow); }
 
   /* ── Source cards ───────────────────────────────────────────────────────── */
@@ -386,6 +415,7 @@ async function sendMessage() {
   // Bot bubble (will be filled by stream)
   const { wrap: botWrap, bubble: botBubble } = addMessage('bot', '');
   botBubble.textContent = '';
+  botBubble.classList.add('markdown');
 
   let fullText    = '';
   let sourcesRendered = false;
@@ -440,7 +470,7 @@ async function sendMessage() {
 
         if (evt.text) {
           fullText += evt.text;
-          botBubble.textContent = fullText;
+          botBubble.innerHTML = marked.parse(fullText);
           scrollBottom();
         }
 

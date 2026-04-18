@@ -1,0 +1,27 @@
+**DVR is in RCW 74.29** — Vocational Rehabilitation Services, sitting inside Title 74 (Public Assistance) because it's a DSHS program. The WAC counterpart is **WAC 388-891**. The federal authority is the Rehabilitation Act of 1973 (29 USC Ch. 16), amended by WIOA.
+
+---
+
+**From your list, here's what matters for IDD families:**
+
+| Priority | Title | Why |
+|----------|-------|-----|
+| **Core** | **Title 11** — Probate and Trust Law | RCW 11.130 (Uniform Guardianship Act) — establishing guardianship or supported decision-making for an adult child with IDD. Probably the single most-used legal process for families at transition age. |
+| **Core** | **Title 71A** — Developmental Disabilities | THE DD title — DDA eligibility, rights, waiver authority. Already on your list. |
+| **Core** | **Title 74** — Public Assistance | DVR (74.29), Medicaid (74.09), DSHS services broadly. Already on your list. |
+| **Core** | **Title 26** — Domestic Relations | Guardianship initiation for minors transitioning to adult status; divorce/custody when a child has IDD. |
+| Secondary | **Title 13** — Juvenile Courts | When a youth with IDD has justice system contact; dependency proceedings. |
+| Secondary | **Title 28C** — Vocational Education | Workforce training programs; Pre-ETS (pre-employment transition services) overlap. |
+| Secondary | **Title 28B** — Higher Education | Inclusive higher ed programs (e.g., UW Integrated Learning) and disability services at community colleges. |
+| Secondary | **Title 34** — Administrative Law | The WA Administrative Procedure Act — governs IEP due process hearings, DDA eligibility appeals, Medicaid fair hearings. Families invoke this constantly without knowing it. |
+| Secondary | **Title 48** — Insurance | Mental health/DD parity laws; relevant when insurer denies ABA or therapy. |
+| Secondary | **Title 49** — Labor Regulations | Minimum wage and supported employment rules; formerly sub-minimum wage (14c) — WA has largely phased this out. |
+| Secondary | **Title 50A** — Family and Medical Leave | PFML for family caregivers. |
+| Secondary | **Title 59** — Landlord and Tenant | Housing rights for adults with IDD in supported living or independent housing. |
+| Secondary | **Title 71** — Behavioral Health | Crisis services when IDD co-occurs with behavioral health needs — families often fall into the gap between 71A (DD) and 71 (BH). |
+| Secondary | **Title 72** — State Institutions | Freestanding residential facilities; Rainier School history. Less active now but matters for rights/oversight. |
+| Secondary | **Title 18** — Businesses and Professions | Licensing of BCBAs, SLPs, OTs, PTs — relevant when families are vetting providers. |
+| Tangential | **Title 29A** — Elections | Voting rights — some guardianship orders affect this; WA has broadly restored voting rights even for people under guardianship. |
+| Tangential | **Title 73** — Veterans | If a veteran parent is accessing VA benefits that interact with DDA services. |
+
+**Title 11 is the one most families don't know they need until they're in crisis** — the deadline to establish guardianship before a child with IDD turns 18 catches many families off guard.

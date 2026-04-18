@@ -884,6 +884,7 @@ def insert_chunks(sb, chunks: list[dict], embeddings: list[list[float]]) -> int:
                 time.sleep(wait)
         inserted += len(rows)
         print(f'  Inserted {inserted}/{len(chunks)} rows...', end='\r', flush=True)
+        time.sleep(0.5)  # throttle IO — free tier has a daily Disk IO budget
     print()
     return inserted
 

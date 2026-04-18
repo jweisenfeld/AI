@@ -191,6 +191,22 @@
   /* ── Token meta ─────────────────────────────────────────────────────────── */
   .meta-badge { font-size: .69rem; color: #8a9aaa; margin-top: 4px; padding-left: 4px; }
 
+  /* ── Continue button ────────────────────────────────────────────────────── */
+  .continue-btn {
+    margin-top: 8px;
+    padding: 5px 14px;
+    font-size: .78rem;
+    font-weight: 700;
+    background: var(--accent);
+    color: #0d2035;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: .9;
+    transition: opacity .15s;
+  }
+  .continue-btn:hover { opacity: 1; }
+
   /* ── Welcome ────────────────────────────────────────────────────────────── */
   .welcome {
     align-self: center;
@@ -982,7 +998,7 @@ async function sendMessage() {
         }
 
         if (evt.meta) {
-          const { inTokens, outTokens, resultCount } = evt.meta;
+          const { inTokens, outTokens, resultCount, stopReason } = evt.meta;
           if (!metaDiv) {
             metaDiv = document.createElement('div');
             metaDiv.className = 'meta-badge';
@@ -990,7 +1006,20 @@ async function sendMessage() {
           }
           const parts = [`${resultCount ?? 0} sections`, `${outTokens} tok`];
           if (inTokens) parts.push(`${inTokens} in`);
+          if (stopReason === 'max_tokens') parts.push('⚠ response clipped');
           metaDiv.textContent = parts.join(' · ');
+
+          if (stopReason === 'max_tokens') {
+            const btn = document.createElement('button');
+            btn.className = 'continue-btn';
+            btn.textContent = 'Continue response →';
+            btn.addEventListener('click', () => {
+              btn.remove();
+              queryEl.value = 'Please continue your response from where you left off.';
+              sendMessage();
+            });
+            botWrap.appendChild(btn);
+          }
         }
       }
     }

@@ -76,7 +76,7 @@ The following law sections were retrieved as relevant to the question:
 {CONTEXT}
 PROMPT);
 
-define('MAX_OUTPUT_TOKENS', 1500);
+define('MAX_OUTPUT_TOKENS', 2000);
 
 // ── Stream handler ────────────────────────────────────────────────────────────
 
@@ -262,7 +262,7 @@ $payload = json_encode([
 // ── Stream Claude ─────────────────────────────────────────────────────────────
 
 $st = ['buf' => '', 'inTok' => 0, 'outTok' => 0, 'cacheRead' => 0, 'cacheWrite' => 0,
-       'httpCode' => 0, 'errBody' => ''];
+       'stopReason' => '', 'httpCode' => 0, 'errBody' => ''];
 
 $ch = curl_init('https://api.anthropic.com/v1/messages');
 curl_setopt($ch, CURLOPT_POST,           true);
@@ -313,7 +313,8 @@ curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($ch, $chunk) use (&$st) {
                 }
                 break;
             case 'message_delta':
-                $st['outTok'] = (int)($event['usage']['output_tokens'] ?? 0);
+                $st['outTok']     = (int)($event['usage']['output_tokens'] ?? 0);
+                $st['stopReason'] = $event['delta']['stop_reason'] ?? '';
                 break;
             case 'error':
                 sse(['error' => $event['error']['message'] ?? 'Claude error']);
@@ -341,6 +342,7 @@ sse(['meta' => [
     'cachedTokens' => $st['cacheRead'],
     'cacheWrite'   => $st['cacheWrite'],
     'resultCount'  => count($results),
+    'stopReason'   => $st['stopReason'],
 ]]);
 echo "data: [DONE]\n\n";
 flush();

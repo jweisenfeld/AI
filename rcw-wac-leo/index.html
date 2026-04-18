@@ -191,6 +191,35 @@
   /* ── Token meta ─────────────────────────────────────────────────────────── */
   .meta-badge { font-size: .69rem; color: #8a9aaa; margin-top: 4px; padding-left: 4px; }
 
+  /* ── Thinking indicator ─────────────────────────────────────────────────── */
+  .thinking-indicator {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 10px 14px;
+    background: var(--bot-bg);
+    border-radius: 14px 14px 14px 4px;
+    box-shadow: var(--shadow);
+    color: #7a8a9a;
+    font-size: .82rem;
+    margin-bottom: 2px;
+  }
+  .think-dots { display: flex; gap: 5px; align-items: center; }
+  .think-dot {
+    width: 9px; height: 9px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: think-bounce 1.4s ease-in-out infinite;
+  }
+  .think-dot:nth-child(2) { animation-delay: .18s; }
+  .think-dot:nth-child(3) { animation-delay: .36s; }
+  @keyframes think-bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: .55; }
+    30%            { transform: translateY(-6px); opacity: 1; }
+  }
+  .think-label { color: #6a7a8a; }
+  .think-timer { font-weight: 700; color: var(--accent); }
+
   /* ── Continue button ────────────────────────────────────────────────────── */
   .continue-btn {
     margin-top: 8px;
@@ -206,6 +235,21 @@
     transition: opacity .15s;
   }
   .continue-btn:hover { opacity: 1; }
+
+  /* ── Copy reply button ──────────────────────────────────────────────────── */
+  .copy-reply-btn {
+    margin-top: 6px;
+    padding: 3px 10px;
+    font-size: .72rem;
+    background: transparent;
+    color: #8a9aaa;
+    border: 1px solid #c0ccd8;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all .15s;
+    align-self: flex-start;
+  }
+  .copy-reply-btn:hover { background: var(--source-bg); color: var(--primary-md); border-color: var(--accent); }
 
   /* ── Welcome ────────────────────────────────────────────────────────────── */
   .welcome {
@@ -945,19 +989,47 @@ async function sendMessage() {
   const { wrap: botWrap, bubble: botBubble } = addMessage('bot', '');
   botBubble.classList.add('markdown');
 
-  let fullText = '';
+  // ── Thinking indicator ──────────────────────────────────────────────────────
+  const thinkEl = document.createElement('div');
+  thinkEl.className = 'thinking-indicator';
+  thinkEl.innerHTML =
+    '<div class="think-dots"><span class="think-dot"></span><span class="think-dot"></span><span class="think-dot"></span></div>' +
+    '<span class="think-label">Searching<span class="think-timer"> · 0s</span></span>';
+  botWrap.appendChild(thinkEl);
+
+  const thinkStart = Date.now();
+  const thinkInterval = setInterval(() => {
+    const t = thinkEl.querySelector('.think-timer');
+    if (t) t.textContent = ` · ${Math.floor((Date.now() - thinkStart) / 1000)}s`;
+  }, 500);
+
+  function stopThinking() {
+    clearInterval(thinkInterval);
+    if (thinkEl.parentNode) thinkEl.remove();
+  }
+
+  let fullText       = '';
   let sourcesRendered = false;
-  let metaDiv = null;
+  let metaDiv        = null;
+  let textStarted    = false;
+  let logId          = 0;
+  let continueCount  = 0;
+  let lastMeta       = { inTokens: 0, outTokens: 0, cachedTokens: 0 };
+
+  function patchLog(extra = {}) {
+    if (!logId) return;
+    fetch('api-proxy.php?log_tokens=1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ log_id: logId, ...lastMeta, continue_count: continueCount, ...extra }),
+    }).catch(() => {});
+  }
 
   try {
     const resp = await fetch('api-proxy.php?stream=1', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query:    text,
-        corpus:   corpus,
-        messages: history.slice(-12),
-      }),
+      body: JSON.stringify({ query: text, corpus, messages: history.slice(-12) }),
     });
 
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -982,31 +1054,38 @@ async function sendMessage() {
         let evt;
         try { evt = JSON.parse(raw); } catch { continue; }
 
-        if (evt.error) { botBubble.textContent = 'Error: ' + evt.error; break; }
+        if (evt.error) { stopThinking(); botBubble.textContent = 'Error: ' + evt.error; break; }
+
+        if (evt.log_id) logId = evt.log_id;
 
         if (evt.sources && !sourcesRendered) {
           const block = renderSources(evt.sources);
-          if (block) botWrap.appendChild(block);
+          if (block) botWrap.insertBefore(block, thinkEl);
+          const lbl = thinkEl.querySelector('.think-label');
+          if (lbl) lbl.firstChild.textContent = 'Generating';
           sourcesRendered = true;
           scrollBottom();
         }
 
         if (evt.text) {
+          if (!textStarted) { stopThinking(); textStarted = true; }
           fullText += evt.text;
           botBubble.innerHTML = marked.parse(fullText);
           scrollBottom();
         }
 
         if (evt.meta) {
-          const { inTokens, outTokens, resultCount, stopReason } = evt.meta;
+          const { inTokens, outTokens, cachedTokens, resultCount, stopReason } = evt.meta;
+          lastMeta = { inTokens: inTokens || 0, outTokens: outTokens || 0, cachedTokens: cachedTokens || 0 };
+
           if (!metaDiv) {
             metaDiv = document.createElement('div');
             metaDiv.className = 'meta-badge';
             botWrap.appendChild(metaDiv);
           }
-          const parts = [`${resultCount ?? 0} sections`, `${outTokens} tok`];
-          if (inTokens) parts.push(`${inTokens} in`);
-          if (stopReason === 'max_tokens') parts.push('⚠ response clipped');
+          const parts = [`${resultCount ?? 0} sections`, `${outTokens} tok out`, `${inTokens} in`];
+          if (cachedTokens) parts.push(`${cachedTokens} cached`);
+          if (stopReason === 'max_tokens') parts.push('⚠ clipped');
           metaDiv.textContent = parts.join(' · ');
 
           if (stopReason === 'max_tokens') {
@@ -1015,6 +1094,8 @@ async function sendMessage() {
             btn.textContent = 'Continue response →';
             btn.addEventListener('click', () => {
               btn.remove();
+              continueCount++;
+              patchLog({ continue_count: continueCount });
               queryEl.value = 'Please continue your response from where you left off.';
               sendMessage();
             });
@@ -1024,10 +1105,28 @@ async function sendMessage() {
       }
     }
   } catch (err) {
+    stopThinking();
     botBubble.textContent = 'Connection error: ' + err.message;
   }
 
-  if (fullText) history.push({ role: 'assistant', content: fullText });
+  stopThinking();
+  patchLog();
+
+  // Copy-reply button
+  if (fullText) {
+    history.push({ role: 'assistant', content: fullText });
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'copy-reply-btn';
+    copyBtn.textContent = 'Copy reply';
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(fullText).then(() => {
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => { copyBtn.textContent = 'Copy reply'; }, 1800);
+      }).catch(() => { copyBtn.textContent = 'Error'; });
+    });
+    botWrap.appendChild(copyBtn);
+  }
+
   sendBtn.disabled = false;
   queryEl.focus();
   scrollBottom();

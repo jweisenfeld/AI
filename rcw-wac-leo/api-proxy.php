@@ -170,6 +170,20 @@ if (isset($_GET['catalog'])) {
     exit;
 }
 
+// ?log_tokens=1 — PATCH token counts onto an existing query_log row
+if (isset($_GET['log_tokens'])) {
+    header('Content-Type: application/json');
+    $d     = json_decode(file_get_contents('php://input'), true) ?? [];
+    $logId = (int)($d['log_id'] ?? 0);
+    if ($logId > 0) {
+        $secrets = load_secrets($secretsFile);
+        $proxy   = new RcwWacProxy($secrets);
+        try { $proxy->logTokens($logId, $d); } catch (\Throwable $e) {}
+    }
+    echo json_encode(['ok' => true]);
+    exit;
+}
+
 if (isset($_GET['stream']) && $_GET['stream'] === 'test') {
     start_sse();
     foreach (['LEO', 'reference', 'streaming', 'OK!'] as $w) {
@@ -221,7 +235,9 @@ $sources = $built['sources'];
 
 sse(['sources' => $sources]);
 
-try { $proxy->logQuery($query, $corpus, count($results)); } catch (\Throwable $e) {}
+$logId = 0;
+try { $logId = $proxy->logQuery($query, $corpus, count($results)); } catch (\Throwable $e) {}
+if ($logId) { sse(['log_id' => $logId]); }
 
 $systemText = str_replace('{CONTEXT}',
     $context ?: '(No matching sections found — answer from general knowledge if possible, but note the gap.)',

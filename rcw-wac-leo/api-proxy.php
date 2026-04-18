@@ -76,7 +76,7 @@ The following law sections were retrieved as relevant to the question:
 {CONTEXT}
 PROMPT);
 
-define('MAX_OUTPUT_TOKENS', 1500);
+define('MAX_OUTPUT_TOKENS', 2000);
 
 // ── Stream handler ────────────────────────────────────────────────────────────
 
@@ -170,6 +170,20 @@ if (isset($_GET['catalog'])) {
     exit;
 }
 
+// ?log_tokens=1 — PATCH token counts onto an existing query_log row
+if (isset($_GET['log_tokens'])) {
+    header('Content-Type: application/json');
+    $d     = json_decode(file_get_contents('php://input'), true) ?? [];
+    $logId = (int)($d['log_id'] ?? 0);
+    if ($logId > 0) {
+        $secrets = load_secrets($secretsFile);
+        $proxy   = new RcwWacProxy($secrets);
+        try { $proxy->logTokens($logId, $d); } catch (\Throwable $e) {}
+    }
+    echo json_encode(['ok' => true]);
+    exit;
+}
+
 if (isset($_GET['stream']) && $_GET['stream'] === 'test') {
     start_sse();
     foreach (['LEO', 'reference', 'streaming', 'OK!'] as $w) {
@@ -221,7 +235,9 @@ $sources = $built['sources'];
 
 sse(['sources' => $sources]);
 
-try { $proxy->logQuery($query, $corpus, count($results)); } catch (\Throwable $e) {}
+$logId = 0;
+try { $logId = $proxy->logQuery($query, $corpus, count($results)); } catch (\Throwable $e) {}
+if ($logId) { sse(['log_id' => $logId]); }
 
 $systemText = str_replace('{CONTEXT}',
     $context ?: '(No matching sections found — answer from general knowledge if possible, but note the gap.)',
@@ -262,7 +278,7 @@ $payload = json_encode([
 // ── Stream Claude ─────────────────────────────────────────────────────────────
 
 $st = ['buf' => '', 'inTok' => 0, 'outTok' => 0, 'cacheRead' => 0, 'cacheWrite' => 0,
-       'httpCode' => 0, 'errBody' => ''];
+       'stopReason' => '', 'httpCode' => 0, 'errBody' => ''];
 
 $ch = curl_init('https://api.anthropic.com/v1/messages');
 curl_setopt($ch, CURLOPT_POST,           true);
@@ -313,7 +329,8 @@ curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($ch, $chunk) use (&$st) {
                 }
                 break;
             case 'message_delta':
-                $st['outTok'] = (int)($event['usage']['output_tokens'] ?? 0);
+                $st['outTok']     = (int)($event['usage']['output_tokens'] ?? 0);
+                $st['stopReason'] = $event['delta']['stop_reason'] ?? '';
                 break;
             case 'error':
                 sse(['error' => $event['error']['message'] ?? 'Claude error']);
@@ -341,6 +358,7 @@ sse(['meta' => [
     'cachedTokens' => $st['cacheRead'],
     'cacheWrite'   => $st['cacheWrite'],
     'resultCount'  => count($results),
+    'stopReason'   => $st['stopReason'],
 ]]);
 echo "data: [DONE]\n\n";
 flush();

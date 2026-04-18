@@ -654,7 +654,8 @@ def crawl_cfr(filter_titles: list[str] | None = None,
 # ── USC crawler (Cornell LII) ─────────────────────────────────────────────────
 #
 # Cornell LII URL hierarchy:
-#   /uscode/text/20/chapter-33          → chapter section list
+#   /uscode/text/34                     → chapter list for Title 34
+#   /uscode/text/20/chapter-33          → section list for Chapter 33
 #   /uscode/text/20/1415                → individual section
 #
 # --titles 20 --chapters 33  →  20 USC Chapter 33 (IDEA statute)
@@ -662,14 +663,14 @@ def crawl_cfr(filter_titles: list[str] | None = None,
 #
 # Cornell LII chapter pages organize sections under subchapters, so direct
 # section links may not appear on the chapter listing page.  USC_CHAPTER_SECTIONS
-# provides known ranges as a fallback for important chapters.
+# provides known section ranges as a fallback for important chapters.
 
 USC_CHAPTER_SECTIONS: dict[tuple[str, str], list[str]] = {
     # IDEA — Individuals with Disabilities Education Act, 20 USC Chapter 33
     # Sparse numbering by subchapter — not every integer in 1400–1482 exists:
-    #   Subchapter I  (General):         §§ 1400–1409
-    #   Subchapter II (All children):    §§ 1411–1419  (no 1410, no 1420–1430)
-    #   Subchapter III (Infants/toddlers): §§ 1431–1444
+    #   Subchapter I  (General):            §§ 1400–1409
+    #   Subchapter II (All children):       §§ 1411–1419  (no 1410, no 1420–1430)
+    #   Subchapter III (Infants/toddlers):  §§ 1431–1444
     #   Subchapter IV (National activities): §§ 1450–1451, 1461–1467, 1470–1474, 1481–1482
     ('20', '33'): [
         '1400','1401','1402','1403','1404','1405','1406','1407','1408','1409',
@@ -681,16 +682,154 @@ USC_CHAPTER_SECTIONS: dict[tuple[str, str], list[str]] = {
         '1470','1471','1472','1473','1474',
         '1481','1482',
     ],
+
+    # ── Title 34 USC — Crime Control and Law Enforcement ─────────────────────
+    # Title 34 was codified in 2018 from Public Law 113-235.
+    # Cornell LII chapter numbers are small integers (1, 10, 12, 13, …),
+    # NOT in the 400s.  Section numbers in each chapter are in the 10000-60000 range.
+    # Below are the most relevant chapters for law enforcement + education contexts.
+
+    # Chapter 1 — Law Enforcement and Administration
+    # Includes Byrne JAG grants (§§ 10151-10156), DNA analysis (§§ 10601+)
+    ('34', '1'): [
+        '10101','10102','10111','10121','10122','10123',
+        '10151','10152','10153','10154','10155','10156','10157','10158',
+        '10161','10162','10171','10172',
+        '10181','10182','10191','10192','10193',
+        '10201','10211','10221','10222','10223','10224',
+        '10231','10232','10241','10242','10243',
+        '10251','10261','10271','10272','10273',
+        '10281','10291','10301','10302','10303','10304','10305','10306',
+        '10311',
+    ],
+
+    # Chapter 10 — Juvenile Justice and Delinquency Prevention (§§ 11101-11322)
+    ('34', '10'): [
+        '11101','11102','11103','11104','11105','11106','11107','11108','11109',
+        '11111','11112','11113','11114','11115','11116','11117','11118','11119',
+        '11121','11122','11123','11124','11125','11126','11127','11128','11129',
+        '11131','11132','11133','11134','11141','11142','11143','11144',
+        '11151','11161','11162','11163','11164','11171','11172','11173',
+        '11181','11182','11183','11184','11185','11186','11187','11188',
+        '11191','11192','11193','11194',
+        '11201','11211','11221','11222','11223','11224','11225',
+        '11231','11241','11251','11261','11271','11281',
+        '11291','11292','11293','11294','11295',
+        '11301','11311','11312','11313','11321','11322',
+    ],
+
+    # Chapter 12 — Victims of Child Abuse (§§ 20301-20351)
+    ('34', '12'): [
+        '20301','20302','20303','20304','20305','20306',
+        '20311','20312','20321','20322','20323','20324',
+        '20331','20332','20333','20334','20335','20341','20351',
+    ],
+
+    # Chapter 12D — Violence Against Women (VAWA) — §§ 12291-12631
+    # VAWA is a subchapter of Chapter 12; on Cornell LII it may be at chapter-12D
+    # or accessible via the section numbers directly.
+    ('34', '12D'): [
+        '12291','12292','12294','12295',
+        '12311','12312','12321','12322','12323','12324','12325','12326',
+        '12331','12341','12351','12361','12371','12372',
+        '12381','12391','12401','12402','12403','12404','12405',
+        '12411','12412','12413','12414','12415','12421','12431',
+        '12441','12442','12443','12444','12445','12451',
+        '12461','12463','12464','12465',
+        '12471','12472','12473','12474','12475','12476',
+        '12481','12482','12491',
+        '12501','12511','12512','12513','12514','12521',
+        '12531','12541','12551','12561','12571',
+        '12581','12582','12583','12584','12585','12586','12587',
+        '12601','12602','12603','12611','12621','12631',
+    ],
+
+    # Chapter 13 — Violence Against Women Act — additional provisions
+    # Includes campus sexual violence, stalking, dating violence programs
+    ('34', '13'): [
+        '20121','20122','20123','20124','20125','20126',
+        '20131','20141','20151','20161','20162',
+        '20171','20181','20191',
+    ],
+
+    # Chapter 19 — Victims of Crime (§§ 20101-20111)
+    # Crime Victims Fund — affects law enforcement response + victim notification
+    ('34', '19'): [
+        '20101','20102','20103','20104','20105','20106',
+        '20107','20108','20109','20110','20111',
+    ],
+
+    # Chapter 46 — Crime Victims Rights (§§ 60501-60506)
+    ('34', '46'): [
+        '60501','60502','60503','60504','60505','60506',
+    ],
 }
 
 
-def usc_list_sections(title_num: str, chapter_num: str) -> list[str]:
+def usc_list_chapters(title_num: str) -> list[dict]:
+    """
+    Discover chapter numbers for a USC title from the Cornell LII title page.
+    Returns [{num, name}] — num is the chapter designator (e.g. '33', '12D').
+    Handles both flat (/uscode/text/20/chapter-33) and subtitle-layer
+    (/uscode/text/34/subtitle-I/chapter-1) URL structures.
+    """
+    url = f'{USC_BASE}/{title_num}'
+    html = fetch(url)
+    if not html:
+        return []
+    soup = BeautifulSoup(html, 'html.parser')
+
+    flat_pattern = re.compile(
+        r'^/uscode/text/' + re.escape(title_num) + r'/chapter-([A-Z0-9]+)$', re.I
+    )
+    subtitle_chapter_pattern = re.compile(
+        r'^/uscode/text/' + re.escape(title_num) + r'/subtitle-[^/]+/chapter-([A-Z0-9]+)$', re.I
+    )
+    subtitle_link_pattern = re.compile(
+        r'^/uscode/text/' + re.escape(title_num) + r'/subtitle-[^/]+$', re.I
+    )
+
+    seen: set[str] = set()
+    chapters: list[dict] = []
+
+    def _scan_soup(s: BeautifulSoup) -> None:
+        for a in s.find_all('a', href=True):
+            href = a['href']
+            m = flat_pattern.match(href) or subtitle_chapter_pattern.match(href)
+            if m:
+                num = m.group(1)
+                if num not in seen:
+                    seen.add(num)
+                    name = a.get_text(' ', strip=True)
+                    name = re.sub(r'^CHAPTER\s+\S+\s*[—\-]\s*', '', name, flags=re.I).strip()
+                    chapters.append({
+                        'num': num, 'name': name,
+                        'url': 'https://www.law.cornell.edu' + href,
+                    })
+
+    _scan_soup(soup)
+
+    # If no chapters found directly, follow subtitle links and scan those pages
+    if not chapters:
+        subtitle_hrefs = [
+            a['href'] for a in soup.find_all('a', href=subtitle_link_pattern)
+        ]
+        for sub_href in subtitle_hrefs[:12]:  # safety cap
+            sub_html = fetch('https://www.law.cornell.edu' + sub_href)
+            if sub_html:
+                _scan_soup(BeautifulSoup(sub_html, 'html.parser'))
+
+    return chapters
+
+
+def usc_list_sections(title_num: str, chapter_num: str,
+                       chapter_url: str | None = None) -> list[str]:
     """Return section numbers for a USC title/chapter from Cornell LII."""
-    url = f'{USC_BASE}/{title_num}/chapter-{chapter_num}'
+    url = chapter_url or f'{USC_BASE}/{title_num}/chapter-{chapter_num}'
     html = fetch(url)
     sections: list[str] = []
 
-    if html:
+    if html and 'Not Found' not in html[:500]:
         soup = BeautifulSoup(html, 'html.parser')
         pattern = re.compile(r'^/uscode/text/' + re.escape(title_num) + r'/(\d+\w*)$', re.I)
         seen: set[str] = set()
@@ -705,7 +844,7 @@ def usc_list_sections(title_num: str, chapter_num: str) -> list[str]:
     if not sections:
         key = (title_num, chapter_num)
         if key in USC_CHAPTER_SECTIONS:
-            print(f'  (Using known section range for {title_num} USC Chapter {chapter_num})')
+            print(f'  (Using known section range for USC Title {title_num} Chapter {chapter_num})')
             sections = USC_CHAPTER_SECTIONS[key]
 
     return sections
@@ -778,28 +917,54 @@ def crawl_usc(filter_titles: list[str] | None = None,
               filter_chapters: list[str] | None = None) -> Generator[dict, None, None]:
     """
     Crawl USC sections from Cornell LII.
-    Requires --titles (USC title, e.g. 20) and --chapters (chapter, e.g. 33).
+    --titles required (e.g. --titles 20).
+    --chapters optional: if omitted, discovers chapters from the Cornell LII title page.
     Example: --corpus usc --titles 20 --chapters 33
+    To see available chapters without ingesting: --dry-run (no --chapters)
     """
     if not filter_titles:
         print('ERROR: --titles required for USC  (e.g. --titles 20 --chapters 33)',
               file=sys.stderr)
         return
-    if not filter_chapters:
-        print('ERROR: --chapters required for USC (e.g. --chapters 33)',
-              file=sys.stderr)
-        return
 
     for title_num in filter_titles:
         title_name = f'USC Title {title_num}'
-        for chap_num in filter_chapters:
-            chapter_name = f'Chapter {chap_num}'
-            print(f'\n  USC Title {title_num} Chapter {chap_num}')
-            sections = usc_list_sections(title_num, chap_num)
+
+        # Discover chapters if none specified
+        if not filter_chapters:
+            print(f'\n  Discovering chapters for USC Title {title_num}...')
+            discovered = usc_list_chapters(title_num)
+            if not discovered:
+                print(f'  ERROR: could not discover chapters for USC Title {title_num}.',
+                      file=sys.stderr)
+                print(f'  Check https://www.law.cornell.edu/uscode/text/{title_num} '
+                      'and specify --chapters explicitly.', file=sys.stderr)
+                continue
+            print(f'  Found {len(discovered)} chapters:')
+            for c in discovered:
+                in_known = '(known sections)' if (title_num, c['num']) in USC_CHAPTER_SECTIONS else ''
+                print(f'    Chapter {c["num"]:<6} {c["name"]} {in_known}')
+            chapters_to_crawl = [
+                {'num': c['num'], 'name': c['name'], 'url': c.get('url')}
+                for c in discovered
+            ]
+        else:
+            chapters_to_crawl = [{'num': n, 'name': f'Chapter {n}'} for n in filter_chapters]
+
+        for chap in chapters_to_crawl:
+            chap_num  = chap['num']
+            chap_name = chap['name']
+            chap_url  = chap.get('url')
+            print(f'\n  USC Title {title_num} Chapter {chap_num} — {chap_name}')
+            sections = usc_list_sections(title_num, chap_num, chap_url)
+            if not sections:
+                print(f'    0 sections — chapter may not exist on Cornell LII. '
+                      f'Check https://www.law.cornell.edu/uscode/text/{title_num}/chapter-{chap_num}')
+                continue
             print(f'    {len(sections)} sections')
             for sec_num in sections:
                 section = usc_fetch_section(title_num, sec_num, title_name,
-                                            chap_num, chapter_name)
+                                            chap_num, chap_name)
                 if section:
                     yield section
 
@@ -884,6 +1049,7 @@ def insert_chunks(sb, chunks: list[dict], embeddings: list[list[float]]) -> int:
                 time.sleep(wait)
         inserted += len(rows)
         print(f'  Inserted {inserted}/{len(chunks)} rows...', end='\r', flush=True)
+        time.sleep(0.5)  # throttle IO — free tier has a daily Disk IO budget
     print()
     return inserted
 

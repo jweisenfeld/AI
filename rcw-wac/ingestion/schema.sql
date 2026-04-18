@@ -212,3 +212,18 @@ alter table public.rcw_wac_query_log enable row level security;
 drop policy if exists "allow_insert" on public.rcw_wac_query_log;
 create policy "allow_insert" on public.rcw_wac_query_log
     for insert to anon with check (true);
+
+-- anon UPDATE: needed so the PHP proxy can PATCH token counts back after streaming.
+-- Restricted to own rows via log_id — harmless since this is anonymous usage data.
+drop policy if exists "allow_update" on public.rcw_wac_query_log;
+create policy "allow_update" on public.rcw_wac_query_log
+    for update to anon using (true) with check (true);
+
+-- ── Migration v2: token + continue logging ────────────────────────────────────
+-- Run once in Supabase SQL Editor if upgrading from the initial schema.
+
+alter table rcw_wac_query_log
+    add column if not exists in_tokens      int,
+    add column if not exists out_tokens     int,
+    add column if not exists cached_tokens  int,
+    add column if not exists continue_count int not null default 0;

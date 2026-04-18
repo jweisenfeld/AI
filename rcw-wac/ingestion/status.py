@@ -7,6 +7,12 @@ Usage examples
 # DB overview (chunk counts per corpus/title)
 python status.py
 
+# What titles of USC are in the DB?
+python status.py --corpus usc
+
+# What chapters of CFR are in the DB?
+python status.py --corpus cfr --titles 34
+
 # What chapters of WAC 388 are in the DB?
 python status.py --corpus wac --titles 388
 
@@ -21,6 +27,9 @@ python status.py --corpus rcw --titles 9A,10,35A --missing --batch
 
 # Save batch commands to a .bat file (Windows)
 python status.py --corpus rcw --titles 9A,10,35A --missing --batch > ingest_missing.bat
+
+# Note: --missing is only supported for rcw and wac (requires leg.wa.gov).
+# For usc and cfr, use without --missing to see what's ingested.
 """
 
 import argparse
@@ -149,8 +158,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    parser.add_argument('--corpus', choices=['rcw', 'wac'],
-                        help='Which corpus to inspect (rcw or wac)')
+    parser.add_argument('--corpus', choices=['rcw', 'wac', 'usc', 'cfr'],
+                        help='Which corpus to inspect (rcw, wac, usc, or cfr)')
     parser.add_argument('--titles', metavar='28A,10,35A',
                         help='Comma-separated title numbers')
     parser.add_argument('--missing', action='store_true',
@@ -219,7 +228,13 @@ def main():
                 print(f'  {chap:<30} {in_db[chap]:>5} chunks')
             continue
 
-        # --missing: fetch chapter list from legislature website
+        # --missing: fetch chapter list from legislature website (RCW/WAC only)
+        if args.corpus not in ('rcw', 'wac'):
+            print(f'  --missing not supported for {args.corpus.upper()} '
+                  f'(no automated chapter list source for federal corpora).')
+            print(f'  Use the DB-only view (drop --missing) to see what\'s ingested.')
+            continue
+
         print(f'\nFetching chapter list for {args.corpus.upper()} Title {title_num} '
               'from legislature website...', flush=True)
         if args.corpus == 'rcw':

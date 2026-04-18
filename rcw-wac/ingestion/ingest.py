@@ -770,32 +770,62 @@ def usc_list_chapters(title_num: str) -> list[dict]:
     """
     Discover chapter numbers for a USC title from the Cornell LII title page.
     Returns [{num, name}] — num is the chapter designator (e.g. '33', '12D').
+    Handles both flat (/uscode/text/20/chapter-33) and subtitle-layer
+    (/uscode/text/34/subtitle-I/chapter-1) URL structures.
     """
     url = f'{USC_BASE}/{title_num}'
     html = fetch(url)
     if not html:
         return []
     soup = BeautifulSoup(html, 'html.parser')
-    pattern = re.compile(
+
+    flat_pattern = re.compile(
         r'^/uscode/text/' + re.escape(title_num) + r'/chapter-([A-Z0-9]+)$', re.I
     )
+    subtitle_chapter_pattern = re.compile(
+        r'^/uscode/text/' + re.escape(title_num) + r'/subtitle-[^/]+/chapter-([A-Z0-9]+)$', re.I
+    )
+    subtitle_link_pattern = re.compile(
+        r'^/uscode/text/' + re.escape(title_num) + r'/subtitle-[^/]+$', re.I
+    )
+
     seen: set[str] = set()
     chapters: list[dict] = []
-    for a in soup.find_all('a', href=pattern):
-        m = pattern.search(a['href'])
-        if m:
-            num = m.group(1)
-            if num not in seen:
-                seen.add(num)
-                name = a.get_text(' ', strip=True)
-                name = re.sub(r'^CHAPTER\s+\S+\s*[—\-]\s*', '', name, flags=re.I).strip()
-                chapters.append({'num': num, 'name': name})
+
+    def _scan_soup(s: BeautifulSoup) -> None:
+        for a in s.find_all('a', href=True):
+            href = a['href']
+            m = flat_pattern.match(href) or subtitle_chapter_pattern.match(href)
+            if m:
+                num = m.group(1)
+                if num not in seen:
+                    seen.add(num)
+                    name = a.get_text(' ', strip=True)
+                    name = re.sub(r'^CHAPTER\s+\S+\s*[—\-]\s*', '', name, flags=re.I).strip()
+                    chapters.append({
+                        'num': num, 'name': name,
+                        'url': 'https://www.law.cornell.edu' + href,
+                    })
+
+    _scan_soup(soup)
+
+    # If no chapters found directly, follow subtitle links and scan those pages
+    if not chapters:
+        subtitle_hrefs = [
+            a['href'] for a in soup.find_all('a', href=subtitle_link_pattern)
+        ]
+        for sub_href in subtitle_hrefs[:12]:  # safety cap
+            sub_html = fetch('https://www.law.cornell.edu' + sub_href)
+            if sub_html:
+                _scan_soup(BeautifulSoup(sub_html, 'html.parser'))
+
     return chapters
 
 
-def usc_list_sections(title_num: str, chapter_num: str) -> list[str]:
+def usc_list_sections(title_num: str, chapter_num: str,
+                       chapter_url: str | None = None) -> list[str]:
     """Return section numbers for a USC title/chapter from Cornell LII."""
-    url = f'{USC_BASE}/{title_num}/chapter-{chapter_num}'
+    url = chapter_url or f'{USC_BASE}/{title_num}/chapter-{chapter_num}'
     html = fetch(url)
     sections: list[str] = []
 
@@ -914,15 +944,19 @@ def crawl_usc(filter_titles: list[str] | None = None,
             for c in discovered:
                 in_known = '(known sections)' if (title_num, c['num']) in USC_CHAPTER_SECTIONS else ''
                 print(f'    Chapter {c["num"]:<6} {c["name"]} {in_known}')
-            chapters_to_crawl = [{'num': c['num'], 'name': c['name']} for c in discovered]
+            chapters_to_crawl = [
+                {'num': c['num'], 'name': c['name'], 'url': c.get('url')}
+                for c in discovered
+            ]
         else:
             chapters_to_crawl = [{'num': n, 'name': f'Chapter {n}'} for n in filter_chapters]
 
         for chap in chapters_to_crawl:
             chap_num  = chap['num']
             chap_name = chap['name']
+            chap_url  = chap.get('url')
             print(f'\n  USC Title {title_num} Chapter {chap_num} — {chap_name}')
-            sections = usc_list_sections(title_num, chap_num)
+            sections = usc_list_sections(title_num, chap_num, chap_url)
             if not sections:
                 print(f'    0 sections — chapter may not exist on Cornell LII. '
                       f'Check https://www.law.cornell.edu/uscode/text/{title_num}/chapter-{chap_num}')

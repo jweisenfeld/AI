@@ -188,14 +188,14 @@ class RcwWacProxy
         return ['context' => trim($context), 'sources' => $sources];
     }
 
-    // ── Log query (fire-and-forget) ───────────────────────────────────────────
+    // ── Log query — returns inserted row ID ──────────────────────────────────
 
-    public function logQuery(string $query, ?string $corpus, int $resultCount): void
+    public function logQuery(string $query, ?string $corpus, int $resultCount): int
     {
         $payload = json_encode([
-            'query_text'   => $query,
+            'query_text'    => $query,
             'corpus_filter' => $corpus,
-            'result_count' => $resultCount,
+            'result_count'  => $resultCount,
         ]);
 
         $ch = curl_init($this->supabaseUrl . '/rest/v1/rcw_wac_query_log');
@@ -207,9 +207,43 @@ class RcwWacProxy
                 'Content-Type: application/json',
                 'apikey: '             . $this->supabaseAnonKey,
                 'Authorization: Bearer ' . $this->supabaseAnonKey,
-                'Prefer: return=minimal',
+                'Prefer: return=representation',  // get ID back
             ],
             CURLOPT_POSTFIELDS => $payload,
+        ]);
+        $result = curl_exec($ch);
+        curl_close($ch);
+
+        $rows = json_decode($result, true) ?? [];
+        return (int)($rows[0]['id'] ?? 0);
+    }
+
+    // ── Patch token counts onto an existing log row ───────────────────────────
+
+    public function logTokens(int $logId, array $data): void
+    {
+        if ($logId <= 0) return;
+
+        $payload = [];
+        foreach (['in_tokens', 'out_tokens', 'cached_tokens', 'continue_count'] as $field) {
+            if (isset($data[$field])) {
+                $payload[$field] = (int)$data[$field];
+            }
+        }
+        if (empty($payload)) return;
+
+        $ch = curl_init($this->supabaseUrl . '/rest/v1/rcw_wac_query_log?id=eq.' . $logId);
+        curl_setopt_array($ch, [
+            CURLOPT_CUSTOMREQUEST  => 'PATCH',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 3,
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: application/json',
+                'apikey: '             . $this->supabaseAnonKey,
+                'Authorization: Bearer ' . $this->supabaseAnonKey,
+                'Prefer: return=minimal',
+            ],
+            CURLOPT_POSTFIELDS => json_encode($payload),
         ]);
         curl_exec($ch);
         curl_close($ch);

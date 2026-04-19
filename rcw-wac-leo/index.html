@@ -386,9 +386,8 @@
   #about-body {
     overflow-y: auto;
     padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
+    flex: 1 1 0;
+    min-height: 0;
   }
   .about-section h3 {
     font-size: .8rem;
@@ -481,6 +480,52 @@
   .tech-notes dt { font-weight: 700; color: var(--primary-md); float: left; min-width: 130px; }
   .tech-notes dd { margin-left: 130px; margin-bottom: 5px; }
   .stats-loading { color: #8a9aaa; font-size: .82rem; font-style: italic; }
+
+  /* ── About tabs ─────────────────────────────────────────────────────────── */
+  .about-tabs {
+    display: flex; padding: 0 16px;
+    background: #f0f4f8; border-bottom: 1px solid var(--border);
+    flex-shrink: 0; overflow-x: auto;
+  }
+  .about-tab-btn {
+    padding: 8px 12px; font-size: .75rem; font-weight: 600;
+    border: none; border-bottom: 2px solid transparent; background: none;
+    cursor: pointer; color: #6a7a8a; margin-bottom: -1px; white-space: nowrap;
+    transition: color .15s, border-color .15s;
+  }
+  .about-tab-btn:hover { color: var(--primary-md); }
+  .about-tab-btn.active { color: var(--primary-md); border-bottom-color: var(--accent); }
+  .about-tab-panel { display: none; flex-direction: column; gap: 24px; }
+  .about-tab-panel.active { display: flex; }
+  .sample-queries-intro { font-size: .78rem; color: #5a6a7a; line-height: 1.55; margin-bottom: 6px; }
+  .sample-query-btn {
+    display: block; width: 100%; text-align: left; box-sizing: border-box;
+    padding: 8px 12px; margin-bottom: 4px;
+    background: var(--source-bg); border: 1px solid var(--source-border);
+    border-radius: 6px; cursor: pointer; font-size: .79rem; color: #2a3a4a;
+    line-height: 1.4; transition: background .12s, border-color .12s;
+  }
+  .sample-query-btn:hover { background: #e8e0cc; border-color: var(--accent); color: var(--primary); }
+  .sample-q-num { display: inline-block; min-width: 22px; font-weight: 700; color: var(--accent); }
+  .sql-health-wrap { position: relative; margin-top: 6px; }
+  .sql-health-block {
+    background: #1e2d3d; color: #c8d8e8; border-radius: 6px;
+    padding: 12px 14px; font-family: monospace; font-size: .73rem;
+    line-height: 1.55; white-space: pre; overflow-x: auto;
+  }
+  #copy-sql-btn {
+    position: absolute; top: 8px; right: 8px;
+    padding: 3px 10px; font-size: .72rem;
+    background: var(--primary-md); color: #fff;
+    border: none; border-radius: 4px; cursor: pointer; opacity: .8; transition: opacity .15s;
+  }
+  #copy-sql-btn:hover { opacity: 1; }
+  .sql-guide {
+    display: grid; grid-template-columns: auto 1fr; gap: 3px 10px;
+    font-size: .76rem; margin-top: 8px; align-items: baseline;
+  }
+  .sql-guide .sg-val { font-family: monospace; font-weight: 700; color: var(--primary-md); }
+  .sql-guide .sg-desc { color: #4a5a6a; }
 
   /* ── Stat cards clickable ───────────────────────────────────────────────── */
   .stat-card.clickable { cursor: pointer; transition: box-shadow .15s, transform .1s; }
@@ -577,67 +622,132 @@
       <h2 id="about-title">🛡️ About LEO Legal Reference</h2>
       <button id="about-close" aria-label="Close">✕</button>
     </div>
+    <div class="about-tabs">
+      <button class="about-tab-btn active" data-tab="pipeline">Pipeline</button>
+      <button class="about-tab-btn" data-tab="database">Database</button>
+      <button class="about-tab-btn" data-tab="prompt">Prompt</button>
+      <button class="about-tab-btn" data-tab="technical">Technical</button>
+      <button class="about-tab-btn" data-tab="samples">Sample Queries</button>
+    </div>
     <div id="about-body">
 
-      <div class="about-section">
-        <h3>How It Works — Query Pipeline</h3>
-        <div class="pipeline">
-          <div class="pipe-step">
-            <strong>Your Question</strong>
-            <span>plain language</span>
-          </div>
-          <span class="pipe-arrow">→</span>
-          <div class="pipe-step">
-            <strong>OpenAI Embed</strong>
-            <span>text-embedding-3-small<br>1536 dimensions</span>
-          </div>
-          <span class="pipe-arrow">→</span>
-          <div class="pipe-step">
-            <strong>Supabase Search</strong>
-            <span>vector + BM25 hybrid<br>top 8 sections</span>
-          </div>
-          <span class="pipe-arrow">→</span>
-          <div class="pipe-step">
-            <strong>Claude Haiku</strong>
-            <span>synthesis + citations<br>streaming SSE</span>
+      <div class="about-tab-panel active" data-tab="pipeline">
+        <div class="about-section">
+          <h3>How It Works — Query Pipeline</h3>
+          <div class="pipeline">
+            <div class="pipe-step">
+              <strong>Your Question</strong>
+              <span>plain language</span>
+            </div>
+            <span class="pipe-arrow">→</span>
+            <div class="pipe-step">
+              <strong>OpenAI Embed</strong>
+              <span>text-embedding-3-small<br>1536 dimensions</span>
+            </div>
+            <span class="pipe-arrow">→</span>
+            <div class="pipe-step">
+              <strong>Supabase Search</strong>
+              <span>vector + BM25 hybrid<br>top 8 sections</span>
+            </div>
+            <span class="pipe-arrow">→</span>
+            <div class="pipe-step">
+              <strong>Claude Haiku</strong>
+              <span>synthesis + citations<br>streaming SSE</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="about-section">
-        <h3>Database — Live Section Counts</h3>
-        <div id="stats-area" class="stats-loading">Loading database stats…</div>
-      </div>
-
-      <div class="about-section">
-        <h3>System Prompt</h3>
-        <p style="font-size:.78rem;color:#5a6a7a;margin-bottom:8px;">The exact instructions sent to Claude before every query (with <code>{CONTEXT}</code> replaced by the retrieved sections at runtime).</p>
-        <div class="prompt-wrap">
-          <div class="prompt-box" id="prompt-box">Loading…</div>
-          <button id="copy-prompt-btn">Copy</button>
+      <div class="about-tab-panel" data-tab="database">
+        <div class="about-section">
+          <h3>Database — Live Section Counts</h3>
+          <div id="stats-area" class="stats-loading">Loading database stats…</div>
         </div>
       </div>
 
-      <div class="about-section">
-        <h3>Technical Notes</h3>
-        <dl class="tech-notes">
-          <dt>Inference model</dt>
-          <dd>Claude Haiku 4.5 (<code>claude-haiku-4-5-20251001</code>) — fast, cheap RAG synthesis</dd>
-          <dt>Embedding model</dt>
-          <dd>OpenAI <code>text-embedding-3-small</code> — 1536 dimensions, used at ingest and at query time</dd>
-          <dt>Chunk size</dt>
-          <dd>~800 tokens per section chunk (single RCW/WAC/USC/CFR section)</dd>
-          <dt>Retrieval</dt>
-          <dd>Top 8 results via Reciprocal Rank Fusion (k=60) of vector cosine + BM25 full-text lanes</dd>
-          <dt>Max output</dt>
-          <dd>1,500 tokens per response</dd>
-          <dt>Corpus sources</dt>
-          <dd>RCW (leg.wa.gov XML), WAC (leg.wa.gov XML), USC (Cornell LII), CFR (eCFR.gov XML)</dd>
-          <dt>Vector store</dt>
-          <dd>Supabase + pgvector, HNSW index (m=16, ef_construction=64)</dd>
-          <dt>Project repo</dt>
-          <dd>jweisenfeld/AI — <code>rcw-wac-leo/</code> (UI) · <code>rcw-wac/</code> (shared proxy + ingestion)</dd>
-        </dl>
+      <div class="about-tab-panel" data-tab="prompt">
+        <div class="about-section">
+          <h3>System Prompt</h3>
+          <p style="font-size:.78rem;color:#5a6a7a;margin-bottom:8px;">The exact instructions sent to Claude before every query (with <code>{CONTEXT}</code> replaced by the retrieved sections at runtime).</p>
+          <div class="prompt-wrap">
+            <div class="prompt-box" id="prompt-box">Loading…</div>
+            <button id="copy-prompt-btn">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="about-tab-panel" data-tab="technical">
+        <div class="about-section">
+          <h3>Technical Notes</h3>
+          <dl class="tech-notes">
+            <dt>Inference model</dt>
+            <dd>Claude Haiku 4.5 (<code>claude-haiku-4-5-20251001</code>) — fast, cheap RAG synthesis</dd>
+            <dt>Embedding model</dt>
+            <dd>OpenAI <code>text-embedding-3-small</code> — 1536 dimensions, used at ingest and at query time</dd>
+            <dt>Chunk size</dt>
+            <dd>~800 tokens per section chunk (single RCW/WAC/USC/CFR section)</dd>
+            <dt>Retrieval</dt>
+            <dd>Top 8 results via Reciprocal Rank Fusion (k=60) of vector cosine + BM25 full-text lanes</dd>
+            <dt>Max output</dt>
+            <dd>2,000 tokens per response</dd>
+            <dt>Corpus sources</dt>
+            <dd>RCW (leg.wa.gov XML), WAC (leg.wa.gov XML), USC (Cornell LII), CFR (eCFR.gov XML)</dd>
+            <dt>Vector store</dt>
+            <dd>Supabase + pgvector, HNSW index (m=16, ef_construction=64)</dd>
+            <dt>Project repo</dt>
+            <dd>jweisenfeld/AI — <code>rcw-wac-leo/</code> (UI) · <code>rcw-wac/</code> (shared proxy + ingestion)</dd>
+          </dl>
+        </div>
+        <div class="about-section">
+          <h3>HNSW Index Health Check</h3>
+          <p style="font-size:.78rem;color:#5a6a7a;line-height:1.55;margin-bottom:4px;">Run in <strong>Supabase → SQL Editor</strong> before and after a test session. A high cache-hit rate means the vector index lives in RAM — queries are fast. A low rate means it's hitting disk — consider upgrading to Micro compute (Project Settings → Infrastructure → Compute).</p>
+          <div class="sql-health-wrap">
+            <div class="sql-health-block">SELECT
+  indexrelname,
+  idx_blks_read  AS disk_reads,
+  idx_blks_hit   AS cache_hits,
+  round(idx_blks_hit::numeric /
+        nullif(idx_blks_hit + idx_blks_read, 0) * 100, 1) AS cache_hit_pct
+FROM pg_statio_user_indexes
+WHERE relname = 'rcw_wac_chunks'
+ORDER BY indexrelname;</div>
+            <button id="copy-sql-btn">Copy SQL</button>
+          </div>
+          <div class="sql-guide">
+            <span class="sg-val">&gt; 95%</span><span class="sg-desc">Index in RAM — optimal latency</span>
+            <span class="sg-val">80–95%</span><span class="sg-desc">Partially cached — acceptable after a cold start</span>
+            <span class="sg-val">&lt; 80%</span><span class="sg-desc">Hitting disk — upgrade to Micro compute tier</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="about-tab-panel" data-tab="samples">
+        <div class="about-section">
+          <h3>Sample Queries — Law Enforcement Scenarios</h3>
+          <p class="sample-queries-intro">20 queries that test cross-title retrieval across use of force, arrest, search, certification, public records, and civil liability. Click any query to run it. Query 20 is the most demanding — it requires synthesizing constitutional standards, Washington statute, and criminal procedure simultaneously.</p>
+          <div id="sample-queries-list">
+            <button class="sample-query-btn" data-query="Under the 2021 Washington police reform law, what is the legal standard for using force, and what specific circumstances justify each level of force?"><span class="sample-q-num">1.</span> Under the 2021 Washington police reform law, what is the legal standard for using force, and what specific circumstances justify each level of force?</button>
+            <button class="sample-query-btn" data-query="An officer used a neck restraint to control an actively combative subject. Is this still an authorized technique under RCW 10.116?"><span class="sample-q-num">2.</span> An officer used a neck restraint to control an actively combative subject. Is this still an authorized technique under RCW 10.116?</button>
+            <button class="sample-query-btn" data-query="What are my obligations under RCW 10.120 if I witness another officer using what I believe is excessive force?"><span class="sample-q-num">3.</span> What are my obligations under RCW 10.120 if I witness another officer using what I believe is excessive force?</button>
+            <button class="sample-query-btn" data-query="A person is threatening suicide with a knife but has committed no crime. What force options are lawful, and what de-escalation steps does Washington law require first?"><span class="sample-q-num">4.</span> A person is threatening suicide with a knife but has committed no crime. What force options are lawful, and what de-escalation steps does Washington law require first?</button>
+            <button class="sample-query-btn" data-query="Can I arrest someone for misdemeanor domestic violence that I didn't witness? What is the mandatory arrest threshold under RCW 10.31.100?"><span class="sample-q-num">5.</span> Can I arrest someone for misdemeanor domestic violence that I didn't witness? What is the mandatory arrest threshold under RCW 10.31.100?</button>
+            <button class="sample-query-btn" data-query="I stopped a vehicle for a traffic infraction and the driver consents to a search. What are the limits of a consent search under Washington law?"><span class="sample-q-num">6.</span> I stopped a vehicle for a traffic infraction and the driver consents to a search. What are the limits of a consent search under Washington law?</button>
+            <button class="sample-query-btn" data-query="Under what circumstances can I enter a private residence without a warrant? What exigent circumstances are recognized in Washington?"><span class="sample-q-num">7.</span> Under what circumstances can I enter a private residence without a warrant? What exigent circumstances are recognized in Washington?</button>
+            <button class="sample-query-btn" data-query="I'm arresting someone who claims they are a medical cannabis patient. How does that affect my authority to search and seize?"><span class="sample-q-num">8.</span> I'm arresting someone who claims they are a medical cannabis patient. How does that affect my authority to search and seize?</button>
+            <button class="sample-query-btn" data-query="A driver fails field sobriety tests but blows under .08. Can I still arrest for DUI and what does Washington law require for implied consent?"><span class="sample-q-num">9.</span> A driver fails field sobriety tests but blows under .08. Can I still arrest for DUI and what does Washington law require for implied consent?</button>
+            <button class="sample-query-btn" data-query="I stopped a driver who I suspect is impaired by marijuana. What are the legal standards for a drug-DUI arrest under RCW 46.61.502?"><span class="sample-q-num">10.</span> I stopped a driver who I suspect is impaired by marijuana. What are the legal standards for a drug-DUI arrest under RCW 46.61.502?</button>
+            <button class="sample-query-btn" data-query="What are the CJTC minimum training requirements for initial officer certification in Washington, and what are the consequences of a lapse in continuing education?"><span class="sample-q-num">11.</span> What are the CJTC minimum training requirements for initial officer certification in Washington, and what are the consequences of a lapse in continuing education?</button>
+            <button class="sample-query-btn" data-query="My department wants to deploy a less-lethal munition not currently in our policy. What does WAC 139 require before we can authorize a new weapon type?"><span class="sample-q-num">12.</span> My department wants to deploy a less-lethal munition not currently in our policy. What does WAC 139 require before we can authorize a new weapon type?</button>
+            <button class="sample-query-btn" data-query="A crime victim is requesting a copy of the incident report 10 days after their assault. What information must I disclose and what exemptions apply under RCW 42.56?"><span class="sample-q-num">13.</span> A crime victim is requesting a copy of the incident report 10 days after their assault. What information must I disclose and what exemptions apply under RCW 42.56?</button>
+            <button class="sample-query-btn" data-query="A journalist is requesting dashcam footage of a use-of-force incident. What are my department's disclosure obligations and timeline under Washington public records law?"><span class="sample-q-num">14.</span> A journalist is requesting dashcam footage of a use-of-force incident. What are my department's disclosure obligations and timeline under Washington public records law?</button>
+            <button class="sample-query-btn" data-query="I've arrested a juvenile and cannot reach a parent or guardian. What are my statutory obligations under Washington law regarding notification and detention?"><span class="sample-q-num">15.</span> I've arrested a juvenile and cannot reach a parent or guardian. What are my statutory obligations under Washington law regarding notification and detention?</button>
+            <button class="sample-query-btn" data-query="A subject I'm contacting appears to be in a mental health crisis. What legal tools are available — crisis triage, involuntary treatment, arrest — and in what order should I consider them?"><span class="sample-q-num">16.</span> A subject I'm contacting appears to be in a mental health crisis. What legal tools are available — crisis triage, involuntary treatment, arrest — and in what order should I consider them?</button>
+            <button class="sample-query-btn" data-query="An arrested person is filing a civil rights lawsuit claiming I violated their Fourth Amendment rights. What immunity protections does Washington law and federal law provide?"><span class="sample-q-num">17.</span> An arrested person is filing a civil rights lawsuit claiming I violated their Fourth Amendment rights. What immunity protections does Washington law and federal law provide?</button>
+            <button class="sample-query-btn" data-query="My city is a code city under RCW Title 35A. What authority does that give the city council to set police policy that differs from state law?"><span class="sample-q-num">18.</span> My city is a code city under RCW Title 35A. What authority does that give the city council to set police policy that differs from state law?</button>
+            <button class="sample-query-btn" data-query="I'm writing a departmental policy on body-worn cameras. What does Washington law require the policy to include regarding activation, retention, and public disclosure?"><span class="sample-q-num">19.</span> I'm writing a departmental policy on body-worn cameras. What does Washington law require the policy to include regarding activation, retention, and public disclosure?</button>
+            <button class="sample-query-btn" data-query="A person with an intellectual disability is in custody and is waiving their Miranda rights. What Washington law or court precedent governs the admissibility of that waiver, and what safeguards should I apply?"><span class="sample-q-num">20.</span> A person with an intellectual disability is in custody and is waiving their Miranda rights. What Washington law or court precedent governs the admissibility of that waiver, and what safeguards should I apply?</button>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -806,6 +916,32 @@ copyPromptBtn.addEventListener('click', () => {
   }).catch(() => {
     copyPromptBtn.textContent = 'Error';
   });
+});
+
+document.querySelectorAll('.about-tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.about-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.about-tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelector(`.about-tab-panel[data-tab="${btn.dataset.tab}"]`).classList.add('active');
+  });
+});
+
+document.getElementById('copy-sql-btn').addEventListener('click', function() {
+  const sql = document.querySelector('.sql-health-block').textContent;
+  navigator.clipboard.writeText(sql).then(() => {
+    this.textContent = 'Copied!';
+    setTimeout(() => { this.textContent = 'Copy SQL'; }, 1800);
+  }).catch(() => { this.textContent = 'Error'; });
+});
+
+document.getElementById('sample-queries-list').addEventListener('click', e => {
+  const btn = e.target.closest('.sample-query-btn');
+  if (!btn) return;
+  closeAbout();
+  queryEl.value = btn.dataset.query;
+  if (welcomeEl) welcomeEl.style.display = 'none';
+  sendMessage();
 });
 
 // ── Catalog modal ─────────────────────────────────────────────────────────────

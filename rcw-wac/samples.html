@@ -1,0 +1,65 @@
+<html>
+<title>Monitoring During Testing</title>
+
+**Run this in SQL Editor before and after your test session** — it tells you if the HNSW index is living in RAM or going
+to disk:
+
+```sql
+SELECT
+indexrelname,
+idx_blks_read AS disk_reads,
+idx_blks_hit AS cache_hits,
+round(idx_blks_hit::numeric /
+nullif(idx_blks_hit + idx_blks_read, 0) * 100, 1) AS cache_hit_pct
+FROM pg_statio_user_indexes
+WHERE relname = 'rcw_wac_chunks'
+ORDER BY indexrelname;
+```
+<title>What to Look For</title>
+- `cache_hit_pct` > 95% → index is in RAM, queries barely touch disk ✓
+- `cache_hit_pct` < 80% → every query is going to disk, IO is real ✗ **In the Supabase dashboard while testing:** -
+    **Infrastructure → Disk IO consumed per day** (where you already are) — watch the bar for today; if it was already
+    at ~50% from yesterday's ingest sprint, be conservative - **Infrastructure → CPU** — IO wait shows up as elevated
+    CPU on the Nano; if CPU spikes during queries that's a sign of disk reads, not compute - **Reports → Database** tab
+    has a live cache hit rate chart — aim for the green zone **Practical rule for today:** You've already burned most of
+    today's burst budget. Fire queries one at a time with a few seconds between them, not in rapid succession. Queries
+    are read-only and light — the risk is low — but let the buffer cache warm up after the first few queries and you'll
+    see cache hits climb. --- ## 20 IDD Family Test Queries These are designed to force cross-title connections (RCW +
+    WAC, state + federal) and cover the full lifespan arc: **Early childhood (0–5)** 1. My 18-month-old isn't talking
+    and the pediatrician suspects a developmental delay. What early intervention services is he entitled to, and who do
+    I contact in Washington? 2. My daughter was just diagnosed with autism at age 3. She's transitioning from early
+    intervention to preschool. What does the school district have to provide and what are the timelines? **School years
+    — eligibility and evaluation** 3. My son has an intellectual disability and his school says he doesn't qualify for
+    an IEP. What are my rights to dispute that decision and what is the appeals process in Washington? 4. What is the
+    difference between an IEP under IDEA and a 504 Plan under Section 504? Which one applies to a child with ADHD and
+    anxiety who is struggling academically? 5. My daughter's IEP team wants to move her from a general education
+    classroom to a self-contained special education room. What are her rights regarding least restrictive environment?
+    **School years — services and discipline** 6. My son with Down syndrome has a paraeducator in his IEP. The school
+    keeps pulling the para to cover other classrooms. What does Washington law say about this? 7. My child with an IDD
+    was suspended for 8 days for a behavioral incident. What is a manifestation determination review and what are his
+    rights under IDEA? 8. My daughter with intellectual disability is being bullied and harassed at school. What is the
+    school legally required to do under Washington law? **Transition (ages 14–21)** 9. My son is turning 16 and has an
+    intellectual disability. What transition planning must his IEP include, and who is responsible for coordinating
+    services after he ages out at 21? 10. My daughter is aging out of school services at 21. Walk me through every
+    service system that should be in place before her last day of school — DDA, DVR, Medicaid, housing. **Adult services
+    — DDA and Medicaid** 11. How do I apply for DDA services for my adult son with intellectual disability? What is the
+    eligibility criteria and what happens if he is placed on a waitlist? 12. What is the difference between the DDA CORE
+    waiver and the Basic Plus waiver, and how do I know which one my family member qualifies for? 13. Is ABA therapy
+    covered by Apple Health Medicaid for a teenager with autism? Are there age limits or prior authorization
+    requirements? **Legal and financial** 14. My child with IDD is turning 18. What is the difference between full
+    guardianship and supported decision-making in Washington, and which is appropriate for my situation? 15. My adult
+    daughter with intellectual disability lives in a supported living home. What are her legal rights as a resident and
+    what oversight does the state provide? **Employment and independence** 16. My son with intellectual disability wants
+    to get a job. How does the Division of Vocational Rehabilitation help, and what is Pre-Employment Transition
+    Services for students still in school? 17. Can I take Washington Paid Family and Medical Leave to care for my adult
+    child with a developmental disability during a health crisis? **Rights and enforcement** 18. My insurance company
+    denied coverage for my child's speech therapy, saying it isn't medically necessary. What are my appeal rights under
+    Washington insurance law? 19. My adult son with intellectual disability was arrested. What protections does
+    Washington law provide regarding competency, interrogation, and diversion programs? 20. I believe my daughter's
+    group home is neglecting her. Who do I report this to in Washington, what is the investigation process, and what are
+    the timelines for a response? --- Query 10 is the one I'd most want to see — it requires the tool to synthesize
+    across DDA (WAC 388-845), DVR (WAC 490), Medicaid (WAC 182), and IDEA transition (WAC 392-172A) simultaneously.
+    That's exactly the kind of answer a family needs and currently has to assemble from four different agency websites.
+
+</html>
+

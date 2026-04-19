@@ -1,0 +1,39 @@
+**First — your DVR question answered:** It's right there in the list: **Title 490 — Workforce Training and Education Coordinating Board, *Also Vocational Rehabilitation*.** That "Also Vocational Rehabilitation" is DVR's WAC home. Pair it with RCW 74.29.
+
+---
+
+**WAC titles for an IDD family chatbot:**
+
+| Priority | Title | Why |
+|----------|-------|-----|
+|✅**Core** | **110** — Children, Youth & Families (DCYF) | ESIT (birth-to-three Part C), child care for children with disabilities, dependency when IDD intersects with child welfare |
+|✅**Core** | **182** — Health Care Authority | Medicaid/Apple Health, ABA coverage, HCBS waivers, school-based health for IEP/IFSP students |
+|✅**Core** | **388** — Social & Health Services (DSHS) | DDA eligibility/services, adult family homes (388-76), assisted living (388-78A), community residential (388-101), personal care (388-106) |
+|✅**Core** | **392** — Superintendent of Public Instruction | WAC 392-172A special education, transition services |
+|✅**Core** | **490** — Workforce Training / **Vocational Rehabilitation** | DVR rules — Pre-ETS, order of selection, transition-age services |
+|✅Secondary | **10** — Office of Administrative Hearings | Procedural rules for IEP due process hearings, DDA eligibility appeals, Medicaid fair hearings — this is the administrative court families end up in |
+|✅Secondary | **162** — Human Rights Commission | Disability discrimination in employment, public accommodations, schools |
+|✅Secondary | **170** — Early Learning | Child care licensing including inclusion requirements for children with disabilities |
+|✅Secondary | **179** — Paraeducator Board | Paraeducator training/certification — most IDD students have paras; relevant for IEP implementation disputes |
+|✅Secondary | **180** — State Board of Education | Graduation requirements, alternative pathways for students with IDD |
+|✅Secondary | **192** — Employment Security | Unemployment for family caregivers who leave work; also for the person with IDD who is employed |
+|✅Secondary | **246** — Department of Health | Licensing of BCBAs, SLPs, OTs, PTs, nurses — families vetting providers |
+|✅Secondary | **257** — Home Care Quality Authority | DSHS-funded home care worker rules — wages, training, rights of caregivers serving IDD individuals |
+|✅Secondary | **284** — Insurance Commissioner | Parity laws, autism/ABA coverage mandates, fighting insurance denials |
+|✅Secondary | **296** — Labor & Industries | Workplace safety and supported employment protections for adults with IDD |
+| Secondary | **440** — DSHS General Provisions | Client rights, DSHS appeals process, administrative hearings — the procedural backbone behind 388 |
+| Tangential | **67** — Services for the Blind | When visual impairment co-occurs with IDD |
+| Tangential | **72** — WA School for the Blind | Same overlap population |
+| Tangential | **112** — Family & Children's Ombudsman | Advocacy office for families navigating DCYF; relevant when IDD intersects with foster/dependency |
+| Tangential | **131** — Community & Technical Colleges | Disability services framework at CTC system level — transition to post-secondary |
+| Tangential | **137** — Corrections | IDD individuals are disproportionately in the justice system; relevant for families navigating that intersection |
+| Tangential | **148** — WA School for the Deaf | Deaf-blind and hearing+IDD co-occurring population |
+| Tangential | **262** — Housing Finance Commission | Affordable/accessible housing programs for adults with IDD |
+| Tangential | **484** — Veterans Affairs | VA benefits can interact with DDA/Medicaid; relevant if parent or the individual is a veteran |
+| Nice-to-have | **132A–132Z** — Individual community colleges | Each has disability services rules; very granular but relevant for specific post-secondary transitions |
+| Nice-to-have | **249** — Higher Education Assistance Authority | Financial aid programs for students with disabilities |
+
+---
+
+**Practical starting priority for ingestion:**
+`392` + `388` + `182` + `490` + `110` — those five cover the entire lifespan arc. Add `10` (OAH) and `440` (DSHS general) for the appeals/procedural layer that families inevitably hit.

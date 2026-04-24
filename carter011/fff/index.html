@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>Fight, Flight, or Freeze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+min-height: 100%;
+font-family: 'Inter', system-ui, sans-serif;
+background: radial-gradient(ellipse at top, #1a1530 0%, #0a0814 50%, #050309 100%);
+color: #ece7ff;
+line-height: 1.5;
+-webkit-font-smoothing: antialiased;
+}
+
+#app { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
+
+.hero { text-align: center; margin-bottom: 40px; }
+
+.eyebrow {
+font-size: 12px; font-weight: 700; letter-spacing: 4px;
+text-transform: uppercase; color: #ff5577; margin-bottom: 12px;
+}
+
+.hero h1 {
+font-size: clamp(32px, 6vw, 52px); font-weight: 900; letter-spacing: -1px;
+background: linear-gradient(135deg, #ff5577 0%, #b366ff 50%, #5b9dff 100%);
+-webkit-background-clip: text; background-clip: text;
+color: transparent; margin-bottom: 14px;
+}
+
+.hero h1 span {
+color: #4a4060; -webkit-text-fill-color: #4a4060;
+margin: 0 4px; font-weight: 400;
+}
+
+.tagline { color: #a89cc8; font-size: 16px; max-width: 480px; margin: 0 auto; }
+.tagline em { color: #fff; font-style: normal; font-weight: 600; }
+
+.scene-card {
+background: linear-gradient(180deg, rgba(40, 30, 70, 0.6) 0%, rgba(20, 15, 40, 0.6) 100%);
+border: 1px solid rgba(180, 150, 255, 0.15);
+border-radius: 20px; padding: 36px 32px;
+backdrop-filter: blur(12px);
+box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+margin-bottom: 32px;
+}
+
+.scene-meta {
+display: flex; justify-content: space-between; align-items: center;
+margin-bottom: 18px; font-size: 11px; letter-spacing: 2px;
+text-transform: uppercase; font-weight: 700; color: #8e7eb8;
+}
+
+.scene-tag {
+background: rgba(180, 150, 255, 0.1);
+border: 1px solid rgba(180, 150, 255, 0.25);
+padding: 5px 12px; border-radius: 999px; color: #c8b8ff;
+}
+
+.scene-card h2 {
+font-size: 26px; font-weight: 800; margin-bottom: 14px;
+color: #fff; line-height: 1.25;
+}
+
+#scene-text { font-size: 17px; color: #cabfe8; margin-bottom: 28px; }
+
+.choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+@media (max-width: 580px) {
+.choices { grid-template-columns: 1fr; }
+.scene-card { padding: 28px 20px; }
+#app { padding: 32px 16px 60px; }
+}
+
+.choice {
+display: flex; flex-direction: column; align-items: center; gap: 6px;
+padding: 22px 14px; border-radius: 14px;
+border: 1px solid rgba(255, 255, 255, 0.08);
+background: rgba(255, 255, 255, 0.03);
+color: #fff; cursor: pointer; font-family: inherit;
+transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.choice:hover:not(:disabled) { transform: translateY(-3px); background: rgba(255, 255, 255, 0.06); }
+.choice:active:not(:disabled) { transform: translateY(-1px); }
+.choice:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.choice-icon { font-size: 26px; margin-bottom: 4px; }
+.choice-label { font-weight: 800; font-size: 16px; letter-spacing: 0.5px; }
+.choice-sub { font-size: 11px; color: #9b8fc0; text-align: center; }
+
+.choice.fight:hover:not(:disabled) {
+border-color: #ff5577; box-shadow: 0 12px 30px -10px rgba(255, 85, 119, 0.6);
+}
+.choice.flight:hover:not(:disabled) {
+border-color: #ffa84a; box-shadow: 0 12px 30px -10px rgba(255, 168, 74, 0.6);
+}
+.choice.freeze:hover:not(:disabled) {
+border-color: #5bb8ff; box-shadow: 0 12px 30px -10px rgba(91, 184, 255, 0.6);
+}
+
+.choice.correct {
+background: linear-gradient(135deg, rgba(80, 220, 130, 0.3), rgba(80, 220, 130, 0.05));
+border-color: #50dc82; opacity: 1;
+}
+.choice.wrong {
+background: linear-gradient(135deg, rgba(255, 80, 80, 0.25), rgba(255, 80, 80, 0.05));
+border-color: #ff5050; opacity: 1;
+}
+
+.outcome {
+margin-top: 28px; padding: 24px;
+background: rgba(0, 0, 0, 0.3);
+border-left: 3px solid #b366ff;
+border-radius: 10px;
+animation: slideIn 0.4s ease;
+}
+
+.outcome.hidden { display: none; }
+
+@keyframes slideIn {
+from { opacity: 0; transform: translateY(8px); }
+to { opacity: 1; transform: translateY(0); }
+}
+
+.verdict {
+display: inline-block; font-size: 11px; letter-spacing: 3px;
+font-weight: 700; padding: 5px 12px; border-radius: 999px;
+margin-bottom: 12px;
+}
+.verdict.right { background: rgba(80, 220, 130, 0.15); color: #6eea99; border: 1px solid #50dc82; }
+.verdict.wrong { background: rgba(255, 80, 80, 0.15); color: #ff8888; border: 1px solid #ff5050; }
+
+.outcome h3 { font-size: 22px; font-weight: 800; margin-bottom: 12px; color: #fff; }
+#outcome-text { font-size: 16px; color: #d8cef0; margin-bottom: 20px; }
+
+.fact-box {
+margin-top: 18px; padding: 16px 18px;
+background: rgba(91, 157, 255, 0.08);
+border: 1px solid rgba(91, 157, 255, 0.25);
+border-radius: 10px;
+}
+.fact-eyebrow {
+font-size: 10px; letter-spacing: 3px; font-weight: 700;
+color: #5b9dff; margin-bottom: 6px; text-transform: uppercase;
+}
+.fact-text { font-size: 14px; color: #d8cef0; line-height: 1.55; }
+
+.outcome-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
+
+.primary-btn {
+background: linear-gradient(135deg, #b366ff, #5b9dff);
+color: #fff; border: none; padding: 12px 24px;
+font-family: inherit; font-weight: 700; font-size: 14px;
+letter-spacing: 0.5px; border-radius: 10px; cursor: pointer;
+transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.primary-btn:hover {
+transform: translateY(-2px);
+box-shadow: 0 12px 28px -8px rgba(179, 102, 255, 0.6);
+}
+
+.stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 32px; }
+
+.stat {
+text-align: center; padding: 18px 10px;
+background: rgba(255, 255, 255, 0.03);
+border: 1px solid rgba(255, 255, 255, 0.06);
+border-radius: 12px;
+}
+
+.stat-num { display: block; font-size: 28px; font-weight: 900; color: #fff; margin-bottom: 4px; }
+.stat-label { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #8e7eb8; font-weight: 600; }
+
+.footer { text-align: center; font-size: 13px; color: #6e6390; max-width: 460px; margin: 0 auto; }
+</style>
+</head>
+<body>
+<main id="app">
+<header class="hero">
+<p class="eyebrow">Survival Instincts</p>
+<h1>Fight <span>·</span> Flight <span>·</span> Freeze</h1>
+<p class="tagline">A scenario hits. Pick the response your body should take. Then learn what's happening inside <em>you</em>.</p>
+</header>
+
+<section class="scene-card">
+<div class="scene-meta">
+<span id="scene-counter">Scenario 1</span>
+<span id="scene-tag" class="scene-tag">—</span>
+</div>
+<h2 id="scene-title">Loading...</h2>
+<p id="scene-text">Get ready.</p>
+
+<div class="choices" id="choices">
+<button class="choice fight" data-choice="fight">
+<span class="choice-icon">⚔</span>
+<span class="choice-label">Fight</span>
+<span class="choice-sub">Confront the threat</span>
+</button>
+<button class="choice flight" data-choice="flight">
+<span class="choice-icon">➤</span>
+<span class="choice-label">Flight</span>
+<span class="choice-sub">Get away fast</span>
+</button>
+<button class="choice freeze" data-choice="freeze">
+<span class="choice-icon">❄</span>
+<span class="choice-label">Freeze</span>
+<span class="choice-sub">Stay perfectly still</span>
+</button>
+</div>
+
+<div id="outcome" class="outcome hidden">
+<span id="verdict" class="verdict right">CORRECT</span>
+<h3 id="outcome-title">—</h3>
+<p id="outcome-text">—</p>
+
+<div class="fact-box">
+<p class="fact-eyebrow">Body Fact</p>
+<p id="fact-text" class="fact-text">—</p>
+</div>
+
+<div class="outcome-actions">
+<button id="next-btn" class="primary-btn">Next Scenario →</button>
+</div>
+</div>
+</section>
+
+<section class="stats">
+<div class="stat"><span class="stat-num" id="stat-correct">0</span><span class="stat-label">Correct</span></div>
+<div class="stat"><span class="stat-num" id="stat-wrong">0</span><span class="stat-label">Wrong</span></div>
+</section>
+
+<footer class="footer">
+<p>Each scenario has one survival-smart answer. Pick wisely — and learn what your nervous system is doing the whole time.</p>
+</footer>
+</main>
+
+<script>
+(function () {
+"use strict";
+
+const SCENARIOS = [
+{
+tag: "Dark Alley",
+title: "A stranger steps out of the shadows",
+text: "You're walking home alone at night down a narrow alley. Footsteps quicken behind you. A tall figure in a hood appears in front of you, blocking your path. He says nothing — just stares.",
+answer: "flight",
+outcome: "FLIGHT is the smart move. You pivot and sprint the other way before he can close the distance. Two blocks later, under a streetlight, you finally look back. He didn't follow. Confronting an unknown attacker in a dark alley is a coin flip — running buys you space, witnesses, and time."
+},
+{
+tag: "Wildlife",
+title: "A black bear enters the campsite",
+text: "You're roasting marshmallows when a black bear lumbers into the clearing twenty feet away. It sniffs the air, locks eyes with you, and takes one slow step closer.",
+answer: "fight",
+outcome: "FIGHT is correct — for a black bear. Stand tall, raise your arms, and bang a pot with a stick. Yell. The bear's ears flatten and it crashes back into the trees. Running triggers a chase instinct, and freezing means you're prey."
+},
+{
+tag: "Public Speaking",
+title: "The mic is on. Everyone is staring.",
+text: "You step up to give a presentation to 200 people. The slides freeze. The clicker won't work. The audience starts murmuring. Your boss is in the front row.",
+answer: "fight",
+outcome: "FIGHT — meaning take charge. You laugh into the mic. 'Well, the tech gods clearly hate me today.' You ditch the slides, walk to the edge of the stage, and just talk. The audience laughs with you. Owning the moment beats hiding from it."
+},
+{
+tag: "Predator",
+title: "A mountain lion is crouched on the trail",
+text: "You round a bend on a hiking trail and freeze mid-step. Forty feet ahead, a mountain lion is in a low crouch, tail twitching. It hasn't pounced — yet. It's watching you.",
+answer: "fight",
+outcome: "FIGHT. Make yourself look as large as possible — open your jacket, raise your arms, throw rocks, shout. Mountain lions ambush prey that runs. Turning your back tells it dinner just decided to flee. Stand your ground and slowly back away while keeping eye contact."
+},
+{
+tag: "Home Invasion",
+title: "Glass breaks downstairs at 3 AM",
+text: "You wake up to the unmistakable sound of a window shattering on the first floor. Then footsteps. Slow ones. Your phone is across the room.",
+answer: "freeze",
+outcome: "FREEZE — at first. Stay silent, stay hidden, lock the bedroom door, and quietly call 911. Most burglars want stuff, not confrontation. Charging downstairs into the unknown or jumping out a window risks more than waiting them out from a locked room."
+},
+{
+tag: "Snake",
+title: "A rattlesnake is coiled on the path",
+text: "You step around a boulder and there it is — three feet away, body tightly coiled, tail rattling like a maraca. Its head is up. Its eyes are on you.",
+answer: "freeze",
+outcome: "FREEZE. Don't move. Don't even shift your weight. Snakes strike at motion. Stand perfectly still until the snake calms and slithers away, then slowly back up. Running risks a strike on the heel. Stillness is survival."
+},
+{
+tag: "Riptide",
+title: "The current is pulling you out to sea",
+text: "You're swimming at the beach when you suddenly realize the shore is getting smaller. Fast. Your arms burn from trying to swim back, but you're losing ground. Panic rising.",
+answer: "flight",
+outcome: "FLIGHT — but sideways, not back. Stop fighting the current. Swim PARALLEL to the shore until you're out of the riptide's narrow channel, then angle back in. Fighting straight against it is how people drown from exhaustion."
+},
+{
+tag: "Active Threat",
+title: "Loud popping sounds in the building",
+text: "You're in a crowded mall food court when you hear what sounds like firecrackers — three sharp pops, then more. People near the source start screaming and running. You see a clear exit fifty feet away.",
+answer: "flight",
+outcome: "FLIGHT. Run — Hide — Fight, in that order. If there's a clear escape route, take it. Drop your bags. Don't stop for belongings. Don't pull out your phone to film. Move fast, move low, and put as many walls and corners between you and the threat as possible."
+},
+{
+tag: "Fire",
+title: "Smoke is pouring under the door",
+text: "You wake up in a hotel room. Smoke is curling under the door and the smell of something burning fills the air. The fire alarm is wailing in the hallway. You're on the 8th floor.",
+answer: "flight",
+outcome: "FLIGHT — fast, low, and through the stairs. NEVER take an elevator in a fire. Touch the door first; if it's hot, stay in and seal the gap with wet towels. If cool, crawl below the smoke to the nearest stairwell. Smoke kills more people than flames."
+},
+{
+tag: "Dog Attack",
+title: "An off-leash dog is sprinting at you",
+text: "You're jogging through a park when a large unleashed dog spots you and starts barreling in your direction at full speed. Its ears are pinned back, hackles up. The owner is nowhere in sight.",
+answer: "freeze",
+outcome: "FREEZE. Stop running immediately — running activates a dog's chase instinct. Stand sideways, avoid eye contact, keep your hands at your sides, and stay perfectly still. 'Be a tree.' Most charging dogs lose interest when there's no chase. Only fight if it actually attacks."
+},
+{
+tag: "Bully",
+title: "Someone is shoving your friend at school",
+text: "In the hallway, an older student grabs your friend by the shirt and slams them into the lockers. People are watching. Your friend looks terrified. The bully hasn't noticed you yet.",
+answer: "fight",
+outcome: "FIGHT — verbally and visibly, not physically. Step in loudly: 'Hey! Stop. Let them go.' Pull out your phone like you're recording. Get a teacher. Bullies depend on silent audiences. The moment one person speaks up, the dynamic breaks. Don't throw a punch — bring witnesses."
+},
+{
+tag: "Car Crash",
+title: "Headlights are coming straight at you",
+text: "You're driving at night on a two-lane road. A car in the oncoming lane suddenly swerves into yours, headlights blinding you. There's a guardrail to your left and a shoulder to your right. Two seconds.",
+answer: "flight",
+outcome: "FLIGHT — to the right. Steer toward the shoulder, not into the oncoming car or the guardrail. Brake hard but don't lock the wheel. Drivers cross center lines from drowsiness or distraction; they often correct at the last second. Get out of their lane before they fix theirs."
+},
+{
+tag: "Drowning Person",
+title: "Someone is panicking in the pool",
+text: "At a busy pool, a kid you don't know is thrashing in the deep end, gasping. No lifeguard is in sight. People nearby haven't noticed. You're a strong swimmer.",
+answer: "fight",
+outcome: "FIGHT — by acting fast and shouting for help. Yell 'CALL 911!' to get attention, then throw something that floats — a kickboard, a pool noodle, a foam toy. Reach with a pole if possible. Only enter the water as a last resort; panicked drowners climb their rescuers. Get help fast and use a flotation aid."
+},
+{
+tag: "Job Interview",
+title: "They ask the question you didn't prepare for",
+text: "Halfway through the interview, the panel asks: 'Tell us about a time you failed and what you learned.' Your mind goes blank. They're waiting. The pause is getting awkward.",
+answer: "fight",
+outcome: "FIGHT — engage, don't escape. Take a breath and say, 'Good question, let me think about that for a moment.' Buy yourself five seconds. Then pick any real story and shape it into the answer. Confidence in delivery beats a perfect example. Silence and panic lose the room."
+},
+{
+tag: "Bee Swarm",
+title: "Bees are pouring out of the ground",
+text: "You step on a hidden ground nest while hiking. Within seconds, dozens of bees are angrily swarming up around your legs. They're starting to land in your hair.",
+answer: "flight",
+outcome: "FLIGHT — and run far. Don't swat (it releases more attack pheromones), don't jump in water (they wait at the surface), don't drop and play dead. Run in a straight line for at least a quarter mile. Pull your shirt over your head to protect your face. Bees CAN and WILL chase you — but most give up after 100 yards."
+},
+{
+tag: "Earthquake",
+title: "The whole building starts shaking",
+text: "You're in a second-story office when everything starts violently shaking. Light fixtures swing, mugs slide off desks, people are screaming. The shaking gets worse.",
+answer: "freeze",
+outcome: "FREEZE — in place, but get low. DROP, COVER, and HOLD ON. Get under a sturdy desk or table and hold a leg until the shaking stops. Don't run for stairs (you'll be thrown), don't run outside (falling debris). Stay put, stay covered, ride it out."
+},
+{
+tag: "Bad Date",
+title: "Your date is being aggressive at the bar",
+text: "Halfway through a first date, the person across from you starts getting loud, drinking too fast, making comments that feel threatening. They're sitting between you and the door.",
+answer: "flight",
+outcome: "FLIGHT — discreetly. Excuse yourself for the bathroom. On the way, tell a bartender or server you don't feel safe and ask them to call you a ride. Many bars have 'angel shot' codes for exactly this. Leave through a back exit if possible. Don't confront. Don't return to the table."
+},
+{
+tag: "Choking",
+title: "Someone at the table can't breathe",
+text: "At a restaurant, the woman across from you suddenly clutches her throat. Her face is turning red. She can't speak. She's pointing frantically at her neck. Other diners are staring.",
+answer: "fight",
+outcome: "FIGHT — act NOW. Get behind her, fist above the navel, other hand wrapped around it, and thrust inward and upward five times. Repeat until the food dislodges or she loses consciousness. A choking person has minutes. Hesitating to ask permission can kill them. The Heimlich is permission."
+},
+{
+tag: "Argument",
+title: "Your partner is screaming at you",
+text: "A small disagreement has spiraled. Your partner is yelling, voice shaking, saying things they don't mean. The argument is escalating fast. Your heart is pounding and you feel words rising you'll regret.",
+answer: "freeze",
+outcome: "FREEZE — not avoidance, but a deliberate pause. Say calmly: 'I need ten minutes. I'm coming back.' Walk away, breathe, let your nervous system come down. Adrenaline-fueled arguments do permanent damage. The pause is the relationship-saving move — not the silent treatment, just a regulated reset."
+},
+{
+tag: "Lost in Wilderness",
+title: "The trail vanished an hour ago",
+text: "You're hiking solo and realize you've been off-trail for over an hour. The sun is dropping. You don't recognize anything. Phone has no signal. You're starting to feel cold.",
+answer: "freeze",
+outcome: "FREEZE — stop where you are. The wilderness rule is STOP: Stop, Think, Observe, Plan. Wandering further makes you harder to find and burns calories you'll need. Stay put, make yourself visible, build a small shelter, and conserve energy. Search and rescue look for stationary people, not moving targets."
+}
+];
+
+const BODY_FACTS = [
+"Your adrenal glands flood your body with adrenaline and cortisol within 1-2 seconds of perceiving a threat. Your heart rate can double in under 10 seconds, pumping oxygen-rich blood to your large muscles so you can fight or run.",
+"Blood is rerouted away from your skin, stomach, and digestive system and shoved toward your arms and legs. That's why your face goes pale, your mouth goes dry, and your stomach feels like it dropped — your body just shut down digestion to power your muscles.",
+"Your pupils dilate to let in more light and your peripheral vision narrows into 'tunnel vision.' Hearing can dull or sharpen unpredictably. Your brain is literally reconfiguring your senses to focus only on the threat in front of you.",
+"During a freeze response, your body does the opposite — heart rate and breathing slow down, muscles tense and lock, and the vagus nerve essentially hits the brakes on your nervous system. This is an ancient reflex from when staying still meant predators couldn't see you.",
+"After the threat passes, your body has to burn off all that stress chemistry. That's why you shake, cry, laugh hysterically, or feel exhausted afterward — adrenaline and cortisol take 20-60 minutes to fully clear your bloodstream, even after your brain knows you're safe."
+];
+
+const stats = { correct: 0, wrong: 0 };
+const order = shuffle(SCENARIOS.map((_, i) => i));
+const factOrder = shuffle(BODY_FACTS.map((_, i) => i));
+let pointer = 0;
+let answered = false;
+
+const els = {
+counter: document.getElementById("scene-counter"),
+tag: document.getElementById("scene-tag"),
+title: document.getElementById("scene-title"),
+text: document.getElementById("scene-text"),
+choices: document.querySelectorAll(".choice"),
+outcome: document.getElementById("outcome"),
+verdict: document.getElementById("verdict"),
+outcomeTitle: document.getElementById("outcome-title"),
+outcomeText: document.getElementById("outcome-text"),
+factText: document.getElementById("fact-text"),
+nextBtn: document.getElementById("next-btn"),
+statCorrect: document.getElementById("stat-correct"),
+statWrong: document.getElementById("stat-wrong")
+};
+
+function shuffle(arr) {
+const a = arr.slice();
+for (let i = a.length - 1; i > 0; i--) {
+const j = Math.floor(Math.random() * (i + 1));
+[a[i], a[j]] = [a[j], a[i]];
+}
+return a;
+}
+
+function currentScenario() {
+return SCENARIOS[order[pointer % order.length]];
+}
+
+function currentFact() {
+return BODY_FACTS[factOrder[pointer % factOrder.length]];
+}
+
+function renderScenario() {
+answered = false;
+const s = currentScenario();
+els.counter.textContent = "Scenario " + (pointer + 1);
+els.tag.textContent = s.tag;
+els.title.textContent = s.title;
+els.text.textContent = s.text;
+els.outcome.classList.add("hidden");
+els.choices.forEach(function (btn) {
+btn.disabled = false;
+btn.classList.remove("correct", "wrong");
+});
+}
+
+function handleChoice(choice) {
+if (answered) return;
+answered = true;
+
+const s = currentScenario();
+const isCorrect = choice === s.answer;
+
+if (isCorrect) stats.correct += 1;
+else stats.wrong += 1;
+updateStats();
+
+els.choices.forEach(function (btn) {
+btn.disabled = true;
+if (btn.dataset.choice === s.answer) btn.classList.add("correct");
+if (btn.dataset.choice === choice && !isCorrect) btn.classList.add("wrong");
+});
+
+els.verdict.textContent = isCorrect ? "CORRECT" : "NOT QUITE";
+els.verdict.classList.toggle("right", isCorrect);
+els.verdict.classList.toggle("wrong", !isCorrect);
+
+const labels = { fight: "FIGHT", flight: "FLIGHT", freeze: "FREEZE" };
+els.outcomeTitle.textContent = isCorrect
+? "Right call — " + labels[s.answer]
+: "The right call was " + labels[s.answer];
+els.outcomeText.textContent = s.outcome;
+els.factText.textContent = currentFact();
+
+els.outcome.classList.remove("hidden");
+els.outcome.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function updateStats() {
+els.statCorrect.textContent = stats.correct;
+els.statWrong.textContent = stats.wrong;
+}
+
+function nextScenario() {
+pointer += 1;
+renderScenario();
+document.querySelector(".scene-card").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+els.choices.forEach(function (btn) {
+btn.addEventListener("click", function () {
+handleChoice(btn.dataset.choice);
+});
+});
+
+els.nextBtn.addEventListener("click", nextScenario);
+
+renderScenario();
+})();
+</script>
+</body>
+</html>

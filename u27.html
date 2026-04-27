@@ -1,260 +1,272 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Unit 27 Optics Sign Convention Calculator</title>
+  <title>Unit 27 Lenses & Mirrors Calculator</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       background: #f4f6f8;
       margin: 0;
       padding: 20px;
-      color: #1f2933;
+      color: #1f2933
     }
+
     .wrap {
-      max-width: 920px;
+      max-width: 900px;
       margin: 0 auto;
       background: #fff;
+      padding: 20px;
       border-radius: 10px;
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
-      padding: 24px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, .12)
     }
-    h1 { margin-top: 0; color: #223b53; }
-    .note {
-      background: #fff7e6;
-      border-left: 4px solid #f5a623;
-      padding: 12px;
-      border-radius: 4px;
-      margin-bottom: 18px;
-      line-height: 1.35;
+
+    h1 {
+      margin-top: 0
     }
+
+    .row {
+      margin: 8px 0
+    }
+
+    label {
+      display: inline-block;
+      width: 180px;
+      font-weight: 700
+    }
+
+    select {
+      padding: 6px 8px
+    }
+
     .grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 14px;
+      gap: 16px
     }
-    .row {
+
+    .symrow {
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 10px;
+      margin: 8px 0
     }
-    label {
-      width: 240px;
-      font-weight: 700;
-      font-size: 14px;
+
+    .sym {
+      width: 30px;
+      text-align: right
     }
-    input, select {
-      padding: 8px 10px;
-      border: 2px solid #cfd8e3;
-      border-radius: 6px;
-      font-size: 15px;
+
+    .eq {
+      width: 16px;
+      text-align: center
     }
-    input { width: 160px; }
-    .unit { color: #627d98; }
-    .actions { margin: 18px 0; text-align: center; }
+
+    .in {
+      width: 90px;
+      background: #ecef9e;
+      border: 2px solid #444;
+      border-radius: 8px;
+      padding: 6px;
+      text-align: center
+    }
+
+    .out {
+      width: 96px;
+      background: #4cf165;
+      border: 2px solid #1f7f34;
+      border-radius: 8px;
+      padding: 6px;
+      text-align: center
+    }
+
+    .btns {
+      margin: 14px 0
+    }
+
     button {
+      padding: 10px 16px;
       border: none;
       border-radius: 6px;
-      padding: 11px 22px;
-      font-size: 16px;
-      cursor: pointer;
+      cursor: pointer
     }
-    .calc { background: #2f80ed; color: #fff; }
-    .clear { background: #7b8794; color: #fff; margin-left: 10px; }
+
+    .calc {
+      background: #2f80ed;
+      color: #fff
+    }
+
+    .clear {
+      background: #7b8794;
+      color: #fff;
+      margin-left: 8px
+    }
+
     .results {
+      display: none;
       background: #e9f7ef;
-      border-radius: 8px;
-      padding: 16px;
-      display: none;
+      padding: 12px;
+      border-radius: 8px
     }
-    .results.show { display: block; }
-    .card {
-      background: #fff;
-      border-radius: 6px;
-      padding: 10px 12px;
-      margin: 8px 0;
+
+    .results.show {
+      display: block
     }
-    .error {
+
+    .qa {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px
+    }
+
+    .qa select {
+      width: 170px;
+      background: #4cf165;
+      border: 2px solid #1f7f34;
+      border-radius: 8px
+    }
+
+    .err {
       display: none;
-      margin-top: 10px;
-      color: #b00020;
       background: #fdecef;
-      border-radius: 6px;
+      color: #b00020;
       padding: 10px;
+      border-radius: 6px
     }
-    .error.show { display: block; }
-    @media (max-width: 760px) {
-      .grid { grid-template-columns: 1fr; }
-      label { width: 190px; }
+
+    .err.show {
+      display: block
     }
   </style>
 </head>
+
 <body>
   <div class="wrap">
-    <h1>Unit 27: Lenses & Mirrors Sign Calculator</h1>
+    <h1>Unit 27: Lenses & Mirrors Sign Convention Calculator</h1>
 
-    <div class="note">
-      Enter <strong>magnitudes</strong> for distances/heights. This tool applies traditional sign conventions automatically:<br>
-      • Converging lens / concave mirror: <strong>f positive</strong><br>
-      • Diverging lens / convex mirror: <strong>f negative</strong><br>
-      • Real object in front: <strong>d<sub>o</sub> positive</strong>, <strong>h<sub>o</sub> positive</strong>
+    <div class="row"><label>Device family</label>
+      <select id="deviceType">
+        <option value="lens">Lens</option>
+        <option value="mirror">Mirror</option>
+      </select>
+    </div>
+    <div class="row"><label>Behavior</label>
+      <select id="behavior">
+        <option value="converging">Converging</option>
+        <option value="diverging">Diverging</option>
+      </select>
     </div>
 
     <div class="grid">
       <div>
-        <div class="row">
-          <label for="deviceType">Device family</label>
-          <select id="deviceType">
-            <option value="lens">Lens</option>
-            <option value="mirror">Mirror</option>
-          </select>
-        </div>
-        <div class="row">
-          <label for="behavior">Behavior</label>
-          <select id="behavior">
-            <option value="converging">Converging</option>
-            <option value="diverging">Diverging</option>
-          </select>
-        </div>
-        <div class="row">
-          <label for="fMag">Focal length magnitude |f|</label>
-          <input id="fMag" type="number" min="0" step="any" placeholder="e.g. 20" />
-          <span class="unit">cm</span>
-        </div>
+        <div class="symrow"><span class="sym">f</span><span class="eq">=</span><input id="fVal" class="in" type="number"
+            min="0" step="any"><span>cm</span></div>
+        <div class="symrow"><span class="sym">d<sub>o</sub></span><span class="eq">=</span><input id="doVal" class="in"
+            type="number" min="0" step="any"><span>cm</span></div>
+        <div class="symrow"><span class="sym">h<sub>o</sub></span><span class="eq">=</span><input id="hoVal" class="in"
+            type="number" min="0" step="any"><span>cm</span></div>
       </div>
-
       <div>
-        <div class="row">
-          <label for="doMag">Object distance |d<sub>o</sub>|</label>
-          <input id="doMag" type="number" min="0" step="any" placeholder="e.g. 15" />
-          <span class="unit">cm</span>
-        </div>
-        <div class="row">
-          <label for="hoMag">Object height |h<sub>o</sub>|</label>
-          <input id="hoMag" type="number" min="0" step="any" placeholder="e.g. 10" />
-          <span class="unit">cm</span>
-        </div>
+        <div class="symrow"><span class="sym">M</span><span class="eq">=</span><input id="mVal" class="in" type="number"
+            min="0" step="any"></div>
+        <div class="symrow"><span class="sym">d<sub>i</sub></span><span class="eq">=</span><input id="diVal" class="in"
+            type="number" min="0" step="any"><span>cm</span></div>
+        <div class="symrow"><span class="sym">h<sub>i</sub></span><span class="eq">=</span><input id="hiVal" class="in"
+            type="number" min="0" step="any"><span>cm</span></div>
       </div>
     </div>
 
-    <div class="actions">
-      <button class="calc" id="calcBtn">Calculate</button>
-      <button class="clear" id="clearBtn" type="button">Clear</button>
-    </div>
-
-    <div id="error" class="error"></div>
+    <div class="btns"><button class="calc" id="calcBtn">Calculate</button><button class="clear"
+        id="clearBtn">Clear</button></div>
+    <div id="error" class="err"></div>
 
     <div id="results" class="results">
       <h3>Calculated values (with signs)</h3>
       <div id="valueCards"></div>
-      <h3>Interpretation</h3>
-      <div id="interpretation"></div>
+      <div class="qa"><span>What type of image is formed?</span><select id="typeOut">
+          <option></option>
+        </select></div>
+      <div class="qa"><span>What is the size of the image?</span><select id="sizeOut">
+          <option></option>
+        </select></div>
+      <div class="qa"><span>What is the orientation of the image?</span><select id="orientationOut">
+          <option></option>
+        </select></div>
     </div>
   </div>
 
   <script>
-    const $ = (id) => document.getElementById(id);
-
-    function fmt(n) {
-      if (!Number.isFinite(n)) return 'undefined';
-      return Math.abs(n) < 1e-10 ? '0.000' : n.toFixed(3);
-    }
-
-    function signFromBehavior(behavior) {
-      return behavior === 'converging' ? 1 : -1;
-    }
-
-    function describeImageType(di, deviceType) {
-      if (di > 0) {
-        return deviceType === 'lens'
-          ? 'Real image (forms on opposite side of the lens from the object).'
-          : 'Real image (forms in front of the mirror, same side as object).';
-      }
-      if (di < 0) {
-        return deviceType === 'lens'
-          ? 'Virtual image (forms on the same side of the lens as the object).'
-          : 'Virtual image (forms behind the mirror).';
-      }
-      return 'Image at infinity (object at focal point).';
-    }
+    const $ = id => document.getElementById(id);
+    const fmt = n => Number.isFinite(n) ? (Math.abs(n) < 1e-10 ? '0.000' : n.toFixed(3)) : 'undefined';
+    const parseMaybe = id => { const v = $(id).value.trim(); if (v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : NaN; };
+    const approx = (a, b, t = 1e-6) => Math.abs(a - b) <= t * Math.max(1, Math.abs(a), Math.abs(b));
+    function setOrCheck(s, k, v) { if (!Number.isFinite(v)) return false; if (s[k] === null) { s[k] = v; return true; } if (!approx(s[k], v)) throw new Error('Input conflict for ' + k); return false; }
 
     function calculate() {
-      const error = $('error');
-      error.classList.remove('show');
-      error.textContent = '';
+      const error = $('error'); error.classList.remove('show'); error.textContent = '';
+      const behavior = $('behavior').value, signF = behavior === 'converging' ? 1 : -1;
+      const i = { fMag: parseMaybe('fVal'), doMag: parseMaybe('doVal'), hoMag: parseMaybe('hoVal'), mMag: parseMaybe('mVal'), diMag: parseMaybe('diVal'), hiMag: parseMaybe('hiVal') };
+      if (Object.values(i).some(v => Number.isNaN(v))) { error.textContent = 'Enter valid numbers or leave blank.'; error.classList.add('show'); $('results').classList.remove('show'); return; }
+      if (Object.values(i).filter(v => v !== null).length < 2) { error.textContent = 'Enter at least two known values.'; error.classList.add('show'); $('results').classList.remove('show'); return; }
 
-      const deviceType = $('deviceType').value;
-      const behavior = $('behavior').value;
-      const fMag = parseFloat($('fMag').value);
-      const doMag = parseFloat($('doMag').value);
-      const hoMag = parseFloat($('hoMag').value);
+      const signChoices = (i.mMag !== null ? [1, -1] : [1]).flatMap(sm => (i.diMag !== null ? [1, -1] : [1]).flatMap(sd => (i.hiMag !== null ? [1, -1] : [1]).map(sh => ({ sm, sd, sh }))));
+      const sols = [];
 
-      if (![fMag, doMag, hoMag].every(v => Number.isFinite(v) && v > 0)) {
-        error.textContent = 'Please enter positive magnitudes for |f|, |dₒ|, and |hₒ|.';
-        error.classList.add('show');
-        $('results').classList.remove('show');
-        return;
+      for (const c of signChoices) {
+        const s = { f: i.fMag === null ? null : signF * i.fMag, d_o: i.doMag === null ? null : i.doMag, h_o: i.hoMag === null ? null : i.hoMag, M: i.mMag === null ? null : c.sm * i.mMag, d_i: i.diMag === null ? null : c.sd * i.diMag, h_i: i.hiMag === null ? null : c.sh * i.hiMag };
+        try {
+          let ch = true, g = 0;
+          while (ch && g < 20) {
+            ch = false; g++;
+            const { f, d_o, d_i, M, h_o, h_i } = s;
+            if (f !== null && d_o !== null && d_i === null && !approx((1 / f) - (1 / d_o), 0)) ch = setOrCheck(s, 'd_i', 1 / ((1 / f) - (1 / d_o))) || ch;
+            if (f !== null && d_i !== null && d_o === null && !approx((1 / f) - (1 / d_i), 0)) ch = setOrCheck(s, 'd_o', 1 / ((1 / f) - (1 / d_i))) || ch;
+            if (d_o !== null && d_i !== null && f === null && !approx((1 / d_o) + (1 / d_i), 0)) ch = setOrCheck(s, 'f', 1 / ((1 / d_o) + (1 / d_i))) || ch;
+            if (M !== null && d_o !== null && d_i === null) ch = setOrCheck(s, 'd_i', -M * d_o) || ch;
+            if (M !== null && d_i !== null && d_o === null && !approx(M, 0)) ch = setOrCheck(s, 'd_o', -d_i / M) || ch;
+            if (d_o !== null && d_i !== null && M === null && !approx(d_o, 0)) ch = setOrCheck(s, 'M', -d_i / d_o) || ch;
+            if (h_o !== null && M !== null && h_i === null) ch = setOrCheck(s, 'h_i', M * h_o) || ch;
+            if (h_i !== null && M !== null && h_o === null && !approx(M, 0)) ch = setOrCheck(s, 'h_o', h_i / M) || ch;
+            if (h_o !== null && h_i !== null && M === null && !approx(h_o, 0)) ch = setOrCheck(s, 'M', h_i / h_o) || ch;
+          }
+          if ([s.f, s.d_o, s.h_o, s.M, s.d_i, s.h_i].every(v => v !== null)) sols.push(s);
+        } catch (e) { }
       }
 
-      const f = signFromBehavior(behavior) * fMag;
-      const d_o = doMag;
-      const h_o = hoMag;
-
-      const denom = (1 / f) - (1 / d_o);
-      if (Math.abs(denom) < 1e-12) {
-        error.textContent = 'No finite image forms (object is at focal point, so image is at infinity).';
-        error.classList.add('show');
-        $('results').classList.remove('show');
-        return;
-      }
-
-      const d_i = 1 / denom;
-      const M = -d_i / d_o;
-      const h_i = M * h_o;
-
-      const sizeText = Math.abs(M) > 1 ? 'Larger than object' : (Math.abs(M) < 1 ? 'Smaller than object' : 'Same size as object');
-      const orientationText = h_i < 0 ? 'Inverted (negative image height).' : (h_i > 0 ? 'Upright (positive image height).' : 'No height (degenerate case).');
+      if (sols.length !== 1) { error.textContent = sols.length === 0 ? 'No unique solution from provided magnitudes.' : 'Multiple sign solutions fit. Add one more value.'; error.classList.add('show'); $('results').classList.remove('show'); return; }
+      const { f, d_o, h_o, M, d_i, h_i } = sols[0];
 
       $('valueCards').innerHTML = `
-        <div class="card"><strong>f</strong> = ${fmt(f)} cm</div>
-        <div class="card"><strong>d<sub>o</sub></strong> = ${fmt(d_o)} cm</div>
-        <div class="card"><strong>h<sub>o</sub></strong> = ${fmt(h_o)} cm</div>
-        <div class="card"><strong>d<sub>i</sub></strong> = ${fmt(d_i)} cm</div>
-        <div class="card"><strong>M</strong> = ${fmt(M)}</div>
-        <div class="card"><strong>h<sub>i</sub></strong> = ${fmt(h_i)} cm</div>
-      `;
-
-      $('interpretation').innerHTML = `
-        <div class="card">${describeImageType(d_i, deviceType)}</div>
-        <div class="card">${sizeText} (${fmt(M)} magnification).</div>
-        <div class="card">${orientationText}</div>
-        <div class="card"><strong>Negative-sign conventions used:</strong><br>
-          • <strong>f &lt; 0</strong>: diverging device (diverging lens or convex mirror).<br>
-          • <strong>d<sub>i</sub> &lt; 0</strong>: virtual image.<br>
-          • <strong>M &lt; 0</strong> and <strong>h<sub>i</sub> &lt; 0</strong>: inverted image.
-        </div>
-      `;
-
+    <div class="grid">
+      <div>
+        <div class="symrow"><span class="sym">f</span><span class="eq">=</span><input class="out" value="${fmt(f)}" readonly><span>cm</span></div>
+        <div class="symrow"><span class="sym">d<sub>o</sub></span><span class="eq">=</span><input class="out" value="${fmt(d_o)}" readonly><span>cm</span></div>
+        <div class="symrow"><span class="sym">h<sub>o</sub></span><span class="eq">=</span><input class="out" value="${fmt(h_o)}" readonly><span>cm</span></div>
+      </div>
+      <div>
+        <div class="symrow"><span class="sym">M</span><span class="eq">=</span><input class="out" value="${fmt(M)}" readonly></div>
+        <div class="symrow"><span class="sym">d<sub>i</sub></span><span class="eq">=</span><input class="out" value="${fmt(d_i)}" readonly><span>cm</span></div>
+        <div class="symrow"><span class="sym">h<sub>i</sub></span><span class="eq">=</span><input class="out" value="${fmt(h_i)}" readonly><span>cm</span></div>
+      </div>
+    </div>`;
+      $('typeOut').innerHTML = `<option selected>${d_i > 0 ? 'real' : (d_i < 0 ? 'virtual' : 'none')}</option>`;
+      $('sizeOut').innerHTML = `<option selected>${Math.abs(M) > 1 ? 'larger' : (Math.abs(M) < 1 ? 'smaller' : 'same size')}</option>`;
+      $('orientationOut').innerHTML = `<option selected>${h_i < 0 ? 'inverted' : (h_i > 0 ? 'upright' : 'none')}</option>`;
       $('results').classList.add('show');
     }
-
     function clearAll() {
-      $('fMag').value = '';
-      $('doMag').value = '';
-      $('hoMag').value = '';
-      $('deviceType').value = 'lens';
-      $('behavior').value = 'converging';
-      $('error').classList.remove('show');
-      $('error').textContent = '';
-      $('results').classList.remove('show');
-      $('valueCards').innerHTML = '';
-      $('interpretation').innerHTML = '';
+      ['fVal', 'doVal', 'hoVal', 'mVal', 'diVal', 'hiVal'].forEach(id => $(id).value = '');
+      $('deviceType').value = 'lens'; $('behavior').value = 'converging';
+      $('error').classList.remove('show'); $('error').textContent = '';
+      $('results').classList.remove('show'); $('valueCards').innerHTML = '';
+      $('typeOut').innerHTML = '<option></option>'; $('sizeOut').innerHTML = '<option></option>'; $('orientationOut').innerHTML = '<option></option>';
     }
-
     $('calcBtn').addEventListener('click', calculate);
     $('clearBtn').addEventListener('click', clearAll);
   </script>
 </body>
+
 </html>

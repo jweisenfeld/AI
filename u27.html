@@ -76,27 +76,6 @@
       padding: 10px 12px;
       margin: 8px 0;
     }
-    .result-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin: 8px 0;
-    }
-    .result-label {
-      min-width: 245px;
-      font-weight: 700;
-    }
-    .result-value-box {
-      background: #fff;
-      border: 2px solid #d9e2ec;
-      border-radius: 6px;
-      padding: 8px 12px;
-      min-width: 140px;
-      font-family: "Courier New", monospace;
-    }
-    .result-unit {
-      color: #486581;
-    }
     .error {
       display: none;
       margin-top: 10px;
@@ -109,8 +88,6 @@
     @media (max-width: 760px) {
       .grid { grid-template-columns: 1fr; }
       label { width: 190px; }
-      .result-row { flex-wrap: wrap; gap: 6px; }
-      .result-label { min-width: 100%; }
     }
   </style>
 </head>
@@ -119,12 +96,10 @@
     <h1>Unit 27: Lenses & Mirrors Sign Calculator</h1>
 
     <div class="note">
-      Enter <strong>any values you know</strong> (you may leave the rest blank), then press <strong>Calculate</strong>.<br>
-      Use traditional sign conventions: negative values are allowed and meaningful.<br>
-      Required equations used by this calculator:<br>
-      • <strong>1/f = 1/d<sub>o</sub> + 1/d<sub>i</sub></strong><br>
-      • <strong>M = -d<sub>i</sub>/d<sub>o</sub></strong><br>
-      • <strong>h<sub>i</sub> = M·h<sub>o</sub></strong>
+      Enter <strong>magnitudes</strong> for distances/heights. This tool applies traditional sign conventions automatically:<br>
+      • Converging lens / concave mirror: <strong>f positive</strong><br>
+      • Diverging lens / convex mirror: <strong>f negative</strong><br>
+      • Real object in front: <strong>d<sub>o</sub> positive</strong>, <strong>h<sub>o</sub> positive</strong>
     </div>
 
     <div class="grid">
@@ -144,36 +119,21 @@
           </select>
         </div>
         <div class="row">
-          <label for="fVal">Focal length (f)</label>
-          <input id="fVal" type="number" step="any" placeholder="e.g. -20 or 20" />
-          <span class="unit">cm</span>
-        </div>
-        <div class="row">
-          <label for="doVal">Object distance (d<sub>o</sub>)</label>
-          <input id="doVal" type="number" step="any" placeholder="e.g. 15" />
-          <span class="unit">cm</span>
-        </div>
-        <div class="row">
-          <label for="hoVal">Object height (h<sub>o</sub>)</label>
-          <input id="hoVal" type="number" step="any" placeholder="e.g. 10" />
+          <label for="fMag">Focal length magnitude |f|</label>
+          <input id="fMag" type="number" min="0" step="any" placeholder="e.g. 20" />
           <span class="unit">cm</span>
         </div>
       </div>
 
       <div>
         <div class="row">
-          <label for="mVal">Magnification (M)</label>
-          <input id="mVal" type="number" step="any" placeholder="e.g. -0.65" />
-          <span class="unit">(unitless)</span>
-        </div>
-        <div class="row">
-          <label for="diVal">Image distance (d<sub>i</sub>)</label>
-          <input id="diVal" type="number" step="any" placeholder="e.g. -40 or 60" />
+          <label for="doMag">Object distance |d<sub>o</sub>|</label>
+          <input id="doMag" type="number" min="0" step="any" placeholder="e.g. 15" />
           <span class="unit">cm</span>
         </div>
         <div class="row">
-          <label for="hiVal">Image height (h<sub>i</sub>)</label>
-          <input id="hiVal" type="number" step="any" placeholder="e.g. -25 or 30" />
+          <label for="hoMag">Object height |h<sub>o</sub>|</label>
+          <input id="hoMag" type="number" min="0" step="any" placeholder="e.g. 10" />
           <span class="unit">cm</span>
         </div>
       </div>
@@ -202,28 +162,8 @@
       return Math.abs(n) < 1e-10 ? '0.000' : n.toFixed(3);
     }
 
-    function parseMaybe(id) {
-      const raw = $(id).value.trim();
-      if (raw === '') return null;
-      const n = Number(raw);
-      return Number.isFinite(n) ? n : NaN;
-    }
-
-    function approxEqual(a, b, tol = 1e-6) {
-      const scale = Math.max(1, Math.abs(a), Math.abs(b));
-      return Math.abs(a - b) <= tol * scale;
-    }
-
-    function setOrCheck(state, key, value) {
-      if (!Number.isFinite(value)) return false;
-      if (state[key] === null) {
-        state[key] = value;
-        return true;
-      }
-      if (!approxEqual(state[key], value)) {
-        throw new Error(`Input conflict detected for ${key}. Please adjust given values.`);
-      }
-      return false;
+    function signFromBehavior(behavior) {
+      return behavior === 'converging' ? 1 : -1;
     }
 
     function describeImageType(di, deviceType) {
@@ -247,108 +187,43 @@
 
       const deviceType = $('deviceType').value;
       const behavior = $('behavior').value;
-      const input = {
-        f: parseMaybe('fVal'),
-        d_o: parseMaybe('doVal'),
-        h_o: parseMaybe('hoVal'),
-        M: parseMaybe('mVal'),
-        d_i: parseMaybe('diVal'),
-        h_i: parseMaybe('hiVal')
-      };
+      const fMag = parseFloat($('fMag').value);
+      const doMag = parseFloat($('doMag').value);
+      const hoMag = parseFloat($('hoMag').value);
 
-      if (Object.values(input).some(v => Number.isNaN(v))) {
-        error.textContent = 'Please enter valid numbers or leave fields blank.';
+      if (![fMag, doMag, hoMag].every(v => Number.isFinite(v) && v > 0)) {
+        error.textContent = 'Please enter positive magnitudes for |f|, |dₒ|, and |hₒ|.';
         error.classList.add('show');
         $('results').classList.remove('show');
         return;
       }
 
-      const givenCount = Object.values(input).filter(v => v !== null).length;
-      if (givenCount < 2) {
-        error.textContent = 'Enter at least two known values to calculate the rest.';
+      const f = signFromBehavior(behavior) * fMag;
+      const d_o = doMag;
+      const h_o = hoMag;
+
+      const denom = (1 / f) - (1 / d_o);
+      if (Math.abs(denom) < 1e-12) {
+        error.textContent = 'No finite image forms (object is at focal point, so image is at infinity).';
         error.classList.add('show');
         $('results').classList.remove('show');
         return;
       }
 
-      const state = { ...input };
-
-      try {
-        let changed = true;
-        let guard = 0;
-        while (changed && guard < 20) {
-          changed = false;
-          guard++;
-
-          const { f, d_o, d_i, M, h_o, h_i } = state;
-
-          if (f !== null && d_o !== null && d_i === null && !approxEqual((1 / f) - (1 / d_o), 0)) changed = setOrCheck(state, 'd_i', 1 / ((1 / f) - (1 / d_o))) || changed;
-          if (f !== null && d_i !== null && d_o === null && !approxEqual((1 / f) - (1 / d_i), 0)) changed = setOrCheck(state, 'd_o', 1 / ((1 / f) - (1 / d_i))) || changed;
-          if (d_o !== null && d_i !== null && f === null && !approxEqual((1 / d_o) + (1 / d_i), 0)) changed = setOrCheck(state, 'f', 1 / ((1 / d_o) + (1 / d_i))) || changed;
-
-          if (M !== null && d_o !== null && d_i === null) changed = setOrCheck(state, 'd_i', -M * d_o) || changed;
-          if (M !== null && d_i !== null && d_o === null && !approxEqual(M, 0)) changed = setOrCheck(state, 'd_o', -d_i / M) || changed;
-          if (d_o !== null && d_i !== null && M === null && !approxEqual(d_o, 0)) changed = setOrCheck(state, 'M', -d_i / d_o) || changed;
-
-          if (h_o !== null && M !== null && h_i === null) changed = setOrCheck(state, 'h_i', M * h_o) || changed;
-          if (h_i !== null && M !== null && h_o === null && !approxEqual(M, 0)) changed = setOrCheck(state, 'h_o', h_i / M) || changed;
-          if (h_o !== null && h_i !== null && M === null && !approxEqual(h_o, 0)) changed = setOrCheck(state, 'M', h_i / h_o) || changed;
-        }
-      } catch (e) {
-        error.textContent = e.message;
-        error.classList.add('show');
-        $('results').classList.remove('show');
-        return;
-      }
-
-      const { f, d_o, h_o, M, d_i, h_i } = state;
-      if ([f, d_o, h_o, M, d_i, h_i].some(v => v === null)) {
-        error.textContent = 'Cannot determine a unique full solution from the provided values.';
-        error.classList.add('show');
-        $('results').classList.remove('show');
-        return;
-      }
-      if ((behavior === 'converging' && f < 0) || (behavior === 'diverging' && f > 0)) {
-        error.textContent = 'Solved focal length sign does not match selected converging/diverging behavior.';
-        error.classList.add('show');
-        $('results').classList.remove('show');
-        return;
-      }
+      const d_i = 1 / denom;
+      const M = -d_i / d_o;
+      const h_i = M * h_o;
 
       const sizeText = Math.abs(M) > 1 ? 'Larger than object' : (Math.abs(M) < 1 ? 'Smaller than object' : 'Same size as object');
       const orientationText = h_i < 0 ? 'Inverted (negative image height).' : (h_i > 0 ? 'Upright (positive image height).' : 'No height (degenerate case).');
 
       $('valueCards').innerHTML = `
-        <div class="result-row">
-          <div class="result-label">Focal length (<strong>f</strong>)</div>
-          <div class="result-value-box">${fmt(f)}</div>
-          <div class="result-unit">cm</div>
-        </div>
-        <div class="result-row">
-          <div class="result-label">Object distance (<strong>d<sub>o</sub></strong>)</div>
-          <div class="result-value-box">${fmt(d_o)}</div>
-          <div class="result-unit">cm</div>
-        </div>
-        <div class="result-row">
-          <div class="result-label">Object height (<strong>h<sub>o</sub></strong>)</div>
-          <div class="result-value-box">${fmt(h_o)}</div>
-          <div class="result-unit">cm</div>
-        </div>
-        <div class="result-row">
-          <div class="result-label">Image distance (<strong>d<sub>i</sub></strong>)</div>
-          <div class="result-value-box">${fmt(d_i)}</div>
-          <div class="result-unit">cm</div>
-        </div>
-        <div class="result-row">
-          <div class="result-label">Magnification (<strong>M</strong>)</div>
-          <div class="result-value-box">${fmt(M)}</div>
-          <div class="result-unit">(unitless)</div>
-        </div>
-        <div class="result-row">
-          <div class="result-label">Image height (<strong>h<sub>i</sub></strong>)</div>
-          <div class="result-value-box">${fmt(h_i)}</div>
-          <div class="result-unit">cm</div>
-        </div>
+        <div class="card"><strong>f</strong> = ${fmt(f)} cm</div>
+        <div class="card"><strong>d<sub>o</sub></strong> = ${fmt(d_o)} cm</div>
+        <div class="card"><strong>h<sub>o</sub></strong> = ${fmt(h_o)} cm</div>
+        <div class="card"><strong>d<sub>i</sub></strong> = ${fmt(d_i)} cm</div>
+        <div class="card"><strong>M</strong> = ${fmt(M)}</div>
+        <div class="card"><strong>h<sub>i</sub></strong> = ${fmt(h_i)} cm</div>
       `;
 
       $('interpretation').innerHTML = `
@@ -366,12 +241,9 @@
     }
 
     function clearAll() {
-      $('fVal').value = '';
-      $('doVal').value = '';
-      $('hoVal').value = '';
-      $('mVal').value = '';
-      $('diVal').value = '';
-      $('hiVal').value = '';
+      $('fMag').value = '';
+      $('doMag').value = '';
+      $('hoMag').value = '';
       $('deviceType').value = 'lens';
       $('behavior').value = 'converging';
       $('error').classList.remove('show');

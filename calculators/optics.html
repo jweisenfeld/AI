@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Unit 27 Optics Sign Convention Calculator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 20px;
+      color: #1f2933;
+    }
+
+    .wrap {
+      max-width: 920px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+      padding: 24px;
+    }
+
+    h1 {
+      margin-top: 0;
+      color: #223b53;
+    }
+
+    .note {
+      background: #fff7e6;
+      border-left: 4px solid #f5a623;
+      padding: 12px;
+      border-radius: 4px;
+      margin-bottom: 18px;
+      line-height: 1.35;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    label {
+      width: 240px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    input,
+    select {
+      padding: 8px 10px;
+      border: 2px solid #cfd8e3;
+      border-radius: 6px;
+      font-size: 15px;
+    }
+
+    input {
+      width: 160px;
+    }
+
+    .symbol-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 34px;
+      margin-top: 8px;
+    }
+
+    .symbol-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .symbol {
+      min-width: 18px;
+      text-align: right;
+      font-size: 36px;
+      line-height: 0.8;
+    }
+
+    .eq {
+      width: 18px;
+      text-align: center;
+      font-size: 34px;
+      line-height: 0.8;
+    }
+
+    .input-box {
+      width: 80px;
+      background: #ecef9e;
+      border: 2px solid #3d3d3d;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 32px;
+      line-height: 1;
+      padding: 8px 6px;
+      font-family: Arial, sans-serif;
+    }
+
+    .output-box {
+      width: 88px;
+      background: #4cf165;
+      border: 2px solid #1f7f34;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 32px;
+      line-height: 1;
+      padding: 8px 6px;
+      font-family: Arial, sans-serif;
+    }
+
+    .unit-lg {
+      color: #1f2933;
+      font-size: 34px;
+    }
+
+    .qa-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .qa-row label {
+      width: auto;
+      font-size: 38px;
+      font-weight: 500;
+    }
+
+    .qa-select {
+      width: 170px;
+      background: #4cf165;
+      border: 2px solid #1f7f34;
+      border-radius: 8px;
+      font-size: 36px;
+      line-height: 1.1;
+      padding: 5px 8px;
+    }
+
+    .unit {
+      color: #627d98;
+    }
+
+    .actions {
+      margin: 18px 0;
+      text-align: center;
+    }
+
+    button {
+      border: none;
+      border-radius: 6px;
+      padding: 11px 22px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .calc {
+      background: #2f80ed;
+      color: #fff;
+    }
+
+    .clear {
+      background: #7b8794;
+      color: #fff;
+      margin-left: 10px;
+    }
+
+    .results {
+      background: #e9f7ef;
+      border-radius: 8px;
+      padding: 16px;
+      display: none;
+    }
+
+    .results.show {
+      display: block;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin: 8px 0;
+    }
+
+    .result-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 8px 0;
+    }
+
+    .result-label {
+      min-width: 245px;
+      font-weight: 700;
+    }
+
+    .result-value-box {
+      background: #fff;
+      border: 2px solid #d9e2ec;
+      border-radius: 6px;
+      padding: 8px 12px;
+      min-width: 140px;
+      font-family: "Courier New", monospace;
+    }
+
+    .result-unit {
+      color: #486581;
+    }
+
+    .error {
+      display: none;
+      margin-top: 10px;
+      color: #b00020;
+      background: #fdecef;
+      border-radius: 6px;
+      padding: 10px;
+    }
+
+    .error.show {
+      display: block;
+    }
+
+    @media (max-width: 760px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      label {
+        width: 190px;
+      }
+
+      .result-row {
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .result-label {
+        min-width: 100%;
+      }
+
+      .symbol-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .qa-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .qa-row label {
+        font-size: 30px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <h1>Unit 27: Lenses & Mirrors Sign Calculator</h1>
+
+    <div class="note">
+      Enter magnitudes for any known quantities (leave unknowns blank), then press <strong>Calculate</strong>.<br>
+      This calculator applies signs automatically using your lens/mirror and converging/diverging choices.<br>
+      Required equations used by this calculator:<br>
+      • <strong>1/f = 1/d<sub>o</sub> + 1/d<sub>i</sub></strong><br>
+      • <strong>M = -d<sub>i</sub>/d<sub>o</sub></strong><br>
+      • <strong>h<sub>i</sub> = M·h<sub>o</sub></strong>
+    </div>
+
+    <div class="row">
+      <label for="deviceType">Device family</label>
+      <select id="deviceType">
+        <option value="lens">Lens</option>
+        <option value="mirror">Mirror</option>
+      </select>
+    </div>
+    <div class="row">
+      <label for="behavior">Behavior</label>
+      <select id="behavior">
+        <option value="converging">Converging</option>
+        <option value="diverging">Diverging</option>
+      </select>
+    </div>
+
+    <div class="symbol-grid">
+      <div>
+        <div class="symbol-row"><span class="symbol">f</span><span class="eq">=</span><input id="fVal" class="input-box"
+            type="number" min="0" step="any"><span class="unit-lg">cm</span></div>
+        <div class="symbol-row"><span class="symbol">d<sub>o</sub></span><span class="eq">=</span><input id="doVal"
+            class="input-box" type="number" min="0" step="any"><span class="unit-lg">cm</span></div>
+        <div class="symbol-row"><span class="symbol">h<sub>o</sub></span><span class="eq">=</span><input id="hoVal"
+            class="input-box" type="number" min="0" step="any"><span class="unit-lg">cm</span></div>
+      </div>
+      <div>
+        <div class="symbol-row"><span class="symbol">M</span><span class="eq">=</span><input id="mVal" class="input-box"
+            type="number" min="0" step="any"></div>
+        <div class="symbol-row"><span class="symbol">d<sub>i</sub></span><span class="eq">=</span><input id="diVal"
+            class="input-box" type="number" min="0" step="any"><span class="unit-lg">cm</span></div>
+        <div class="symbol-row"><span class="symbol">h<sub>i</sub></span><span class="eq">=</span><input id="hiVal"
+            class="input-box" type="number" min="0" step="any"><span class="unit-lg">cm</span></div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="calc" id="calcBtn">Calculate</button>
+      <button class="clear" id="clearBtn" type="button">Clear</button>
+    </div>
+
+    <div id="error" class="error"></div>
+
+    <div id="results" class="results">
+      <h3>Calculated values (with signs)</h3>
+      <div id="valueCards"></div>
+      <div class="qa-row">
+        <label>What type of image is formed?</label>
+        <select id="typeOut" class="qa-select">
+          <option></option>
+        </select>
+      </div>
+      <div class="qa-row">
+        <label>What is the size of the image?</label>
+        <select id="sizeOut" class="qa-select">
+          <option></option>
+        </select>
+      </div>
+      <div class="qa-row">
+        <label>What is the orientation of the image?</label>
+        <select id="orientationOut" class="qa-select">
+          <option></option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function fmt(n) {
+      if (!Number.isFinite(n)) return 'undefined';
+      return Math.abs(n) < 1e-10 ? '0.000' : n.toFixed(3);
+    }
+
+    function parseMaybe(id) {
+      const raw = $(id).value.trim();
+      if (raw === '') return null;
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : NaN;
+    }
+
+    function approxEqual(a, b, tol = 1e-6) {
+      const scale = Math.max(1, Math.abs(a), Math.abs(b));
+      return Math.abs(a - b) <= tol * scale;
+    }
+
+    function setOrCheck(state, key, value) {
+      if (!Number.isFinite(value)) return false;
+      if (state[key] === null) {
+        state[key] = value;
+        return true;
+      }
+      if (!approxEqual(state[key], value)) {
+        throw new Error(`Input conflict detected for ${key}. Please adjust given values.`);
+      }
+      return false;
+    }
+
+    function calculate() {
+      const error = $('error');
+      error.classList.remove('show');
+      error.textContent = '';
+
+      const behavior = $('behavior').value;
+      const signF = behavior === 'converging' ? 1 : -1;
+      const input = {
+        fMag: parseMaybe('fVal'),
+        doMag: parseMaybe('doVal'),
+        hoMag: parseMaybe('hoVal'),
+        mMag: parseMaybe('mVal'),
+        diMag: parseMaybe('diVal'),
+        hiMag: parseMaybe('hiVal')
+      };
+
+      if (Object.values(input).some(v => Number.isNaN(v))) {
+        error.textContent = 'Please enter valid numbers or leave fields blank.';
+        error.classList.add('show');
+        $('results').classList.remove('show');
+        return;
+      }
+      // Inputs are magnitudes; force non-negative values.
+      for (const key of Object.keys(input)) {
+        if (input[key] !== null) input[key] = Math.abs(input[key]);
+      }
+      // Special case: object at focal length for a converging device => image at infinity.
+      if (behavior === 'converging' && input.fMag !== null && input.doMag !== null && approxEqual(input.fMag, input.doMag)) {
+        error.textContent = 'Cannot be determined (object at focal length, image at infinity).';
+        error.classList.add('show');
+        $('results').classList.remove('show');
+        return;
+      }
+
+      const givenCount = Object.values(input).filter(v => v !== null).length;
+      if (givenCount < 2) {
+        error.textContent = 'Enter at least two known values to calculate the rest.';
+        error.classList.add('show');
+        $('results').classList.remove('show');
+        return;
+      }
+
+      const preferredSm = behavior === 'converging' ? -1 : 1;
+      const preferredSdi = behavior === 'converging' ? 1 : -1;
+      const preferredShi = preferredSm;
+
+      const fullSignChoices = (input.mMag !== null ? [1, -1] : [1])
+        .flatMap(sm => (input.diMag !== null ? [1, -1] : [1]).flatMap(sdi =>
+          (input.hiMag !== null ? [1, -1] : [1]).map(shi => ({ sm, sdi, shi }))
+        ));
+
+      const preferredSignChoices = [{
+        sm: input.mMag !== null ? preferredSm : 1,
+        sdi: input.diMag !== null ? preferredSdi : 1,
+        shi: input.hiMag !== null ? preferredShi : 1
+      }];
+
+      const solveForChoices = (signChoices) => {
+        const solutions = [];
+
+        for (const choice of signChoices) {
+          const state = {
+            f: input.fMag === null ? null : signF * input.fMag,
+            d_o: input.doMag === null ? null : input.doMag,
+            h_o: input.hoMag === null ? null : input.hoMag,
+            M: input.mMag === null ? null : choice.sm * input.mMag,
+            d_i: input.diMag === null ? null : choice.sdi * input.diMag,
+            h_i: input.hiMag === null ? null : choice.shi * input.hiMag
+          };
+
+          try {
+            let changed = true;
+            let guard = 0;
+            while (changed && guard < 20) {
+              changed = false;
+              guard++;
+
+              const { f, d_o, d_i, M, h_o, h_i } = state;
+
+              if (f !== null && d_o !== null && d_i === null && !approxEqual((1 / f) - (1 / d_o), 0)) changed = setOrCheck(state, 'd_i', 1 / ((1 / f) - (1 / d_o))) || changed;
+              if (f !== null && d_i !== null && d_o === null && !approxEqual((1 / f) - (1 / d_i), 0)) changed = setOrCheck(state, 'd_o', 1 / ((1 / f) - (1 / d_i))) || changed;
+              if (d_o !== null && d_i !== null && f === null && !approxEqual((1 / d_o) + (1 / d_i), 0)) changed = setOrCheck(state, 'f', 1 / ((1 / d_o) + (1 / d_i))) || changed;
+
+              if (M !== null && d_o !== null && d_i === null) changed = setOrCheck(state, 'd_i', -M * d_o) || changed;
+              if (M !== null && d_i !== null && d_o === null && !approxEqual(M, 0)) changed = setOrCheck(state, 'd_o', -d_i / M) || changed;
+              if (d_o !== null && d_i !== null && M === null && !approxEqual(d_o, 0)) changed = setOrCheck(state, 'M', -d_i / d_o) || changed;
+
+              if (h_o !== null && M !== null && h_i === null) changed = setOrCheck(state, 'h_i', M * h_o) || changed;
+              if (h_i !== null && M !== null && h_o === null && !approxEqual(M, 0)) changed = setOrCheck(state, 'h_o', h_i / M) || changed;
+              if (h_o !== null && h_i !== null && M === null && !approxEqual(h_o, 0)) changed = setOrCheck(state, 'M', h_i / h_o) || changed;
+            }
+            if ([state.f, state.d_o, state.h_o, state.M, state.d_i, state.h_i].every(v => v !== null)) {
+              if ((behavior === 'converging' && state.f > 0) || (behavior === 'diverging' && state.f < 0)) {
+                solutions.push(state);
+              }
+            }
+          } catch (_) {
+            // ignore inconsistent sign branch
+          }
+        }
+        return solutions;
+      };
+
+      // First pass: use convention-preferred image/magnification signs.
+      // If that fails, fall back to full sign search.
+      let solutions = solveForChoices(preferredSignChoices);
+      if (solutions.length === 0) solutions = solveForChoices(fullSignChoices);
+
+      const uniqueSolutions = [];
+      const seen = new Set();
+      for (const s of solutions) {
+        const key = ['f', 'd_o', 'h_o', 'M', 'd_i', 'h_i']
+          .map(k => Math.round(s[k] * 1e6) / 1e6)
+          .join('|');
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueSolutions.push(s);
+        }
+      }
+
+      if (uniqueSolutions.length === 0) {
+        error.textContent = 'Cannot determine a unique full solution from the provided magnitudes.';
+        error.classList.add('show');
+        $('results').classList.remove('show');
+        return;
+      }
+      if (uniqueSolutions.length > 1) {
+        error.textContent = 'Multiple sign solutions fit these magnitudes. Please enter one more known value.';
+        error.classList.add('show');
+        $('results').classList.remove('show');
+        return;
+      }
+      const { f, d_o, h_o, M, d_i, h_i } = uniqueSolutions[0];
+
+      const sizeText = Math.abs(M) > 1 ? 'larger' : (Math.abs(M) < 1 ? 'smaller' : 'same size');
+      const orientationText = h_i < 0 ? 'inverted' : (h_i > 0 ? 'upright' : 'none');
+      const typeText = d_i > 0 ? 'real' : (d_i < 0 ? 'virtual' : 'none');
+
+      $('valueCards').innerHTML = `
+        <div class="symbol-grid">
+          <div>
+            <div class="symbol-row"><span class="symbol">f</span><span class="eq">=</span><input class="output-box" value="${fmt(f)}" readonly><span class="unit-lg">cm</span></div>
+            <div class="symbol-row"><span class="symbol">d<sub>o</sub></span><span class="eq">=</span><input class="output-box" value="${fmt(d_o)}" readonly><span class="unit-lg">cm</span></div>
+            <div class="symbol-row"><span class="symbol">h<sub>o</sub></span><span class="eq">=</span><input class="output-box" value="${fmt(h_o)}" readonly><span class="unit-lg">cm</span></div>
+          </div>
+          <div>
+            <div class="symbol-row"><span class="symbol">M</span><span class="eq">=</span><input class="output-box" value="${fmt(M)}" readonly></div>
+            <div class="symbol-row"><span class="symbol">d<sub>i</sub></span><span class="eq">=</span><input class="output-box" value="${fmt(d_i)}" readonly><span class="unit-lg">cm</span></div>
+            <div class="symbol-row"><span class="symbol">h<sub>i</sub></span><span class="eq">=</span><input class="output-box" value="${fmt(h_i)}" readonly><span class="unit-lg">cm</span></div>
+          </div>
+        </div>
+      `;
+      $('typeOut').innerHTML = `<option selected>${typeText}</option>`;
+      $('sizeOut').innerHTML = `<option selected>${sizeText}</option>`;
+      $('orientationOut').innerHTML = `<option selected>${orientationText}</option>`;
+
+      $('results').classList.add('show');
+    }
+
+    function clearAll() {
+      $('fVal').value = '';
+      $('doVal').value = '';
+      $('hoVal').value = '';
+      $('mVal').value = '';
+      $('diVal').value = '';
+      $('hiVal').value = '';
+      $('deviceType').value = 'lens';
+      $('behavior').value = 'converging';
+      $('error').classList.remove('show');
+      $('error').textContent = '';
+      $('results').classList.remove('show');
+      $('valueCards').innerHTML = '';
+      $('typeOut').innerHTML = '<option></option>';
+      $('sizeOut').innerHTML = '<option></option>';
+      $('orientationOut').innerHTML = '<option></option>';
+    }
+
+    $('calcBtn').addEventListener('click', calculate);
+    $('clearBtn').addEventListener('click', clearAll);
+  </script>
+</body>
+
+</html>

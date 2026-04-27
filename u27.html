@@ -403,6 +403,13 @@
       for (const key of Object.keys(input)) {
         if (input[key] !== null) input[key] = Math.abs(input[key]);
       }
+      // Special case: object at focal length for a converging device => image at infinity.
+      if (behavior === 'converging' && input.fMag !== null && input.doMag !== null && approxEqual(input.fMag, input.doMag)) {
+        error.textContent = 'Cannot be determined (object at focal length, image at infinity).';
+        error.classList.add('show');
+        $('results').classList.remove('show');
+        return;
+      }
 
       const givenCount = Object.values(input).filter(v => v !== null).length;
       if (givenCount < 2) {
@@ -412,52 +419,71 @@
         return;
       }
 
-      const signChoices = (input.mMag !== null ? [1, -1] : [1])
+      const preferredSm = behavior === 'converging' ? -1 : 1;
+      const preferredSdi = behavior === 'converging' ? 1 : -1;
+      const preferredShi = preferredSm;
+
+      const fullSignChoices = (input.mMag !== null ? [1, -1] : [1])
         .flatMap(sm => (input.diMag !== null ? [1, -1] : [1]).flatMap(sdi =>
           (input.hiMag !== null ? [1, -1] : [1]).map(shi => ({ sm, sdi, shi }))
         ));
-      const solutions = [];
 
-      for (const choice of signChoices) {
-        const state = {
-          f: input.fMag === null ? null : signF * input.fMag,
-          d_o: input.doMag === null ? null : input.doMag,
-          h_o: input.hoMag === null ? null : input.hoMag,
-          M: input.mMag === null ? null : choice.sm * input.mMag,
-          d_i: input.diMag === null ? null : choice.sdi * input.diMag,
-          h_i: input.hiMag === null ? null : choice.shi * input.hiMag
-        };
+      const preferredSignChoices = [{
+        sm: input.mMag !== null ? preferredSm : 1,
+        sdi: input.diMag !== null ? preferredSdi : 1,
+        shi: input.hiMag !== null ? preferredShi : 1
+      }];
 
-        try {
-          let changed = true;
-          let guard = 0;
-          while (changed && guard < 20) {
-            changed = false;
-            guard++;
+      const solveForChoices = (signChoices) => {
+        const solutions = [];
 
-            const { f, d_o, d_i, M, h_o, h_i } = state;
+        for (const choice of signChoices) {
+          const state = {
+            f: input.fMag === null ? null : signF * input.fMag,
+            d_o: input.doMag === null ? null : input.doMag,
+            h_o: input.hoMag === null ? null : input.hoMag,
+            M: input.mMag === null ? null : choice.sm * input.mMag,
+            d_i: input.diMag === null ? null : choice.sdi * input.diMag,
+            h_i: input.hiMag === null ? null : choice.shi * input.hiMag
+          };
 
-            if (f !== null && d_o !== null && d_i === null && !approxEqual((1 / f) - (1 / d_o), 0)) changed = setOrCheck(state, 'd_i', 1 / ((1 / f) - (1 / d_o))) || changed;
-            if (f !== null && d_i !== null && d_o === null && !approxEqual((1 / f) - (1 / d_i), 0)) changed = setOrCheck(state, 'd_o', 1 / ((1 / f) - (1 / d_i))) || changed;
-            if (d_o !== null && d_i !== null && f === null && !approxEqual((1 / d_o) + (1 / d_i), 0)) changed = setOrCheck(state, 'f', 1 / ((1 / d_o) + (1 / d_i))) || changed;
+          try {
+            let changed = true;
+            let guard = 0;
+            while (changed && guard < 20) {
+              changed = false;
+              guard++;
 
-            if (M !== null && d_o !== null && d_i === null) changed = setOrCheck(state, 'd_i', -M * d_o) || changed;
-            if (M !== null && d_i !== null && d_o === null && !approxEqual(M, 0)) changed = setOrCheck(state, 'd_o', -d_i / M) || changed;
-            if (d_o !== null && d_i !== null && M === null && !approxEqual(d_o, 0)) changed = setOrCheck(state, 'M', -d_i / d_o) || changed;
+              const { f, d_o, d_i, M, h_o, h_i } = state;
 
-            if (h_o !== null && M !== null && h_i === null) changed = setOrCheck(state, 'h_i', M * h_o) || changed;
-            if (h_i !== null && M !== null && h_o === null && !approxEqual(M, 0)) changed = setOrCheck(state, 'h_o', h_i / M) || changed;
-            if (h_o !== null && h_i !== null && M === null && !approxEqual(h_o, 0)) changed = setOrCheck(state, 'M', h_i / h_o) || changed;
-          }
-          if ([state.f, state.d_o, state.h_o, state.M, state.d_i, state.h_i].every(v => v !== null)) {
-            if ((behavior === 'converging' && state.f > 0) || (behavior === 'diverging' && state.f < 0)) {
-              solutions.push(state);
+              if (f !== null && d_o !== null && d_i === null && !approxEqual((1 / f) - (1 / d_o), 0)) changed = setOrCheck(state, 'd_i', 1 / ((1 / f) - (1 / d_o))) || changed;
+              if (f !== null && d_i !== null && d_o === null && !approxEqual((1 / f) - (1 / d_i), 0)) changed = setOrCheck(state, 'd_o', 1 / ((1 / f) - (1 / d_i))) || changed;
+              if (d_o !== null && d_i !== null && f === null && !approxEqual((1 / d_o) + (1 / d_i), 0)) changed = setOrCheck(state, 'f', 1 / ((1 / d_o) + (1 / d_i))) || changed;
+
+              if (M !== null && d_o !== null && d_i === null) changed = setOrCheck(state, 'd_i', -M * d_o) || changed;
+              if (M !== null && d_i !== null && d_o === null && !approxEqual(M, 0)) changed = setOrCheck(state, 'd_o', -d_i / M) || changed;
+              if (d_o !== null && d_i !== null && M === null && !approxEqual(d_o, 0)) changed = setOrCheck(state, 'M', -d_i / d_o) || changed;
+
+              if (h_o !== null && M !== null && h_i === null) changed = setOrCheck(state, 'h_i', M * h_o) || changed;
+              if (h_i !== null && M !== null && h_o === null && !approxEqual(M, 0)) changed = setOrCheck(state, 'h_o', h_i / M) || changed;
+              if (h_o !== null && h_i !== null && M === null && !approxEqual(h_o, 0)) changed = setOrCheck(state, 'M', h_i / h_o) || changed;
             }
+            if ([state.f, state.d_o, state.h_o, state.M, state.d_i, state.h_i].every(v => v !== null)) {
+              if ((behavior === 'converging' && state.f > 0) || (behavior === 'diverging' && state.f < 0)) {
+                solutions.push(state);
+              }
+            }
+          } catch (_) {
+            // ignore inconsistent sign branch
           }
-        } catch (_) {
-          // ignore inconsistent sign branch
         }
-      }
+        return solutions;
+      };
+
+      // First pass: use convention-preferred image/magnification signs.
+      // If that fails, fall back to full sign search.
+      let solutions = solveForChoices(preferredSignChoices);
+      if (solutions.length === 0) solutions = solveForChoices(fullSignChoices);
 
       const uniqueSolutions = [];
       const seen = new Set();

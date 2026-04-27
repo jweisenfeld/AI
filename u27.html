@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Unit 27 Optics Sign Convention Calculator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 20px;
+      color: #1f2933;
+    }
+    .wrap {
+      max-width: 920px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+      padding: 24px;
+    }
+    h1 { margin-top: 0; color: #223b53; }
+    .note {
+      background: #fff7e6;
+      border-left: 4px solid #f5a623;
+      padding: 12px;
+      border-radius: 4px;
+      margin-bottom: 18px;
+      line-height: 1.35;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    label {
+      width: 240px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    input, select {
+      padding: 8px 10px;
+      border: 2px solid #cfd8e3;
+      border-radius: 6px;
+      font-size: 15px;
+    }
+    input { width: 160px; }
+    .unit { color: #627d98; }
+    .actions { margin: 18px 0; text-align: center; }
+    button {
+      border: none;
+      border-radius: 6px;
+      padding: 11px 22px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .calc { background: #2f80ed; color: #fff; }
+    .clear { background: #7b8794; color: #fff; margin-left: 10px; }
+    .results {
+      background: #e9f7ef;
+      border-radius: 8px;
+      padding: 16px;
+      display: none;
+    }
+    .results.show { display: block; }
+    .card {
+      background: #fff;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin: 8px 0;
+    }
+    .error {
+      display: none;
+      margin-top: 10px;
+      color: #b00020;
+      background: #fdecef;
+      border-radius: 6px;
+      padding: 10px;
+    }
+    .error.show { display: block; }
+    @media (max-width: 760px) {
+      .grid { grid-template-columns: 1fr; }
+      label { width: 190px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Unit 27: Lenses & Mirrors Sign Calculator</h1>
+
+    <div class="note">
+      Enter <strong>magnitudes</strong> for distances/heights. This tool applies traditional sign conventions automatically:<br>
+      • Converging lens / concave mirror: <strong>f positive</strong><br>
+      • Diverging lens / convex mirror: <strong>f negative</strong><br>
+      • Real object in front: <strong>d<sub>o</sub> positive</strong>, <strong>h<sub>o</sub> positive</strong>
+    </div>
+
+    <div class="grid">
+      <div>
+        <div class="row">
+          <label for="deviceType">Device family</label>
+          <select id="deviceType">
+            <option value="lens">Lens</option>
+            <option value="mirror">Mirror</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="behavior">Behavior</label>
+          <select id="behavior">
+            <option value="converging">Converging</option>
+            <option value="diverging">Diverging</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="fMag">Focal length magnitude |f|</label>
+          <input id="fMag" type="number" min="0" step="any" placeholder="e.g. 20" />
+          <span class="unit">cm</span>
+        </div>
+      </div>
+
+      <div>
+        <div class="row">
+          <label for="doMag">Object distance |d<sub>o</sub>|</label>
+          <input id="doMag" type="number" min="0" step="any" placeholder="e.g. 15" />
+          <span class="unit">cm</span>
+        </div>
+        <div class="row">
+          <label for="hoMag">Object height |h<sub>o</sub>|</label>
+          <input id="hoMag" type="number" min="0" step="any" placeholder="e.g. 10" />
+          <span class="unit">cm</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="calc" id="calcBtn">Calculate</button>
+      <button class="clear" id="clearBtn" type="button">Clear</button>
+    </div>
+
+    <div id="error" class="error"></div>
+
+    <div id="results" class="results">
+      <h3>Calculated values (with signs)</h3>
+      <div id="valueCards"></div>
+      <h3>Interpretation</h3>
+      <div id="interpretation"></div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function fmt(n) {
+      if (!Number.isFinite(n)) return 'undefined';
+      return Math.abs(n) < 1e-10 ? '0.000' : n.toFixed(3);
+    }
+
+    function signFromBehavior(behavior) {
+      return behavior === 'converging' ? 1 : -1;
+    }
+
+    function describeImageType(di, deviceType) {
+      if (di > 0) {
+        return deviceType === 'lens'
+          ? 'Real image (forms on opposite side of the lens from the object).'
+          : 'Real image (forms in front of the mirror, same side as object).';
+      }
+      if (di < 0) {
+        return deviceType === 'lens'
+          ? 'Virtual image (forms on the same side of the lens as the object).'
+          : 'Virtual image (forms behind the mirror).';
+      }
+      return 'Image at infinity (object at focal point).';
+    }
+
+    function calculate() {
+      const error = $('error');
+      error.classList.remove('show');
+      error.textContent = '';
+
+      const deviceType = $('deviceType').value;
+      const behavior = $('behavior').value;
+      const fMag = parseFloat($('fMag').value);
+      const doMag = parseFloat($('doMag').value);
+      const hoMag = parseFloat($('hoMag').value);
+
+      if (![fMag, doMag, hoMag].every(v => Number.isFinite(v) && v > 0)) {
+        error.textContent = 'Please enter positive magnitudes for |f|, |dₒ|, and |hₒ|.';
+        error.classList.add('show');
+        $('results').classList.remove('show');
+        return;
+      }
+
+      const f = signFromBehavior(behavior) * fMag;
+      const d_o = doMag;
+      const h_o = hoMag;
+
+      const denom = (1 / f) - (1 / d_o);
+      if (Math.abs(denom) < 1e-12) {
+        error.textContent = 'No finite image forms (object is at focal point, so image is at infinity).';
+        error.classList.add('show');
+        $('results').classList.remove('show');
+        return;
+      }
+
+      const d_i = 1 / denom;
+      const M = -d_i / d_o;
+      const h_i = M * h_o;
+
+      const sizeText = Math.abs(M) > 1 ? 'Larger than object' : (Math.abs(M) < 1 ? 'Smaller than object' : 'Same size as object');
+      const orientationText = h_i < 0 ? 'Inverted (negative image height).' : (h_i > 0 ? 'Upright (positive image height).' : 'No height (degenerate case).');
+
+      $('valueCards').innerHTML = `
+        <div class="card"><strong>f</strong> = ${fmt(f)} cm</div>
+        <div class="card"><strong>d<sub>o</sub></strong> = ${fmt(d_o)} cm</div>
+        <div class="card"><strong>h<sub>o</sub></strong> = ${fmt(h_o)} cm</div>
+        <div class="card"><strong>d<sub>i</sub></strong> = ${fmt(d_i)} cm</div>
+        <div class="card"><strong>M</strong> = ${fmt(M)}</div>
+        <div class="card"><strong>h<sub>i</sub></strong> = ${fmt(h_i)} cm</div>
+      `;
+
+      $('interpretation').innerHTML = `
+        <div class="card">${describeImageType(d_i, deviceType)}</div>
+        <div class="card">${sizeText} (${fmt(M)} magnification).</div>
+        <div class="card">${orientationText}</div>
+        <div class="card"><strong>Negative-sign conventions used:</strong><br>
+          • <strong>f &lt; 0</strong>: diverging device (diverging lens or convex mirror).<br>
+          • <strong>d<sub>i</sub> &lt; 0</strong>: virtual image.<br>
+          • <strong>M &lt; 0</strong> and <strong>h<sub>i</sub> &lt; 0</strong>: inverted image.
+        </div>
+      `;
+
+      $('results').classList.add('show');
+    }
+
+    function clearAll() {
+      $('fMag').value = '';
+      $('doMag').value = '';
+      $('hoMag').value = '';
+      $('deviceType').value = 'lens';
+      $('behavior').value = 'converging';
+      $('error').classList.remove('show');
+      $('error').textContent = '';
+      $('results').classList.remove('show');
+      $('valueCards').innerHTML = '';
+      $('interpretation').innerHTML = '';
+    }
+
+    $('calcBtn').addEventListener('click', calculate);
+    $('clearBtn').addEventListener('click', clearAll);
+  </script>
+</body>
+</html>

@@ -76,27 +76,6 @@
       padding: 10px 12px;
       margin: 8px 0;
     }
-    .result-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin: 8px 0;
-    }
-    .result-label {
-      min-width: 245px;
-      font-weight: 700;
-    }
-    .result-value-box {
-      background: #fff;
-      border: 2px solid #d9e2ec;
-      border-radius: 6px;
-      padding: 8px 12px;
-      min-width: 140px;
-      font-family: "Courier New", monospace;
-    }
-    .result-unit {
-      color: #486581;
-    }
     .error {
       display: none;
       margin-top: 10px;
@@ -109,8 +88,6 @@
     @media (max-width: 760px) {
       .grid { grid-template-columns: 1fr; }
       label { width: 190px; }
-      .result-row { flex-wrap: wrap; gap: 6px; }
-      .result-label { min-width: 100%; }
     }
   </style>
 </head>
@@ -241,36 +218,12 @@
       const orientationText = h_i < 0 ? 'Inverted (negative image height).' : (h_i > 0 ? 'Upright (positive image height).' : 'No height (degenerate case).');
 
       $('valueCards').innerHTML = `
-        <div class="result-row">
-          <div class="result-label">Focal length (<strong>f</strong>)</div>
-          <div class="result-value-box">${fmt(f)}</div>
-          <div class="result-unit">cm</div>
-        </div>
-        <div class="result-row">
-          <div class="result-label">Object distance (<strong>d<sub>o</sub></strong>)</div>
-          <div class="result-value-box">${fmt(d_o)}</div>
-          <div class="result-unit">cm</div>
-        </div>
-        <div class="result-row">
-          <div class="result-label">Object height (<strong>h<sub>o</sub></strong>)</div>
-          <div class="result-value-box">${fmt(h_o)}</div>
-          <div class="result-unit">cm</div>
-        </div>
-        <div class="result-row">
-          <div class="result-label">Image distance (<strong>d<sub>i</sub></strong>)</div>
-          <div class="result-value-box">${fmt(d_i)}</div>
-          <div class="result-unit">cm</div>
-        </div>
-        <div class="result-row">
-          <div class="result-label">Magnification (<strong>M</strong>)</div>
-          <div class="result-value-box">${fmt(M)}</div>
-          <div class="result-unit">(unitless)</div>
-        </div>
-        <div class="result-row">
-          <div class="result-label">Image height (<strong>h<sub>i</sub></strong>)</div>
-          <div class="result-value-box">${fmt(h_i)}</div>
-          <div class="result-unit">cm</div>
-        </div>
+        <div class="card"><strong>f</strong> = ${fmt(f)} cm</div>
+        <div class="card"><strong>d<sub>o</sub></strong> = ${fmt(d_o)} cm</div>
+        <div class="card"><strong>h<sub>o</sub></strong> = ${fmt(h_o)} cm</div>
+        <div class="card"><strong>d<sub>i</sub></strong> = ${fmt(d_i)} cm</div>
+        <div class="card"><strong>M</strong> = ${fmt(M)}</div>
+        <div class="card"><strong>h<sub>i</sub></strong> = ${fmt(h_i)} cm</div>
       `;
 
       $('interpretation').innerHTML = `

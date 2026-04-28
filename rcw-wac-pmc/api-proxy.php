@@ -361,6 +361,21 @@ if ($curlErrno) {
     sse(['error' => $body['error']['message'] ?? "Anthropic returned HTTP {$st['httpCode']}"]);
 } elseif ($st['textChars'] === 0 && !$st['sawErrorEvent']) {
     $reason = $st['stopReason'] ?: 'unknown';
+    $fallback = "I couldn't generate a full narrative answer for this request "
+        . "(stop_reason={$reason}).\n\n";
+    if (!empty($sources)) {
+        $fallback .= "Most relevant retrieved sections:\n";
+        foreach (array_slice($sources, 0, 6) as $s) {
+            $sid = $s['section_id'] ?? 'Unknown section';
+            $hd  = trim((string)($s['section_heading'] ?? ''));
+            $fallback .= "- {$sid}" . ($hd !== '' ? " — {$hd}" : '') . "\n";
+        }
+        $fallback .= "\nTry narrowing the question (for example: title/chapter, permit type, or one scenario), "
+                  . "or run again with a different Source scope.";
+    } else {
+        $fallback .= "No source sections were retrieved. Try broadening your query or switching Source scope.";
+    }
+    sse(['text' => $fallback]);
     sse(['error' => "Model returned no text content (stop_reason={$reason})."]);
 }
 

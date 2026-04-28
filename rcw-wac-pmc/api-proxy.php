@@ -273,7 +273,8 @@ $payload = json_encode([
 // ── Stream Claude ─────────────────────────────────────────────────────────────
 
 $st = ['buf' => '', 'inTok' => 0, 'outTok' => 0, 'cacheRead' => 0, 'cacheWrite' => 0,
-       'stopReason' => '', 'httpCode' => 0, 'errBody' => ''];
+       'stopReason' => '', 'httpCode' => 0, 'errBody' => '',
+       'textChars' => 0, 'sawErrorEvent' => false];
 
 $ch = curl_init('https://api.anthropic.com/v1/messages');
 curl_setopt($ch, CURLOPT_POST,           true);
@@ -317,10 +318,22 @@ curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($ch, $chunk) use (&$st) {
                 $st['cacheRead'] = (int)($u['cache_read_input_tokens']     ?? 0);
                 $st['cacheWrite']= (int)($u['cache_creation_input_tokens'] ?? 0);
                 break;
+            case 'content_block_start':
+                if (($event['content_block']['type'] ?? '') === 'text') {
+                    $txt = $event['content_block']['text'] ?? '';
+                    if ($txt !== '') {
+                        $st['textChars'] += strlen($txt);
+                        sse(['text' => $txt]);
+                    }
+                }
+                break;
             case 'content_block_delta':
                 if (($event['delta']['type'] ?? '') === 'text_delta') {
                     $txt = $event['delta']['text'] ?? '';
-                    if ($txt !== '') { sse(['text' => $txt]); }
+                    if ($txt !== '') {
+                        $st['textChars'] += strlen($txt);
+                        sse(['text' => $txt]);
+                    }
                 }
                 break;
             case 'message_delta':
@@ -328,6 +341,7 @@ curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($ch, $chunk) use (&$st) {
                 $st['stopReason'] = $event['delta']['stop_reason'] ?? '';
                 break;
             case 'error':
+                $st['sawErrorEvent'] = true;
                 sse(['error' => $event['error']['message'] ?? 'Claude error']);
                 break;
         }
@@ -345,6 +359,9 @@ if ($curlErrno) {
 } elseif ($st['httpCode'] !== 200) {
     $body = json_decode($st['errBody'], true);
     sse(['error' => $body['error']['message'] ?? "Anthropic returned HTTP {$st['httpCode']}"]);
+} elseif ($st['textChars'] === 0 && !$st['sawErrorEvent']) {
+    $reason = $st['stopReason'] ?: 'unknown';
+    sse(['error' => "Model returned no text content (stop_reason={$reason})."]);
 }
 
 sse(['meta' => [

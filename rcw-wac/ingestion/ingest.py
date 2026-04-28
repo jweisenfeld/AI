@@ -1201,6 +1201,14 @@ def insert_chunks(sb, chunks: list[dict], embeddings: list[list[float]]) -> int:
                 sb.table('rcw_wac_chunks').upsert(rows, on_conflict='section_id,chunk_index').execute()
                 break
             except Exception as e:
+                msg = str(e)
+                if 'rcw_wac_chunks_corpus_check' in msg and "'code': '23514'" in msg:
+                    raise RuntimeError(
+                        "Supabase rejected corpus value due to rcw_wac_chunks_corpus_check.\n"
+                        "Your DB schema still only allows old corpus values.\n"
+                        "Run the PMC migration SQL in rcw-wac/ingestion/schema.sql "
+                        "(section: 'Migration v3: expand allowed corpora')."
+                    ) from e
                 if attempt == 4:
                     raise
                 wait = 2 ** attempt   # 1s, 2s, 4s, 8s

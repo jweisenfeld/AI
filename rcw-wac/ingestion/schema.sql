@@ -23,7 +23,7 @@ create extension if not exists vector;
 
 create table if not exists rcw_wac_chunks (
     id              bigint      primary key generated always as identity,
-    corpus          text        not null check (corpus in ('rcw', 'wac')),
+    corpus          text        not null check (corpus in ('pmc', 'rcw', 'wac', 'usc', 'cfr')),
     title_num       text        not null,   -- '28A', '392', etc.
     title_name      text,                   -- 'Common School Provisions'
     chapter_num     text        not null,   -- '28A.400', '392-121', etc.
@@ -49,9 +49,9 @@ create table if not exists rcw_wac_chunks (
     unique (section_id, chunk_index)
 );
 
-comment on table  rcw_wac_chunks                  is 'One chunk per RCW/WAC section (long sections split). Contains embedding + full-text index for hybrid vector+BM25 search.';
-comment on column rcw_wac_chunks.corpus           is '''rcw'' = Revised Code of Washington (statute), ''wac'' = Washington Administrative Code (administrative rule)';
-comment on column rcw_wac_chunks.section_id       is 'Canonical citation: ''RCW 28A.400.010'' or ''WAC 392-121-122''';
+comment on table  rcw_wac_chunks                  is 'One chunk per legal section (PMC/RCW/WAC/USC/CFR). Contains embedding + full-text index for hybrid vector+BM25 search.';
+comment on column rcw_wac_chunks.corpus           is '''pmc'' = Pasco Municipal Code, ''rcw'' = Revised Code of Washington, ''wac'' = Washington Administrative Code, ''usc'' = United States Code, ''cfr'' = Code of Federal Regulations';
+comment on column rcw_wac_chunks.section_id       is 'Canonical citation: ''PMC 25.12.040'', ''RCW 28A.400.010'', ''WAC 392-121-122'', ''20 USC § 1415'', ''34 CFR § 300.8''';
 comment on column rcw_wac_chunks.chunk_index      is '0-based. Most sections = single chunk (index 0). Long sections are split; each chunk includes the section_id prefix for context.';
 comment on column rcw_wac_chunks.content          is 'Embedded text: ''RCW 28A.400.010 — Heading\n\nBody text...''. Heading prefix on every chunk ensures context survives chunking.';
 comment on column rcw_wac_chunks.embedding        is '1536-dim OpenAI text-embedding-3-small. Regenerate from content if model changes.';
@@ -62,7 +62,7 @@ comment on column rcw_wac_chunks.fts              is 'GIN-indexed tsvector cover
 create table if not exists rcw_wac_query_log (
     id           bigint      primary key generated always as identity,
     query_text   text        not null,
-    corpus_filter text,                 -- 'rcw' | 'wac' | null for both
+    corpus_filter text,                 -- 'pmc'|'rcw'|'wac'|'usc'|'cfr'|'state'|'federal'|'local'|null
     result_count int         not null default 0,
     queried_at   timestamptz default now()
 );
@@ -95,7 +95,7 @@ create or replace function search_rcw_wac(
     query_embedding  vector(1536),
     match_count      int     default 8,
     min_similarity   float   default 0.25,
-    filter_corpus    text    default null,   -- 'rcw' | 'wac' | null
+    filter_corpus    text    default null,   -- 'pmc'|'rcw'|'wac'|'usc'|'cfr'|'state'|'federal'|'local'|null
     filter_title     text    default null,   -- e.g. '28A'
     query_text       text    default null    -- enables BM25 lane when supplied
 )
@@ -122,7 +122,13 @@ language sql stable security definer as $$
         from rcw_wac_chunks c
         where
             c.embedding is not null
-            and (filter_corpus is null or c.corpus   = filter_corpus)
+            and (
+                filter_corpus is null
+                or (filter_corpus = 'state'   and c.corpus in ('rcw','wac'))
+                or (filter_corpus = 'federal' and c.corpus in ('usc','cfr'))
+                or (filter_corpus = 'local'   and c.corpus in ('pmc','rcw','wac','usc','cfr'))
+                or c.corpus = filter_corpus
+            )
             and (filter_title  is null or c.title_num = filter_title)
             and (1 - (c.embedding <=> query_embedding)) >= min_similarity
         order by c.embedding <=> query_embedding
@@ -146,7 +152,13 @@ language sql stable security definer as $$
         where
             query_text is not null
             and c.fts @@ tsq.q
-            and (filter_corpus is null or c.corpus   = filter_corpus)
+            and (
+                filter_corpus is null
+                or (filter_corpus = 'state'   and c.corpus in ('rcw','wac'))
+                or (filter_corpus = 'federal' and c.corpus in ('usc','cfr'))
+                or (filter_corpus = 'local'   and c.corpus in ('pmc','rcw','wac','usc','cfr'))
+                or c.corpus = filter_corpus
+            )
             and (filter_title  is null or c.title_num = filter_title)
         order by ts_rank_cd(c.fts, tsq.q) desc
         limit match_count * 10
@@ -177,11 +189,17 @@ $$;
 create or replace function rcw_wac_stats()
 returns json language sql security definer as $$
     select json_build_object(
+        'pmc_chunks', (select count(*) from rcw_wac_chunks where corpus = 'pmc'),
         'rcw_chunks', (select count(*) from rcw_wac_chunks where corpus = 'rcw'),
         'wac_chunks', (select count(*) from rcw_wac_chunks where corpus = 'wac'),
+        'usc_chunks', (select count(*) from rcw_wac_chunks where corpus = 'usc'),
+        'cfr_chunks', (select count(*) from rcw_wac_chunks where corpus = 'cfr'),
         'total_chunks', (select count(*) from rcw_wac_chunks),
+        'pmc_titles', (select count(distinct title_num) from rcw_wac_chunks where corpus = 'pmc'),
         'rcw_titles', (select count(distinct title_num) from rcw_wac_chunks where corpus = 'rcw'),
         'wac_titles', (select count(distinct title_num) from rcw_wac_chunks where corpus = 'wac'),
+        'usc_titles', (select count(distinct title_num) from rcw_wac_chunks where corpus = 'usc'),
+        'cfr_titles', (select count(distinct title_num) from rcw_wac_chunks where corpus = 'cfr'),
         'total_queries', (select count(*) from rcw_wac_query_log),
         'zero_hit_queries', (select count(*) from rcw_wac_query_log where result_count = 0)
     );
@@ -227,3 +245,14 @@ alter table rcw_wac_query_log
     add column if not exists out_tokens     int,
     add column if not exists cached_tokens  int,
     add column if not exists continue_count int not null default 0;
+
+-- ── Migration v3: expand allowed corpora + combined corpus filters ───────────
+-- Required for PMC/USC/CFR ingestion + 'state'/'federal'/'local' query filters.
+-- Safe to run multiple times.
+
+alter table rcw_wac_chunks
+    drop constraint if exists rcw_wac_chunks_corpus_check;
+
+alter table rcw_wac_chunks
+    add constraint rcw_wac_chunks_corpus_check
+    check (corpus in ('pmc', 'rcw', 'wac', 'usc', 'cfr'));

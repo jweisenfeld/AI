@@ -101,7 +101,7 @@ class RcwWacProxy
             'match_count'     => max(1, min($limit, 20)),
             'min_similarity'  => $minSimilarity,
         ];
-        if ($corpus && in_array($corpus, ['rcw', 'wac', 'usc', 'cfr', 'state', 'federal'], true)) {
+        if ($corpus && in_array($corpus, ['pmc', 'rcw', 'wac', 'usc', 'cfr', 'state', 'federal', 'local'], true)) {
             $params['filter_corpus'] = $corpus;
         }
         if ($queryText) {
@@ -158,7 +158,7 @@ class RcwWacProxy
             $sectionId   = $r['section_id']      ?? '';
             $heading     = $r['section_heading'] ?? '';
             $corpusLabel = match($r['corpus'] ?? '') {
-                'rcw' => 'RCW', 'wac' => 'WAC',
+                'pmc' => 'PMC', 'rcw' => 'RCW', 'wac' => 'WAC',
                 'usc' => 'USC', 'cfr' => 'CFR',
                 default => strtoupper($r['corpus'] ?? ''),
             };

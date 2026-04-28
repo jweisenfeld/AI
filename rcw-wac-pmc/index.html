@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PMC Legal Reference — Pasco Municipal Code</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+<style>
+  :root {
+    --primary:      #0d2035;
+    --primary-md:   #1a3a5c;
+    --accent:       #c9a227;   /* badge gold */
+    --accent-dk:    #a07f18;
+    --user-bg:      #0d2035;
+    --user-fg:      #ffffff;
+    --bot-bg:       #f4f7fb;
+    --bot-fg:       #1a1a2e;
+    --source-bg:    #eef2f8;
+    --source-border:#c0cfd8;
+    --rcw-badge:    #1a3a5c;
+    --wac-badge:    #2e6b3e;
+    --usc-badge:    #7b2d2d;
+    --cfr-badge:    #5a3472;
+    --sim-color:    #c9a227;
+    --disclaimer:   #7a8a9a;
+    --border:       #ccd6e0;
+    --bg:           #edf1f5;
+    --shadow:       0 2px 8px rgba(0,0,0,.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Header ─────────────────────────────────────────────────────────────── */
+  header {
+    background: var(--primary);
+    color: #fff;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+    box-shadow: var(--shadow);
+    border-bottom: 2px solid var(--accent);
+  }
+  .header-badge {
+    font-size: 1.6rem;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  header h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: .02em; }
+  header .subtitle {
+    font-size: .72rem;
+    color: #8aaccc;
+    margin-top: 2px;
+    letter-spacing: .04em;
+  }
+  .sources-dropdown { margin-left: auto; position: relative; }
+  #source-btn {
+    padding: 4px 10px; border: 1px solid #3a5a7a; background: transparent;
+    color: #8aaccc; border-radius: 4px; cursor: pointer; font-size: .75rem;
+  }
+  #source-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .source-menu {
+    display: none; position: absolute; right: 0; top: calc(100% + 6px);
+    background: #10263d; border: 1px solid #3a5a7a; border-radius: 6px;
+    min-width: 250px; padding: 8px; z-index: 20; box-shadow: var(--shadow);
+  }
+  .source-menu.open { display: block; }
+  .source-menu label { display: flex; gap: 8px; align-items: center; padding: 5px 6px; color: #d7e3ef; font-size: .76rem; cursor: pointer; }
+  .source-menu label:hover { background: #1a3652; border-radius: 4px; }
+
+  /* ── Messages ───────────────────────────────────────────────────────────── */
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    scroll-behavior: smooth;
+  }
+
+  .message { display: flex; flex-direction: column; max-width: 86%; }
+  .message.user  { align-self: flex-end; align-items: flex-end; }
+  .message.bot   { align-self: flex-start; align-items: flex-start; }
+
+  /* ── Markdown ────────────────────────────────────────────────────────────── */
+  .bubble.markdown { white-space: normal; }
+  .bubble.markdown p          { margin: 0 0 .6em; }
+  .bubble.markdown p:last-child { margin-bottom: 0; }
+  .bubble.markdown h1,.bubble.markdown h2,.bubble.markdown h3 {
+    margin: .8em 0 .3em; font-weight: 700; line-height: 1.3;
+  }
+  .bubble.markdown h1 { font-size: 1.1em; }
+  .bubble.markdown h2 { font-size: 1.0em; }
+  .bubble.markdown h3 { font-size: .95em; }
+  .bubble.markdown ul,.bubble.markdown ol { margin: .4em 0 .6em 1.4em; }
+  .bubble.markdown li { margin-bottom: .25em; }
+  .bubble.markdown code {
+    background: rgba(0,0,0,.08); border-radius: 3px;
+    padding: 1px 5px; font-family: monospace; font-size: .88em;
+  }
+  .bubble.markdown pre {
+    background: rgba(0,0,0,.06); border-radius: 6px;
+    padding: 10px 12px; overflow-x: auto; margin: .5em 0;
+  }
+  .bubble.markdown pre code { background: none; padding: 0; }
+  .bubble.markdown a { color: var(--primary-md); }
+  .bubble.markdown strong { font-weight: 700; }
+  .bubble.markdown blockquote {
+    border-left: 3px solid var(--accent); margin: .5em 0;
+    padding-left: .8em; color: #556;
+  }
+
+  .bubble {
+    padding: 10px 14px;
+    border-radius: 14px;
+    line-height: 1.55;
+    font-size: .92rem;
+    word-break: break-word;
+  }
+  .message.user .bubble {
+    background: var(--user-bg);
+    color: var(--user-fg);
+    border-radius: 14px 14px 4px 14px;
+    white-space: pre-wrap;
+  }
+  .message.bot .bubble {
+    background: var(--bot-bg);
+    color: var(--bot-fg);
+    border-radius: 14px 14px 14px 4px;
+    box-shadow: var(--shadow);
+  }
+
+  /* ── Source cards ───────────────────────────────────────────────────────── */
+  .sources-block { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
+  .sources-label {
+    font-size: .7rem; color: #6a7a8a;
+    text-transform: uppercase; letter-spacing: .07em; margin-bottom: 2px;
+  }
+  .source-card {
+    background: var(--source-bg);
+    border: 1px solid var(--source-border);
+    border-radius: 7px;
+    padding: 6px 10px;
+    font-size: .79rem;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .source-card a { font-weight: 700; color: var(--primary-md); text-decoration: none; }
+  .source-card a:hover { text-decoration: underline; }
+  .corpus-badge {
+    font-size: .67rem; font-weight: 700;
+    padding: 1px 6px; border-radius: 3px;
+    color: #fff; flex-shrink: 0;
+  }
+  .corpus-badge.pmc { background: var(--primary-md); }
+  .corpus-badge.rcw { background: var(--rcw-badge); }
+  .corpus-badge.wac { background: var(--wac-badge); }
+  .corpus-badge.usc { background: var(--usc-badge); }
+  .corpus-badge.cfr { background: var(--cfr-badge); }
+  .source-heading {
+    color: #4a5a6a; flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sim-badge { font-size: .69rem; color: var(--sim-color); font-weight: 700; flex-shrink: 0; }
+
+  /* ── Token meta ─────────────────────────────────────────────────────────── */
+  .meta-badge { font-size: .69rem; color: #8a9aaa; margin-top: 4px; padding-left: 4px; }
+
+  /* ── Thinking indicator ─────────────────────────────────────────────────── */
+  .thinking-indicator {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 10px 14px;
+    background: var(--bot-bg);
+    border-radius: 14px 14px 14px 4px;
+    box-shadow: var(--shadow);
+    color: #7a8a9a;
+    font-size: .82rem;
+    margin-bottom: 2px;
+  }
+  .think-dots { display: flex; gap: 5px; align-items: center; }
+  .think-dot {
+    width: 9px; height: 9px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: think-bounce 1.4s ease-in-out infinite;
+  }
+  .think-dot:nth-child(2) { animation-delay: .18s; }
+  .think-dot:nth-child(3) { animation-delay: .36s; }
+  @keyframes think-bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: .55; }
+    30%            { transform: translateY(-6px); opacity: 1; }
+  }
+  .think-label { color: #6a7a8a; }
+  .think-timer { font-weight: 700; color: var(--accent); }
+
+  /* ── Continue button ────────────────────────────────────────────────────── */
+  .continue-btn {
+    margin-top: 8px;
+    padding: 5px 14px;
+    font-size: .78rem;
+    font-weight: 700;
+    background: var(--accent);
+    color: #0d2035;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: .9;
+    transition: opacity .15s;
+  }
+  .continue-btn:hover { opacity: 1; }
+
+  /* ── Copy reply button ──────────────────────────────────────────────────── */
+  .copy-reply-btn {
+    margin-top: 6px;
+    padding: 3px 10px;
+    font-size: .72rem;
+    background: transparent;
+    color: #8a9aaa;
+    border: 1px solid #c0ccd8;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all .15s;
+    align-self: flex-start;
+  }
+  .copy-reply-btn:hover { background: var(--source-bg); color: var(--primary-md); border-color: var(--accent); }
+
+  /* ── Welcome ────────────────────────────────────────────────────────────── */
+  .welcome {
+    align-self: center;
+    text-align: center;
+    margin: auto;
+    color: #5a6a7a;
+    padding: 32px 16px;
+    max-width: 520px;
+  }
+  .welcome .shield { font-size: 2.8rem; margin-bottom: 10px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.15)); }
+  .welcome h2 { font-size: 1.15rem; font-weight: 700; color: var(--primary); margin-bottom: 6px; }
+  .welcome .tagline { font-size: .85rem; color: #7a8a9a; margin-bottom: 16px; line-height: 1.5; }
+  .welcome .examples { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; }
+  .example-chip {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 5px 13px;
+    font-size: .78rem;
+    cursor: pointer;
+    color: var(--primary-md);
+    transition: all .15s;
+    text-align: left;
+  }
+  .example-chip:hover {
+    background: var(--source-bg);
+    border-color: var(--accent);
+    color: var(--primary);
+  }
+
+  /* ── Input ──────────────────────────────────────────────────────────────── */
+  #input-area {
+    padding: 10px 14px;
+    background: #fff;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    flex-shrink: 0;
+  }
+  #query {
+    flex: 1;
+    resize: none;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: .92rem;
+    line-height: 1.45;
+    font-family: inherit;
+    max-height: 120px;
+    overflow-y: auto;
+  }
+  #query:focus { outline: none; border-color: var(--accent); }
+  #send-btn {
+    background: var(--accent);
+    color: #0d2035;
+    border: none;
+    border-radius: 10px;
+    padding: 8px 18px;
+    font-size: .9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s;
+    flex-shrink: 0;
+  }
+  #send-btn:hover:not(:disabled) { background: var(--accent-dk); }
+  #send-btn:disabled { opacity: .45; cursor: default; }
+
+  .disclaimer {
+    font-size: .67rem;
+    color: var(--disclaimer);
+    text-align: center;
+    padding: 3px 14px 6px;
+    flex-shrink: 0;
+    background: #fff;
+  }
+
+  /* ── About button ───────────────────────────────────────────────────────── */
+  #about-btn {
+    margin-left: 8px;
+    padding: 4px 10px;
+    border: 1px solid #3a5a7a;
+    background: transparent;
+    color: #8aaccc;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: .75rem;
+    transition: all .15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  #about-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── About modal ────────────────────────────────────────────────────────── */
+  #about-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.55);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  #about-overlay.open { display: flex; }
+  #about-modal {
+    background: #fff;
+    border-radius: 12px;
+    max-width: 680px;
+    width: 100%;
+    height: min(640px, 88dvh);
+    max-height: 88dvh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0,0,0,.25);
+    overflow: hidden;
+  }
+  .about-header {
+    background: var(--primary);
+    color: #fff;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid var(--accent);
+    flex-shrink: 0;
+  }
+  .about-header h2 { font-size: 1rem; font-weight: 700; }
+  #about-close {
+    background: none; border: none; color: #8aaccc;
+    font-size: 1.3rem; cursor: pointer; line-height: 1;
+    padding: 0 4px;
+  }
+  #about-close:hover { color: #fff; }
+  #about-body {
+    overflow-y: auto;
+    padding: 20px;
+    flex: 1 1 0;
+    min-height: 0;
+  }
+  .about-section h3 {
+    font-size: .8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--primary-md);
+    margin-bottom: 10px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  /* pipeline */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: .8rem;
+  }
+  .pipe-step {
+    background: var(--source-bg);
+    border: 1px solid var(--source-border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    text-align: center;
+    min-width: 110px;
+  }
+  .pipe-step strong { display: block; font-size: .72rem; color: var(--primary-md); margin-bottom: 2px; }
+  .pipe-step span { color: #5a6a7a; font-size: .71rem; }
+  .pipe-arrow { color: var(--accent); font-weight: 700; font-size: 1rem; }
+  /* stats grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 8px;
+  }
+  .stat-card {
+    border: 1px solid var(--source-border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    text-align: center;
+  }
+  .stat-card .stat-label {
+    font-size: .67rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .07em;
+    color: #6a7a8a; margin-bottom: 4px;
+  }
+  .stat-card .stat-num {
+    font-size: 1.4rem; font-weight: 700; color: var(--primary);
+    line-height: 1.1;
+  }
+  .stat-card .stat-sub { font-size: .67rem; color: #8a9aaa; margin-top: 2px; }
+  .stat-card.rcw-card { border-color: var(--rcw-badge); }
+  .stat-card.wac-card { border-color: var(--wac-badge); }
+  .stat-card.usc-card { border-color: var(--usc-badge); }
+  .stat-card.cfr-card { border-color: var(--cfr-badge); }
+  /* prompt box */
+  .prompt-wrap {
+    position: relative;
+  }
+  .prompt-box {
+    background: #f4f7fb;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-family: monospace;
+    font-size: .76rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    max-height: 260px;
+    overflow-y: auto;
+    color: #2a3a4a;
+  }
+  #copy-prompt-btn {
+    position: absolute;
+    top: 8px; right: 8px;
+    padding: 3px 10px;
+    font-size: .72rem;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: .8;
+    transition: opacity .15s;
+  }
+  #copy-prompt-btn:hover { opacity: 1; }
+  /* tech notes */
+  .tech-notes { font-size: .79rem; color: #4a5a6a; line-height: 1.6; }
+  .tech-notes dt { font-weight: 700; color: var(--primary-md); float: left; min-width: 130px; }
+  .tech-notes dd { margin-left: 130px; margin-bottom: 5px; }
+  .stats-loading { color: #8a9aaa; font-size: .82rem; font-style: italic; }
+
+  /* ── About tabs ─────────────────────────────────────────────────────────── */
+  .about-tabs {
+    display: flex; padding: 0 16px;
+    background: #f0f4f8; border-bottom: 1px solid var(--border);
+    flex-shrink: 0; overflow-x: auto;
+  }
+  .about-tab-btn {
+    padding: 8px 12px; font-size: .75rem; font-weight: 600;
+    border: none; border-bottom: 2px solid transparent; background: none;
+    cursor: pointer; color: #6a7a8a; margin-bottom: -1px; white-space: nowrap;
+    transition: color .15s, border-color .15s;
+  }
+  .about-tab-btn:hover { color: var(--primary-md); }
+  .about-tab-btn.active { color: var(--primary-md); border-bottom-color: var(--accent); }
+  .about-tab-panel { display: none; flex-direction: column; gap: 24px; }
+  .about-tab-panel.active { display: flex; }
+  .sample-queries-intro { font-size: .78rem; color: #5a6a7a; line-height: 1.55; margin-bottom: 6px; }
+  .sample-query-btn {
+    display: block; width: 100%; text-align: left; box-sizing: border-box;
+    padding: 8px 12px; margin-bottom: 4px;
+    background: var(--source-bg); border: 1px solid var(--source-border);
+    border-radius: 6px; cursor: pointer; font-size: .79rem; color: #2a3a4a;
+    line-height: 1.4; transition: background .12s, border-color .12s;
+  }
+  .sample-query-btn:hover { background: #e8e0cc; border-color: var(--accent); color: var(--primary); }
+  .sample-q-num { display: inline-block; min-width: 22px; font-weight: 700; color: var(--accent); }
+  .sql-health-wrap { position: relative; margin-top: 6px; }
+  .sql-health-block {
+    background: #1e2d3d; color: #c8d8e8; border-radius: 6px;
+    padding: 12px 14px; font-family: monospace; font-size: .73rem;
+    line-height: 1.55; white-space: pre; overflow-x: auto;
+  }
+  #copy-sql-btn {
+    position: absolute; top: 8px; right: 8px;
+    padding: 3px 10px; font-size: .72rem;
+    background: var(--primary-md); color: #fff;
+    border: none; border-radius: 4px; cursor: pointer; opacity: .8; transition: opacity .15s;
+  }
+  #copy-sql-btn:hover { opacity: 1; }
+  .sql-guide {
+    display: grid; grid-template-columns: auto 1fr; gap: 3px 10px;
+    font-size: .76rem; margin-top: 8px; align-items: baseline;
+  }
+  .sql-guide .sg-val { font-family: monospace; font-weight: 700; color: var(--primary-md); }
+  .sql-guide .sg-desc { color: #4a5a6a; }
+
+  /* ── Stat cards clickable ───────────────────────────────────────────────── */
+  .stat-card.clickable { cursor: pointer; transition: box-shadow .15s, transform .1s; }
+  .stat-card.clickable:hover { box-shadow: 0 3px 12px rgba(0,0,0,.15); transform: translateY(-1px); }
+
+  /* ── Catalog modal ──────────────────────────────────────────────────────── */
+  #catalog-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.55);
+    z-index: 1100;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  #catalog-overlay.open { display: flex; }
+  #catalog-modal {
+    background: #fff;
+    border-radius: 12px;
+    max-width: 580px;
+    width: 100%;
+    max-height: 85dvh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0,0,0,.25);
+    overflow: hidden;
+  }
+  .catalog-header {
+    background: var(--primary);
+    color: #fff;
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid var(--accent);
+    flex-shrink: 0;
+  }
+  .catalog-header h2 { font-size: .95rem; font-weight: 700; }
+  #catalog-close {
+    background: none; border: none; color: #8aaccc;
+    font-size: 1.3rem; cursor: pointer; line-height: 1; padding: 0 4px;
+  }
+  #catalog-close:hover { color: #fff; }
+  #catalog-body {
+    overflow-y: auto;
+    padding: 14px 18px;
+    font-size: .82rem;
+  }
+  .cat-title-block { margin-bottom: 14px; }
+  .cat-title-header {
+    font-weight: 700;
+    color: var(--primary);
+    font-size: .83rem;
+    padding: 5px 0 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+  .cat-chapter {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 3px 6px;
+    border-radius: 4px;
+  }
+  .cat-chapter:hover { background: var(--source-bg); }
+  .cat-chap-num  { color: var(--primary-md); font-weight: 700; flex-shrink: 0; min-width: 90px; }
+  .cat-chap-name { color: #3a4a5a; flex: 1; }
+  .cat-chap-ct   { color: #8a9aaa; font-size: .72rem; flex-shrink: 0; }
+  .cat-summary   { font-size: .75rem; color: #8a9aaa; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-badge">🏛️</div>
+  <div>
+    <h1>PMC Legal Reference</h1>
+    <div class="subtitle">Pasco Municipal Code with optional WA/Federal cross-checks</div>
+  </div>
+  <div class="sources-dropdown">
+    <button id="source-btn" type="button" aria-expanded="false">Source: PMC ▾</button>
+    <div id="source-menu" class="source-menu" role="menu">
+      <label><input type="radio" name="source-corpus" value="pmc" checked> PMC (default)</label>
+      <label><input type="radio" name="source-corpus" value="local"> Local + WA + Federal</label>
+      <label><input type="radio" name="source-corpus" value="state"> Washington State (RCW+WAC)</label>
+      <label><input type="radio" name="source-corpus" value="federal"> Federal (USC+CFR)</label>
+      <label><input type="radio" name="source-corpus" value="null"> All corpora</label>
+    </div>
+  </div>
+  <button id="about-btn" title="About this tool">About</button>
+</header>
+
+<!-- ── About Modal ─────────────────────────────────────────────────────────── -->
+<div id="about-overlay" role="dialog" aria-modal="true" aria-labelledby="about-title">
+  <div id="about-modal">
+    <div class="about-header">
+      <h2 id="about-title">🏛️ About PMC Legal Reference</h2>
+      <button id="about-close" aria-label="Close">✕</button>
+    </div>
+    <div class="about-tabs">
+      <button class="about-tab-btn active" data-tab="pipeline">Pipeline</button>
+      <button class="about-tab-btn" data-tab="database">Database</button>
+      <button class="about-tab-btn" data-tab="prompt">Prompt</button>
+      <button class="about-tab-btn" data-tab="technical">Technical</button>
+      <button class="about-tab-btn" data-tab="samples">Sample Queries</button>
+    </div>
+    <div id="about-body">
+
+      <div class="about-tab-panel active" data-tab="pipeline">
+        <div class="about-section">
+          <h3>How It Works — Query Pipeline</h3>
+          <div class="pipeline">
+            <div class="pipe-step">
+              <strong>Your Question</strong>
+              <span>plain language</span>
+            </div>
+            <span class="pipe-arrow">→</span>
+            <div class="pipe-step">
+              <strong>OpenAI Embed</strong>
+              <span>text-embedding-3-small<br>1536 dimensions</span>
+            </div>
+            <span class="pipe-arrow">→</span>
+            <div class="pipe-step">
+              <strong>Supabase Search</strong>
+              <span>vector + BM25 hybrid<br>top 8 sections</span>
+            </div>
+            <span class="pipe-arrow">→</span>
+            <div class="pipe-step">
+              <strong>Claude Haiku</strong>
+              <span>synthesis + citations<br>streaming SSE</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="about-tab-panel" data-tab="database">
+        <div class="about-section">
+          <h3>Database — Live Section Counts</h3>
+          <div id="stats-area" class="stats-loading">Loading database stats…</div>
+        </div>
+      </div>
+
+      <div class="about-tab-panel" data-tab="prompt">
+        <div class="about-section">
+          <h3>System Prompt</h3>
+          <p style="font-size:.78rem;color:#5a6a7a;margin-bottom:8px;">The exact instructions sent to Claude before every query (with <code>{CONTEXT}</code> replaced by the retrieved sections at runtime).</p>
+          <div class="prompt-wrap">
+            <div class="prompt-box" id="prompt-box">Loading…</div>
+            <button id="copy-prompt-btn">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="about-tab-panel" data-tab="technical">
+        <div class="about-section">
+          <h3>Technical Notes</h3>
+          <dl class="tech-notes">
+            <dt>Inference model</dt>
+            <dd>Claude Haiku 4.5 (<code>claude-haiku-4-5-20251001</code>) — fast, cheap RAG synthesis</dd>
+            <dt>Embedding model</dt>
+            <dd>OpenAI <code>text-embedding-3-small</code> — 1536 dimensions, used at ingest and at query time</dd>
+            <dt>Chunk size</dt>
+            <dd>~800 tokens per section chunk (PMC primary, plus optional RCW/WAC/USC/CFR)</dd>
+            <dt>Retrieval</dt>
+            <dd>Top 8 results via Reciprocal Rank Fusion (k=60) of vector cosine + BM25 full-text lanes</dd>
+            <dt>Max output</dt>
+            <dd>2,000 tokens per response</dd>
+            <dt>Corpus sources</dt>
+            <dd>PMC (Pasco corpus), RCW/WAC (WA Legislature), USC (Cornell LII), CFR (eCFR.gov XML)</dd>
+            <dt>Vector store</dt>
+            <dd>Supabase + pgvector, HNSW index (m=16, ef_construction=64)</dd>
+            <dt>Project repo</dt>
+            <dd>jweisenfeld/AI — <code>rcw-wac-pmc/</code> (UI) · <code>rcw-wac/</code> (shared proxy + ingestion)</dd>
+          </dl>
+        </div>
+        <div class="about-section">
+          <h3>HNSW Index Health Check</h3>
+          <p style="font-size:.78rem;color:#5a6a7a;line-height:1.55;margin-bottom:4px;">Run in <strong>Supabase → SQL Editor</strong> before and after a test session. A high cache-hit rate means the vector index lives in RAM — queries are fast. A low rate means it's hitting disk — consider upgrading to Micro compute (Project Settings → Infrastructure → Compute).</p>
+          <div class="sql-health-wrap">
+            <div class="sql-health-block">SELECT
+  indexrelname,
+  idx_blks_read  AS disk_reads,
+  idx_blks_hit   AS cache_hits,
+  round(idx_blks_hit::numeric /
+        nullif(idx_blks_hit + idx_blks_read, 0) * 100, 1) AS cache_hit_pct
+FROM pg_statio_user_indexes
+WHERE relname = 'rcw_wac_chunks'
+ORDER BY indexrelname;</div>
+            <button id="copy-sql-btn">Copy SQL</button>
+          </div>
+          <div class="sql-guide">
+            <span class="sg-val">&gt; 95%</span><span class="sg-desc">Index in RAM — optimal latency</span>
+            <span class="sg-val">80–95%</span><span class="sg-desc">Partially cached — acceptable after a cold start</span>
+            <span class="sg-val">&lt; 80%</span><span class="sg-desc">Hitting disk — upgrade to Micro compute tier</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="about-tab-panel" data-tab="samples">
+        <div class="about-section">
+          <h3>Sample Queries — Pasco Municipal Code Scenarios</h3>
+          <p class="sample-queries-intro">Six high-value municipal-code prompts (including Spanish and Russian) that test zoning, permitting, enforcement, and cross-section reconciliation. Click any query to run it.</p>
+          <div id="sample-queries-list">
+            <button class="sample-query-btn" data-query="Which Pasco Municipal Code sections apply to opening a food truck, and what permit sequence should I follow?"><span class="sample-q-num">1.</span> Which Pasco Municipal Code sections apply to opening a food truck, and what permit sequence should I follow?</button>
+            <button class="sample-query-btn" data-query="I want to build an ADU in Pasco. Identify all potentially binding code sections, lot constraints, and any internal conflicts."><span class="sample-q-num">2.</span> I want to build an ADU in Pasco. Identify all potentially binding code sections, lot constraints, and any internal conflicts.</button>
+            <button class="sample-query-btn" data-query="For a downtown mixed-use project, reconcile zoning, parking, signage, and design standards from the PMC."><span class="sample-q-num">3.</span> For a downtown mixed-use project, reconcile zoning, parking, signage, and design standards from the PMC.</button>
+            <button class="sample-query-btn" data-query="Compare enforcement and penalty pathways for repeated code violations under the PMC, including notice and appeal rights."><span class="sample-q-num">4.</span> Compare enforcement and penalty pathways for repeated code violations under the PMC, including notice and appeal rights.</button>
+            <button class="sample-query-btn" data-query="¿Qué secciones del Código Municipal de Pasco debo revisar antes de convertir una casa en un uso comercial?"><span class="sample-q-num">5.</span> ¿Qué secciones del Código Municipal de Pasco debo revisar antes de convertir una casa en un uso comercial?</button>
+            <button class="sample-query-btn" data-query="Какие разделы Муниципального кодекса Паско регулируют шум, часы работы бизнеса и порядок обжалования штрафа?"><span class="sample-q-num">6.</span> Какие разделы Муниципального кодекса Паско регулируют шум, часы работы бизнеса и порядок обжалования штрафа?</button>
+          </div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── Catalog Modal ───────────────────────────────────────────────────────── -->
+<div id="catalog-overlay" role="dialog" aria-modal="true">
+  <div id="catalog-modal">
+    <div class="catalog-header">
+      <h2 id="catalog-title">Ingested Sections</h2>
+      <button id="catalog-close" aria-label="Close">✕</button>
+    </div>
+    <div id="catalog-body"></div>
+  </div>
+</div>
+
+<div id="messages">
+  <div class="welcome" id="welcome">
+    <div class="shield">🏛️</div>
+    <h2>Pasco Municipal Code Reference Assistant</h2>
+    <p class="tagline">Ask plain-language questions about the Pasco Municipal Code. The assistant cites sections and can optionally cross-check WA/federal sources.</p>
+    <div class="examples">
+      <span class="example-chip">What PMC sections govern home occupations in Pasco?</span>
+      <span class="example-chip">Show all code provisions for a fence and corner-lot visibility triangle</span>
+      <span class="example-chip">What are the permit and inspection steps for a tenant improvement?</span>
+      <span class="example-chip">Identify conflicting PMC sections on short-term rentals</span>
+      <span class="example-chip">¿Qué código municipal aplica para abrir un negocio en casa?</span>
+      <span class="example-chip">Какие нормы PMC нужно проверить перед установкой вывески?</span>
+    </div>
+  </div>
+</div>
+
+<div id="input-area">
+  <textarea id="query" rows="1" placeholder="Ask about the Pasco Municipal Code…"></textarea>
+  <button id="send-btn">Ask</button>
+</div>
+<div class="disclaimer">General legal information only — not legal advice. Consult the Pasco City Attorney or qualified counsel for specific legal decisions.</div>
+
+<script>
+const messagesEl = document.getElementById('messages');
+const queryEl    = document.getElementById('query');
+const sendBtn    = document.getElementById('send-btn');
+
+let history = [];
+let corpus  = 'pmc';   // default corpus
+
+// ── Source dropdown (radio corpus selector) ─────────────────────────────────
+const sourceBtn = document.getElementById('source-btn');
+const sourceMenu = document.getElementById('source-menu');
+sourceBtn.addEventListener('click', () => {
+  const isOpen = sourceMenu.classList.toggle('open');
+  sourceBtn.setAttribute('aria-expanded', String(isOpen));
+});
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.sources-dropdown')) {
+    sourceMenu.classList.remove('open');
+    sourceBtn.setAttribute('aria-expanded', 'false');
+  }
+});
+
+const sourceLabels = { pmc:'PMC', local:'Local+WA+Federal', state:'State', federal:'Federal', null:'All' };
+document.querySelectorAll('input[name="source-corpus"]').forEach(r => {
+  r.addEventListener('change', () => {
+    corpus = r.value === 'null' ? null : r.value;
+    sourceBtn.textContent = `Source: ${sourceLabels[r.value] ?? r.value.toUpperCase()} ▾`;
+    sourceMenu.classList.remove('open');
+    sourceBtn.setAttribute('aria-expanded', 'false');
+  });
+});
+
+// ── Example chips ─────────────────────────────────────────────────────────────
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('example-chip')) {
+    queryEl.value = e.target.textContent.trim();
+    queryEl.dispatchEvent(new Event('input'));
+    sendMessage();
+  }
+});
+
+// ── Auto-resize textarea ──────────────────────────────────────────────────────
+queryEl.addEventListener('input', () => {
+  queryEl.style.height = 'auto';
+  queryEl.style.height = Math.min(queryEl.scrollHeight, 120) + 'px';
+});
+queryEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+sendBtn.addEventListener('click', sendMessage);
+
+// ── About modal ───────────────────────────────────────────────────────────────
+const aboutOverlay = document.getElementById('about-overlay');
+const aboutBtn     = document.getElementById('about-btn');
+const aboutClose   = document.getElementById('about-close');
+const statsArea    = document.getElementById('stats-area');
+const promptBox    = document.getElementById('prompt-box');
+const copyPromptBtn = document.getElementById('copy-prompt-btn');
+
+let aboutLoaded = false;
+
+function openAbout() {
+  aboutOverlay.classList.add('open');
+  if (!aboutLoaded) { loadAboutData(); aboutLoaded = true; }
+}
+function closeAbout() { aboutOverlay.classList.remove('open'); }
+
+aboutBtn.addEventListener('click', openAbout);
+aboutClose.addEventListener('click', closeAbout);
+aboutOverlay.addEventListener('click', e => { if (e.target === aboutOverlay) closeAbout(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAbout(); });
+
+async function loadAboutData() {
+  // Fetch DB stats
+  try {
+    const resp = await fetch('api-proxy.php?stats=1');
+    const rows = await resp.json();
+    if (rows.error) throw new Error(rows.error);
+
+    const order  = ['pmc','rcw','wac','usc','cfr'];
+    const labels = { pmc:'PMC', rcw:'RCW', wac:'WAC', usc:'USC', cfr:'CFR' };
+    const descs  = {
+      pmc: 'Pasco Municipal Code',
+      rcw: 'Revised Code of WA',
+      wac: 'WA Admin Code',
+      usc: 'US Code',
+      cfr: 'Code of Federal Regs',
+    };
+
+    // stats() returns a single flat row: {rcw_chunks, wac_chunks, usc_chunks, cfr_chunks, ...}
+    const r = Array.isArray(rows) ? rows[0] : rows;
+
+    const grid = document.createElement('div');
+    grid.className = 'stats-grid';
+
+    order.forEach(c => {
+      const card   = document.createElement('div');
+      card.className = `stat-card ${c}-card clickable`;
+      card.dataset.corpus = c;
+      card.title = `Click to browse ingested ${labels[c]} titles & chapters`;
+      const chunks = r[`${c}_chunks`] ?? '—';
+      const titles = r[`${c}_titles`] ?? null;
+      card.innerHTML = `
+        <div class="stat-label">${labels[c]}</div>
+        <div class="stat-num">${typeof chunks === 'number' ? chunks.toLocaleString() : chunks}</div>
+        <div class="stat-sub">${titles !== null ? titles + ' titles' : descs[c]}</div>`;
+      grid.appendChild(card);
+    });
+
+    const total = r.total_chunks ?? 0;
+    const totalCard = document.createElement('div');
+    totalCard.className = 'stat-card';
+    totalCard.style.gridColumn = '1 / -1';
+    totalCard.innerHTML = `
+      <div class="stat-label">Total chunks in database</div>
+      <div class="stat-num" style="font-size:1.1rem">${total.toLocaleString()}</div>
+      <div class="stat-sub">each chunk ≈ one law section</div>`;
+    grid.appendChild(totalCard);
+
+    statsArea.replaceWith(grid);
+  } catch (err) {
+    statsArea.textContent = 'Could not load stats: ' + err.message;
+    statsArea.style.color = '#c0392b';
+  }
+
+  // Fetch system prompt
+  try {
+    const resp = await fetch('api-proxy.php?prompt=1');
+    const data = await resp.json();
+    promptBox.textContent = data.prompt ?? '(not available)';
+  } catch (err) {
+    promptBox.textContent = 'Could not load system prompt: ' + err.message;
+  }
+}
+
+copyPromptBtn.addEventListener('click', () => {
+  const text = promptBox.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    copyPromptBtn.textContent = 'Copied!';
+    setTimeout(() => { copyPromptBtn.textContent = 'Copy'; }, 1800);
+  }).catch(() => {
+    copyPromptBtn.textContent = 'Error';
+  });
+});
+
+document.querySelectorAll('.about-tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.about-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.about-tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelector(`.about-tab-panel[data-tab="${btn.dataset.tab}"]`).classList.add('active');
+  });
+});
+
+document.getElementById('copy-sql-btn').addEventListener('click', function() {
+  const sql = document.querySelector('.sql-health-block').textContent;
+  navigator.clipboard.writeText(sql).then(() => {
+    this.textContent = 'Copied!';
+    setTimeout(() => { this.textContent = 'Copy SQL'; }, 1800);
+  }).catch(() => { this.textContent = 'Error'; });
+});
+
+document.getElementById('sample-queries-list').addEventListener('click', e => {
+  const btn = e.target.closest('.sample-query-btn');
+  if (!btn) return;
+  closeAbout();
+  queryEl.value = btn.dataset.query;
+  if (welcomeEl) welcomeEl.style.display = 'none';
+  sendMessage();
+});
+
+// ── Catalog modal ─────────────────────────────────────────────────────────────
+const catalogOverlay = document.getElementById('catalog-overlay');
+const catalogTitle   = document.getElementById('catalog-title');
+const catalogBody    = document.getElementById('catalog-body');
+const catalogClose   = document.getElementById('catalog-close');
+
+const corpusLabels = { pmc:'PMC', rcw:'RCW', wac:'WAC', usc:'USC', cfr:'CFR' };
+const catalogCache = {};
+
+function openCatalog(corpus) {
+  catalogTitle.textContent = `${corpusLabels[corpus] ?? corpus.toUpperCase()} — Ingested Titles & Chapters`;
+  catalogBody.innerHTML = '<div style="padding:20px;color:#8a9aaa;font-style:italic">Loading…</div>';
+  catalogOverlay.classList.add('open');
+  loadCatalog(corpus);
+}
+function closeCatalog() { catalogOverlay.classList.remove('open'); }
+
+catalogClose.addEventListener('click', closeCatalog);
+catalogOverlay.addEventListener('click', e => { if (e.target === catalogOverlay) closeCatalog(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCatalog(); });
+
+async function loadCatalog(corpus) {
+  if (catalogCache[corpus]) { renderCatalog(catalogCache[corpus]); return; }
+  try {
+    const resp = await fetch(`api-proxy.php?catalog=${corpus}`);
+    const rows = await resp.json();
+    if (rows.error) throw new Error(rows.error);
+    catalogCache[corpus] = rows;
+    renderCatalog(rows);
+  } catch (err) {
+    catalogBody.innerHTML = `<div style="padding:20px;color:#c0392b">Error: ${err.message}</div>`;
+  }
+}
+
+function renderCatalog(rows) {
+  if (!rows.length) {
+    catalogBody.innerHTML = '<div style="padding:20px;color:#8a9aaa">No sections ingested yet.</div>';
+    return;
+  }
+
+  // Group by title
+  const titleMap = new Map();
+  let totalChunks = 0;
+  rows.forEach(r => {
+    const key = r.title_num ?? '';
+    if (!titleMap.has(key)) titleMap.set(key, { title_name: r.title_name ?? '', chapters: [] });
+    titleMap.get(key).chapters.push(r);
+    totalChunks += Number(r.chunk_count ?? 0);
+  });
+
+  const summary = document.createElement('div');
+  summary.className = 'cat-summary';
+  summary.textContent = `${titleMap.size} title${titleMap.size !== 1 ? 's' : ''} · ${rows.length} chapter${rows.length !== 1 ? 's' : ''} · ${totalChunks.toLocaleString()} chunks`;
+
+  const container = document.createElement('div');
+  titleMap.forEach(({ title_name, chapters }, titleNum) => {
+    const block = document.createElement('div');
+    block.className = 'cat-title-block';
+
+    const header = document.createElement('div');
+    header.className = 'cat-title-header';
+    // title_name is often "Title 10" — skip it if it's just a restatement of title_num
+    const genericTitle = `Title ${titleNum}`;
+    const realTitleName = (title_name && title_name !== genericTitle) ? title_name : '';
+    header.textContent = titleNum
+      ? (realTitleName ? `${genericTitle} — ${realTitleName}` : genericTitle)
+      : (title_name || 'Untitled');
+    block.appendChild(header);
+
+    chapters.forEach(c => {
+      const row = document.createElement('div');
+      row.className = 'cat-chapter';
+      // chapter_name often equals chapter_num — suppress it when redundant
+      const chapName = (c.chapter_name && c.chapter_name !== c.chapter_num) ? c.chapter_name : '';
+      row.innerHTML = `
+        <span class="cat-chap-num">${c.chapter_num ?? '—'}</span>
+        <span class="cat-chap-name">${chapName}</span>
+        <span class="cat-chap-ct">${Number(c.chunk_count).toLocaleString()} chunks</span>`;
+      block.appendChild(row);
+    });
+    container.appendChild(block);
+  });
+
+  catalogBody.innerHTML = '';
+  catalogBody.appendChild(summary);
+  catalogBody.appendChild(container);
+}
+
+// Make About stat cards open the catalog
+document.addEventListener('click', e => {
+  const card = e.target.closest('.stat-card.clickable');
+  if (card?.dataset.corpus) openCatalog(card.dataset.corpus);
+
+  // Also trigger from corpus badges on source cards in chat
+  if (e.target.classList.contains('corpus-badge') && e.target.dataset.corpus) {
+    openCatalog(e.target.dataset.corpus);
+  }
+});
+
+// ── DOM helpers ───────────────────────────────────────────────────────────────
+function removeWelcome() {
+  const w = document.getElementById('welcome');
+  if (w) w.remove();
+}
+
+function addMessage(role, text) {
+  removeWelcome();
+  const wrap   = document.createElement('div');
+  wrap.className = `message ${role}`;
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = text;
+  wrap.appendChild(bubble);
+  messagesEl.appendChild(wrap);
+  scrollBottom();
+  return { wrap, bubble };
+}
+
+function scrollBottom() {
+  messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
+}
+
+function renderSources(sources) {
+  if (!sources?.length) return null;
+  const block = document.createElement('div');
+  block.className = 'sources-block';
+  const label = document.createElement('div');
+  label.className = 'sources-label';
+  label.textContent = `Sources (${sources.length})`;
+  block.appendChild(label);
+  sources.forEach(s => {
+    const card = document.createElement('div');
+    card.className = 'source-card';
+
+    const badge = document.createElement('span');
+    badge.className = `corpus-badge ${s.corpus}`;
+    badge.dataset.corpus = s.corpus;
+    badge.title = `Browse all ingested ${s.corpus_label} sections`;
+    badge.style.cursor = 'pointer';
+    badge.textContent = s.corpus_label;
+
+    const link = document.createElement('a');
+    link.href   = s.source_url;
+    link.target = '_blank';
+    link.rel    = 'noopener noreferrer';
+    link.textContent = s.section_id;
+
+    const heading = document.createElement('span');
+    heading.className = 'source-heading';
+    heading.textContent = s.section_heading || s.chapter_name || '';
+
+    card.appendChild(badge);
+    card.appendChild(link);
+    card.appendChild(heading);
+
+    if (s.similarity_pct != null) {
+      const sim = document.createElement('span');
+      sim.className = 'sim-badge';
+      sim.textContent = `${s.similarity_pct}%`;
+      card.appendChild(sim);
+    }
+    block.appendChild(card);
+  });
+  return block;
+}
+
+// ── Send ──────────────────────────────────────────────────────────────────────
+async function sendMessage() {
+  const text = queryEl.value.trim();
+  if (!text || sendBtn.disabled) return;
+
+  queryEl.value = '';
+  queryEl.style.height = 'auto';
+  sendBtn.disabled = true;
+
+  addMessage('user', text);
+  history.push({ role: 'user', content: text });
+
+  const { wrap: botWrap, bubble: botBubble } = addMessage('bot', '');
+  botBubble.classList.add('markdown');
+
+  // ── Thinking indicator ──────────────────────────────────────────────────────
+  const thinkEl = document.createElement('div');
+  thinkEl.className = 'thinking-indicator';
+  thinkEl.innerHTML =
+    '<div class="think-dots"><span class="think-dot"></span><span class="think-dot"></span><span class="think-dot"></span></div>' +
+    '<span class="think-label">Searching<span class="think-timer"> · 0s</span></span>';
+  botWrap.appendChild(thinkEl);
+
+  const thinkStart = Date.now();
+  const thinkInterval = setInterval(() => {
+    const t = thinkEl.querySelector('.think-timer');
+    if (t) t.textContent = ` · ${Math.floor((Date.now() - thinkStart) / 1000)}s`;
+  }, 500);
+
+  function stopThinking() {
+    clearInterval(thinkInterval);
+    if (thinkEl.parentNode) thinkEl.remove();
+  }
+
+  let fullText       = '';
+  let sourcesRendered = false;
+  let metaDiv        = null;
+  let textStarted    = false;
+  let logId          = 0;
+  let continueCount  = 0;
+  let lastMeta       = { inTokens: 0, outTokens: 0, cachedTokens: 0 };
+
+  function patchLog(extra = {}) {
+    if (!logId) return;
+    fetch('api-proxy.php?log_tokens=1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ log_id: logId, ...lastMeta, continue_count: continueCount, ...extra }),
+    }).catch(() => {});
+  }
+
+  try {
+    const resp = await fetch('api-proxy.php?stream=1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: text, corpus, messages: history.slice(-12) }),
+    });
+
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+    const reader = resp.body.getReader();
+    const dec    = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+
+      let nl;
+      while ((nl = buf.indexOf('\n')) !== -1) {
+        const line = buf.slice(0, nl).trimEnd();
+        buf = buf.slice(nl + 1);
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6);
+        if (raw === '[DONE]') break;
+
+        let evt;
+        try { evt = JSON.parse(raw); } catch { continue; }
+
+        if (evt.error) { stopThinking(); botBubble.textContent = 'Error: ' + evt.error; break; }
+
+        if (evt.log_id) logId = evt.log_id;
+
+        if (evt.sources && !sourcesRendered) {
+          const block = renderSources(evt.sources);
+          if (block) botWrap.insertBefore(block, thinkEl);
+          const lbl = thinkEl.querySelector('.think-label');
+          if (lbl) lbl.firstChild.textContent = 'Generating';
+          sourcesRendered = true;
+          scrollBottom();
+        }
+
+        if (evt.text) {
+          if (!textStarted) { stopThinking(); textStarted = true; }
+          fullText += evt.text;
+          botBubble.innerHTML = marked.parse(fullText);
+          scrollBottom();
+        }
+
+        if (evt.meta) {
+          const { inTokens, outTokens, cachedTokens, resultCount, stopReason } = evt.meta;
+          lastMeta = { inTokens: inTokens || 0, outTokens: outTokens || 0, cachedTokens: cachedTokens || 0 };
+
+          if (!metaDiv) {
+            metaDiv = document.createElement('div');
+            metaDiv.className = 'meta-badge';
+            botWrap.appendChild(metaDiv);
+          }
+          const parts = [`${resultCount ?? 0} sections`, `${outTokens} tok out`, `${inTokens} in`];
+          if (cachedTokens) parts.push(`${cachedTokens} cached`);
+          if (stopReason === 'max_tokens') parts.push('⚠ clipped');
+          metaDiv.textContent = parts.join(' · ');
+
+          if (stopReason === 'max_tokens') {
+            const btn = document.createElement('button');
+            btn.className = 'continue-btn';
+            btn.textContent = 'Continue response →';
+            btn.addEventListener('click', () => {
+              btn.remove();
+              continueCount++;
+              patchLog({ continue_count: continueCount });
+              queryEl.value = 'Please continue your response from where you left off.';
+              sendMessage();
+            });
+            botWrap.appendChild(btn);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    stopThinking();
+    botBubble.textContent = 'Connection error: ' + err.message;
+  }
+
+  stopThinking();
+  patchLog();
+
+  // Copy-reply button
+  if (fullText) {
+    history.push({ role: 'assistant', content: fullText });
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'copy-reply-btn';
+    copyBtn.textContent = 'Copy reply';
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(fullText).then(() => {
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => { copyBtn.textContent = 'Copy reply'; }, 1800);
+      }).catch(() => { copyBtn.textContent = 'Error'; });
+    });
+    botWrap.appendChild(copyBtn);
+  }
+
+  sendBtn.disabled = false;
+  queryEl.focus();
+  scrollBottom();
+}
+</script>
+</body>
+</html>

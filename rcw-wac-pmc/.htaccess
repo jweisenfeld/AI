@@ -1,0 +1,17 @@
+# Disable compression for SSE streaming — gzip buffers the entire response
+# before sending, which breaks server-sent events.
+<IfModule mod_deflate.c>
+    SetEnvIfNoCase Request_URI api-proxy\.php no-gzip dont-vary
+</IfModule>
+
+# LiteSpeed-specific compression disable
+<IfModule LiteSpeed>
+    RewriteEngine On
+    RewriteRule ^api-proxy\.php - [E=no-gzip:1,E=no-brotli:1]
+</IfModule>
+
+# PHP settings for streaming
+<FilesMatch "api-proxy\.php$">
+    php_value output_buffering Off
+    php_value zlib.output_compression Off
+</FilesMatch>

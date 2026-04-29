@@ -76,8 +76,11 @@
           const streamResult = await new Promise((resolve, reject) => {
             const chunks = [];
             let sawDone = false;
+            let settled = false;
             const es = new EventSource('api-proxy.php?stream=test');
             const timer = setTimeout(() => {
+              if (settled) return;
+              settled = true;
               es.close();
               reject(new Error('SSE timeout after 15s'));
             }, 15000);
@@ -85,6 +88,7 @@
             es.onmessage = (evt) => {
               if (evt.data === '[DONE]') {
                 sawDone = true;
+                settled = true;
                 clearTimeout(timer);
                 es.close();
                 resolve({ chunks, sawDone });
@@ -99,9 +103,19 @@
             };
 
             es.onerror = () => {
+              if (settled) return;
               clearTimeout(timer);
               es.close();
-              reject(new Error('EventSource connection failed'));
+              // Some servers close the stream immediately after the final
+              // message and browsers surface that close as "error". If we
+              // already captured stream text, treat this as success.
+              if (chunks.length > 0) {
+                settled = true;
+                resolve({ chunks, sawDone });
+              } else {
+                settled = true;
+                reject(new Error('EventSource connection failed'));
+              }
             };
           });
 

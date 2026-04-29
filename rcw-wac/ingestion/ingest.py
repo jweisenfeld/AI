@@ -26,6 +26,12 @@ Usage:
     # Re-ingest a title after law updates
     python ingest.py --corpus rcw --titles 28A --clear
 
+    # Pasco Municipal Code from local HTML export (Title 25 only, dry run)
+    python ingest.py --corpus pmc --titles 25 --pmc-file ../../pmc1/Pasco-Municipal-Code.html --dry-run
+
+    # Pasco Municipal Code full ingest by title range
+    python ingest.py --corpus pmc --titles 1,2,3,4,5,6,8,9,10,12,13,14,15,16,17,18,19,20,21,23,24,25,28,29 --pmc-file ../../pmc1/Pasco-Municipal-Code.html
+
 Environment variables:
     OPENAI_API_KEY       — for text-embedding-3-small
     SUPABASE_URL         — https://your-project.supabase.co
@@ -46,6 +52,7 @@ from typing import Generator
 import requests
 import tiktoken
 from bs4 import BeautifulSoup
+from bs4.element import NavigableString, Tag
 from dotenv import load_dotenv
 from openai import OpenAI
 from supabase import create_client
@@ -59,6 +66,7 @@ RCW_BASE = 'https://app.leg.wa.gov/RCW/default.aspx'
 WAC_BASE = 'https://apps.leg.wa.gov/WAC/default.aspx'
 CFR_BASE = 'https://www.ecfr.gov/current'
 USC_BASE = 'https://www.law.cornell.edu/uscode/text'
+PMC_DEFAULT_HTML = str((Path(__file__).resolve().parents[2] / 'pmc1' / 'Pasco-Municipal-Code.html'))
 
 EMBEDDING_MODEL  = 'text-embedding-3-small'
 MAX_CHUNK_TOKENS = 800
@@ -69,23 +77,30 @@ INSERT_BATCH     = 10    # small batches — HNSW index update time grows with t
 # Polite crawl delay — the legislature server is publicly funded; be a good citizen
 CRAWL_DELAY_SEC  = 0.4   # seconds between HTTP requests
 
-ENC = tiktoken.get_encoding('cl100k_base')
+ENC = None
+
+def _get_encoder():
+    global ENC
+    if ENC is None:
+        ENC = tiktoken.get_encoding('cl100k_base')
+    return ENC
 
 # ── Token utilities ───────────────────────────────────────────────────────────
 
 def count_tokens(text: str) -> int:
-    return len(ENC.encode(text))
+    return len(_get_encoder().encode(text))
 
 def chunk_text(text: str, max_tokens: int = MAX_CHUNK_TOKENS,
                overlap: int = OVERLAP_TOKENS) -> list[str]:
-    tokens = ENC.encode(text)
+    enc = _get_encoder()
+    tokens = enc.encode(text)
     if len(tokens) <= max_tokens:
         return [text]
     chunks = []
     start = 0
     while start < len(tokens):
         end = min(start + max_tokens, len(tokens))
-        chunks.append(ENC.decode(tokens[start:end]))
+        chunks.append(enc.decode(tokens[start:end]))
         if end >= len(tokens):
             break
         start += max_tokens - overlap
@@ -969,6 +984,157 @@ def crawl_usc(filter_titles: list[str] | None = None,
                     yield section
 
 
+# ── PMC crawler (local Pasco Municipal Code HTML export) ─────────────────────
+
+def _pmc_normalize(text: str) -> str:
+    text = text.replace('\xa0', ' ')
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
+def _pmc_table_to_text(table: Tag) -> str:
+    """Render HTML tables into compact plain text so structure survives embedding."""
+    lines: list[str] = []
+
+    caption = table.find('caption')
+    if caption:
+        cap_text = _pmc_normalize(caption.get_text(' ', strip=True))
+        if cap_text:
+            lines.append(f'Table: {cap_text}')
+
+    for tr in table.find_all('tr'):
+        cells = tr.find_all(['th', 'td'])
+        row = [_pmc_normalize(c.get_text(' ', strip=True)) for c in cells]
+        row = [c for c in row if c]
+        if row:
+            lines.append(' | '.join(row))
+
+    if not lines:
+        return ''
+    return '[TABLE]\n' + '\n'.join(lines) + '\n[/TABLE]'
+
+
+def _pmc_extract_section_content(article: Tag) -> str:
+    """
+    Extract section text and preserve table content.
+    Removes TOC/history scaffolding to reduce token waste.
+    """
+    node = BeautifulSoup(str(article), 'html.parser')
+
+    # Remove boilerplate/chrome inside each section.
+    for bad in node.select('.subsec-actions, .toc, .tocHeading, .historyLabel'):
+        bad.decompose()
+    for hist in node.select('.note.history'):
+        hist.decompose()
+
+    # Replace tables with compact text blocks.
+    for table in node.find_all('table'):
+        table_text = _pmc_table_to_text(table)
+        if table_text:
+            table.replace_with(NavigableString('\n' + table_text + '\n'))
+        else:
+            table.decompose()
+
+    text = _pmc_normalize(node.get_text('\n', strip=True))
+    # Drop duplicated numeric heading lines at the start, e.g. "1.01.010"
+    text = re.sub(r'^\d+\.\d+\.\d+(?:\([^)]+\))?\s*', '', text).strip()
+    return text
+
+
+def crawl_pmc(filter_titles: list[str] | None = None,
+              filter_chapters: list[str] | None = None,
+              pmc_file: str | None = None) -> Generator[dict, None, None]:
+    """
+    Crawl PMC sections from a local HTML export.
+    - --titles should be title numbers like 1,2,3,...,29
+    - --chapters (optional) should be chapter numbers like 1.01,25.12
+    """
+    path = Path(pmc_file or PMC_DEFAULT_HTML)
+    if not path.exists():
+        print(f'ERROR: PMC HTML file not found: {path}', file=sys.stderr)
+        return
+
+    print(f'Loading PMC HTML: {path}')
+    html = path.read_text(encoding='utf-8', errors='replace')
+    soup = BeautifulSoup(html, 'html.parser')
+
+    title_articles = soup.select('article.type-Title')
+    if not title_articles:
+        print('ERROR: no PMC titles found in HTML. Verify the export file.', file=sys.stderr)
+        return
+
+    title_filter = set(filter_titles or [])
+    chapter_filter = set(filter_chapters or [])
+    section_count = 0
+    title_count = 0
+
+    for t in title_articles:
+        title_num_raw = ''
+        num_el = t.select_one('header .num')
+        if num_el:
+            m = re.search(r'Title\s+(\d+)', num_el.get_text(' ', strip=True), re.I)
+            if m:
+                title_num_raw = m.group(1)
+        if not title_num_raw:
+            t_id = t.get('id', '')
+            m = re.match(r'PMC_(\d+)$', t_id)
+            if m:
+                title_num_raw = m.group(1)
+        if not title_num_raw:
+            continue
+
+        title_num = str(int(title_num_raw))
+        if title_filter and title_num not in title_filter:
+            continue
+        if 'node-reserved' in (t.get('class') or []):
+            continue
+
+        title_name = _pmc_normalize((t.select_one('header .name') or t).get_text(' ', strip=True))
+        title_count += 1
+        print(f'\n  PMC Title {title_num}: {title_name}')
+
+        for section in t.select('article.type-Section'):
+            sec_id_attr = section.get('id', '')
+            sec_short = section.get('data-short-cite', '').strip()
+            sec_match = re.match(r'(\d+\.\d+\.\d+(?:\([^)]+\))?)', sec_short) or \
+                        re.match(r'PMC_(\d+\.\d+\.\d+(?:\([^)]+\))?)', sec_id_attr)
+            if not sec_match:
+                continue
+            sec_num = sec_match.group(1)
+
+            chap_match = re.match(r'(\d+\.\d+)\.', sec_num)
+            chapter_num = chap_match.group(1) if chap_match else ''
+            if chapter_filter and chapter_num not in chapter_filter:
+                continue
+
+            chapter_name = ''
+            chapter = section.find_parent('article', class_=re.compile(r'\btype-Chapter\b'))
+            if chapter:
+                chapter_name = _pmc_normalize((chapter.select_one('header .name') or chapter).get_text(' ', strip=True))
+
+            heading = _pmc_normalize((section.select_one('header .name') or section).get_text(' ', strip=True))
+            content = _pmc_extract_section_content(section)
+            if not content or len(content) < 20:
+                continue
+
+            section_count += 1
+            yield {
+                'corpus':          'pmc',
+                'title_num':       title_num,
+                'title_name':      title_name,
+                'chapter_num':     chapter_num,
+                'chapter_name':    chapter_name,
+                'section_num':     sec_num,
+                'section_id':      f'PMC {sec_num}',
+                'section_heading': heading,
+                'content':         content,
+                'source_url':      f'file://{path.name}#PMC_{sec_num}',
+            }
+
+    print(f'\nPMC parse complete: {title_count} title(s), {section_count} section(s).')
+
+
 # ── Chunking ──────────────────────────────────────────────────────────────────
 
 def build_chunks(sections: list[dict]) -> list[dict]:
@@ -1042,6 +1208,14 @@ def insert_chunks(sb, chunks: list[dict], embeddings: list[list[float]]) -> int:
                 sb.table('rcw_wac_chunks').upsert(rows, on_conflict='section_id,chunk_index').execute()
                 break
             except Exception as e:
+                msg = str(e)
+                if 'rcw_wac_chunks_corpus_check' in msg and "'code': '23514'" in msg:
+                    raise RuntimeError(
+                        "Supabase rejected corpus value due to rcw_wac_chunks_corpus_check.\n"
+                        "Your DB schema still only allows old corpus values.\n"
+                        "Run the PMC migration SQL in rcw-wac/ingestion/schema.sql "
+                        "(section: 'Migration v3: expand allowed corpora')."
+                    ) from e
                 if attempt == 4:
                     raise
                 wait = 2 ** attempt   # 1s, 2s, 4s, 8s
@@ -1064,13 +1238,16 @@ def main():
                     'Run once to build the database; queries go to Supabase, not leg.wa.gov.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument('--corpus', required=True, choices=['rcw', 'wac', 'cfr', 'usc'],
-                        help='Which code to crawl  (rcw|wac = WA state; cfr|usc = federal)')
+    parser.add_argument('--corpus', required=True, choices=['rcw', 'wac', 'cfr', 'usc', 'pmc'],
+                        help='Which code to crawl  (pmc = Pasco Municipal Code local HTML)')
     parser.add_argument('--titles', metavar='28A,42.56,180',
                         help='Comma-separated title numbers to limit the crawl. Omit for full corpus.')
     parser.add_argument('--chapters', metavar='392-172A,28A.400',
                         help='Comma-separated chapter numbers (title auto-derived if --titles omitted). '
                              'Example: --chapters 392-172A  ingests only WAC special ed rules.')
+    parser.add_argument('--pmc-file', default=PMC_DEFAULT_HTML,
+                        help='Path to Pasco-Municipal-Code.html for --corpus pmc '
+                             f'(default: {PMC_DEFAULT_HTML})')
     parser.add_argument('--dry-run', action='store_true',
                         help='Crawl and parse without embedding or inserting. '
                              'Use this first to verify selectors are working.')
@@ -1126,6 +1303,7 @@ def main():
         'wac': crawl_wac,
         'cfr': crawl_cfr,
         'usc': crawl_usc,
+        'pmc': lambda titles, chapters: crawl_pmc(titles, chapters, args.pmc_file),
     }[args.corpus](filter_titles, filter_chapters)
 
     # Fetch existing hashes once — avoids a full-table SELECT on every flush
@@ -1181,6 +1359,7 @@ def main():
             if stats.data:
                 d = stats.data
                 print(f'  Corpus totals: '
+                      f'{d.get("pmc_chunks",0):,} PMC  '
                       f'{d.get("rcw_chunks",0):,} RCW  '
                       f'{d.get("wac_chunks",0):,} WAC  '
                       f'{d.get("usc_chunks",0):,} USC  '

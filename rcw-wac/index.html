@@ -1051,9 +1051,10 @@ async function sendMessage() {
     if (thinkEl.parentNode) thinkEl.remove();
   }
 
-  let fullText       = '';
+  let fullText        = '';
+  let pendingSources  = null;
   let sourcesRendered = false;
-  let metaDiv        = null;
+  let metaDiv         = null;
   let textStarted    = false;
   let logId          = 0;
   let continueCount  = 0;
@@ -1105,14 +1106,9 @@ async function sendMessage() {
 
         if (evt.log_id) logId = evt.log_id;
 
-        if (evt.sources && !sourcesRendered) {
-          const srcBlock = renderSources(evt.sources);
-          if (srcBlock) botWrap.insertBefore(srcBlock, thinkEl);
-          // Update label from "Searching" to "Generating"
-          const lbl = thinkEl.querySelector('.think-label');
-          if (lbl) lbl.firstChild.textContent = 'Generating';
-          sourcesRendered = true;
-          scrollBottom();
+        if (evt.sources) {
+          pendingSources = evt.sources;
+          // Keep citations hidden until streaming is complete.
         }
 
         if (evt.text) {
@@ -1158,6 +1154,16 @@ async function sendMessage() {
   }
 
   stopThinking();
+
+  if (pendingSources && !sourcesRendered) {
+    const srcBlock = renderSources(pendingSources);
+    if (srcBlock) {
+      if (metaDiv) botWrap.insertBefore(srcBlock, metaDiv);
+      else botWrap.appendChild(srcBlock);
+      sourcesRendered = true;
+      scrollBottom();
+    }
+  }
   patchLog();
 
   // Copy-reply button

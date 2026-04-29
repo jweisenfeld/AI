@@ -215,13 +215,13 @@ $proxy = new RcwWacProxy($secrets);
 try {
     $embedding = $proxy->getEmbedding($query);
 } catch (EmbeddingException $e) {
-    sse_error('Embedding failed: ' . $e->getMessage()); exit;
+    sse_error('OpenAI piece failed: ' . $e->getMessage()); exit;
 }
 
 try {
     $results = $proxy->searchSupabase($embedding, $corpus, 8, $query);
 } catch (SupabaseException $e) {
-    sse_error('Search failed: ' . $e->getMessage()); exit;
+    sse_error('SupaBase server leg failed: ' . $e->getMessage()); exit;
 }
 
 $built   = $proxy->buildContext($results);
@@ -355,10 +355,11 @@ $curlError = curl_error($ch);
 curl_close($ch);
 
 if ($curlErrno) {
-    sse(['error' => "curl error $curlErrno: $curlError"]);
+    sse(['error' => "haiku processing of reply failed: curl error $curlErrno: $curlError"]);
 } elseif ($st['httpCode'] !== 200) {
     $body = json_decode($st['errBody'], true);
-    sse(['error' => $body['error']['message'] ?? "Anthropic returned HTTP {$st['httpCode']}"]);
+    $msg = $body['error']['message'] ?? "Anthropic returned HTTP {$st['httpCode']}";
+    sse(['error' => "haiku processing of reply failed: {$msg}"]);
 } elseif ($st['textChars'] === 0 && !$st['sawErrorEvent']) {
     $reason = $st['stopReason'] ?: 'unknown';
     $fallback = "I couldn't generate a full narrative answer for this request "
@@ -376,7 +377,7 @@ if ($curlErrno) {
         $fallback .= "No source sections were retrieved. Try broadening your query or switching Source scope.";
     }
     sse(['text' => $fallback]);
-    sse(['error' => "Model returned no text content (stop_reason={$reason})."]);
+    sse(['error' => "haiku processing of reply failed: model returned no text content (stop_reason={$reason})."]);
 }
 
 sse(['meta' => [

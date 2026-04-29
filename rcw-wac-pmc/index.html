@@ -1248,7 +1248,8 @@ async function sendMessage() {
   patchLog();
 
   if (!hadError && !fullText.trim()) {
-    botBubble.textContent = 'No answer text was returned for this query. Please retry, or switch Source scope.';
+    botBubble.textContent =
+      'No answer text was returned. Actionable checks: OpenAI piece failed, SupaBase server leg failed, or haiku processing of reply failed.';
   }
 
   // Copy-reply button

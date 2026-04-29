@@ -70,16 +70,51 @@
           promptEl.innerHTML = err(e.message);
         }
 
-        // Stream test check
+        // Stream test check (use EventSource instead of fetch text to avoid
+        // proxy/server content-encoding quirks that can look like binary noise)
         try {
-          const resp = await fetch('api-proxy.php?stream=test');
-          const txt = await resp.text();
-          const hasDone = txt.includes('[DONE]');
-          const hasText = txt.includes('"text"');
-          streamEl.innerHTML = (hasDone && hasText)
+          const streamResult = await new Promise((resolve, reject) => {
+            const chunks = [];
+            let sawDone = false;
+            const es = new EventSource('api-proxy.php?stream=test');
+            const timer = setTimeout(() => {
+              es.close();
+              reject(new Error('SSE timeout after 15s'));
+            }, 15000);
+
+            es.onmessage = (evt) => {
+              if (evt.data === '[DONE]') {
+                sawDone = true;
+                clearTimeout(timer);
+                es.close();
+                resolve({ chunks, sawDone });
+                return;
+              }
+              try {
+                const parsed = JSON.parse(evt.data);
+                if (parsed?.text) chunks.push(parsed.text);
+              } catch {
+                // ignore non-json event payloads
+              }
+            };
+
+            es.onerror = () => {
+              clearTimeout(timer);
+              es.close();
+              reject(new Error('EventSource connection failed'));
+            };
+          });
+
+          const joined = streamResult.chunks.join('');
+          const hasText = joined.trim().length > 0;
+          streamEl.innerHTML = (streamResult.sawDone && hasText)
             ? ok('stream test emitted text + DONE')
-            : err('stream test response missing expected SSE markers');
-          streamEl.innerHTML += `<pre>${txt.slice(0, 1200)}</pre>`;
+            : err('stream test did not emit both text and DONE');
+          streamEl.innerHTML += `<pre>${JSON.stringify({
+            saw_done: streamResult.sawDone,
+            text_preview: joined.slice(0, 200),
+            text_chars: joined.length
+          }, null, 2)}</pre>`;
         } catch (e) {
           streamEl.innerHTML = err(e.message);
         }

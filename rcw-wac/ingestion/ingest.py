@@ -77,23 +77,30 @@ INSERT_BATCH     = 10    # small batches — HNSW index update time grows with t
 # Polite crawl delay — the legislature server is publicly funded; be a good citizen
 CRAWL_DELAY_SEC  = 0.4   # seconds between HTTP requests
 
-ENC = tiktoken.get_encoding('cl100k_base')
+ENC = None
+
+def _get_encoder():
+    global ENC
+    if ENC is None:
+        ENC = tiktoken.get_encoding('cl100k_base')
+    return ENC
 
 # ── Token utilities ───────────────────────────────────────────────────────────
 
 def count_tokens(text: str) -> int:
-    return len(ENC.encode(text))
+    return len(_get_encoder().encode(text))
 
 def chunk_text(text: str, max_tokens: int = MAX_CHUNK_TOKENS,
                overlap: int = OVERLAP_TOKENS) -> list[str]:
-    tokens = ENC.encode(text)
+    enc = _get_encoder()
+    tokens = enc.encode(text)
     if len(tokens) <= max_tokens:
         return [text]
     chunks = []
     start = 0
     while start < len(tokens):
         end = min(start + max_tokens, len(tokens))
-        chunks.append(ENC.decode(tokens[start:end]))
+        chunks.append(enc.decode(tokens[start:end]))
         if end >= len(tokens):
             break
         start += max_tokens - overlap

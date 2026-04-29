@@ -102,6 +102,18 @@ function sse_error(string $msg): void {
     flush();
 }
 
+function proxy_log(string $requestId, string $stage, array $extra = []): void {
+    $dir = __DIR__ . '/logs';
+    if (!is_dir($dir)) { @mkdir($dir, 0755, true); }
+    $file = $dir . '/pmc-proxy-' . gmdate('Y-m-d') . '.log';
+    $row = array_merge([
+        'ts' => gmdate('c'),
+        'request_id' => $requestId,
+        'stage' => $stage,
+    ], $extra);
+    @file_put_contents($file, json_encode($row, JSON_UNESCAPED_UNICODE) . PHP_EOL, FILE_APPEND);
+}
+
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 $data = json_decode(file_get_contents('php://input'), true) ?? [];
@@ -198,31 +210,37 @@ if (!isset($_GET['stream']) || $_GET['stream'] !== '1') {
 // ── Main stream request ───────────────────────────────────────────────────────
 
 start_sse();
+$requestId = 'pmc_' . gmdate('Ymd_His') . '_' . bin2hex(random_bytes(3));
+proxy_log($requestId, 'request_start', ['path' => $_SERVER['REQUEST_URI'] ?? '', 'method' => $_SERVER['REQUEST_METHOD'] ?? '']);
 
 $query     = trim($data['query'] ?? $data['messages'][array_key_last($data['messages'] ?? [])]['content'] ?? '');
 $corpusRaw = $data['corpus'] ?? null;
 $corpus    = in_array($corpusRaw, ['pmc', 'rcw', 'wac', 'usc', 'cfr', 'state', 'federal', 'local'], true) ? $corpusRaw : null;
 $messages  = $data['messages'] ?? [];
 
-if (!$query) { sse_error('No query provided.'); exit; }
+if (!$query) { proxy_log($requestId, 'request_invalid', ['reason' => 'no_query']); sse_error('No query provided.'); exit; }
 
 $secrets = load_secrets($secretsFile);
-if (empty($secrets['ANTHROPIC_API_KEY'])) { sse_error('ANTHROPIC_API_KEY missing.'); exit; }
-if (empty($secrets['OPENAI_API_KEY']))    { sse_error('OPENAI_API_KEY missing.');    exit; }
+if (empty($secrets['ANTHROPIC_API_KEY'])) { proxy_log($requestId, 'config_error', ['reason' => 'missing_anthropic_key']); sse_error('ANTHROPIC_API_KEY missing.'); exit; }
+if (empty($secrets['OPENAI_API_KEY']))    { proxy_log($requestId, 'config_error', ['reason' => 'missing_openai_key']); sse_error('OPENAI_API_KEY missing.');    exit; }
 
 $proxy = new RcwWacProxy($secrets);
 
 try {
     $embedding = $proxy->getEmbedding($query);
 } catch (EmbeddingException $e) {
+    proxy_log($requestId, 'embedding_error', ['error' => $e->getMessage()]);
     sse_error('OpenAI piece failed: ' . $e->getMessage()); exit;
 }
+proxy_log($requestId, 'embedding_ok');
 
 try {
     $results = $proxy->searchSupabase($embedding, $corpus, 8, $query);
 } catch (SupabaseException $e) {
+    proxy_log($requestId, 'supabase_error', ['error' => $e->getMessage(), 'corpus' => $corpus]);
     sse_error('SupaBase server leg failed: ' . $e->getMessage()); exit;
 }
+proxy_log($requestId, 'supabase_ok', ['result_count' => count($results), 'corpus' => $corpus]);
 
 $built   = $proxy->buildContext($results);
 $context = $built['context'];
@@ -355,10 +373,12 @@ $curlError = curl_error($ch);
 curl_close($ch);
 
 if ($curlErrno) {
+    proxy_log($requestId, 'anthropic_curl_error', ['errno' => $curlErrno, 'error' => $curlError]);
     sse(['error' => "haiku processing of reply failed: curl error $curlErrno: $curlError"]);
 } elseif ($st['httpCode'] !== 200) {
     $body = json_decode($st['errBody'], true);
     $msg = $body['error']['message'] ?? "Anthropic returned HTTP {$st['httpCode']}";
+    proxy_log($requestId, 'anthropic_http_error', ['http_code' => $st['httpCode'], 'error' => $msg]);
     sse(['error' => "haiku processing of reply failed: {$msg}"]);
 } elseif ($st['textChars'] === 0 && !$st['sawErrorEvent']) {
     $reason = $st['stopReason'] ?: 'unknown';
@@ -378,7 +398,9 @@ if ($curlErrno) {
     }
     sse(['text' => $fallback]);
     sse(['error' => "haiku processing of reply failed: model returned no text content (stop_reason={$reason})."]);
+    proxy_log($requestId, 'anthropic_no_text', ['stop_reason' => $reason, 'result_count' => count($results)]);
 }
+proxy_log($requestId, 'request_done', ['http_code' => $st['httpCode'], 'text_chars' => $st['textChars'], 'stop_reason' => $st['stopReason'], 'out_tokens' => $st['outTok']]);
 
 sse(['meta' => [
     'inTokens'     => $st['inTok'],

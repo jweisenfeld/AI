@@ -238,7 +238,7 @@ try {
 proxy_log($requestId, 'embedding_ok');
 
 try {
-    $results = $proxy->searchSupabase($embedding, $corpus, 8, $query);
+    $results = $proxy->searchSupabase($embedding, $corpus, 16, $query);
 } catch (SupabaseException $e) {
     proxy_log($requestId, 'supabase_error', ['error' => $e->getMessage(), 'corpus' => $corpus]);
     sse_error('SupaBase server leg failed: ' . $e->getMessage()); exit;

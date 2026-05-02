@@ -58,7 +58,7 @@ from openai import OpenAI
 from supabase import create_client
 
 # Load .env from the same directory as this script (rcw-wac/ingestion/.env)
-load_dotenv(Path(__file__).parent / '.env')
+load_dotenv(Path(__file__).parent / '.env', override=True)
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -67,6 +67,19 @@ WAC_BASE = 'https://apps.leg.wa.gov/WAC/default.aspx'
 CFR_BASE = 'https://www.ecfr.gov/current'
 USC_BASE = 'https://www.law.cornell.edu/uscode/text'
 PMC_DEFAULT_HTML = str((Path(__file__).resolve().parents[2] / 'pmc1' / 'Pasco-Municipal-Code.html'))
+PSD1_DEFAULT_DIR = r'C:\Users\johnw\Downloads\Policies_and_Procedures'
+
+PSD1_SERIES_NAMES = {
+    '1': 'Board of Directors',
+    '2': 'Administration',
+    '3': 'Students',
+    '4': 'Personnel',
+    '5': 'Finance',
+    '6': 'Educational Program',
+    '7': 'Facilities and Safety',
+    '8': 'Community Relations',
+    '9': 'Technology',
+}
 
 EMBEDDING_MODEL  = 'text-embedding-3-small'
 MAX_CHUNK_TOKENS = 800
@@ -1138,6 +1151,141 @@ def crawl_pmc(filter_titles: list[str] | None = None,
     print(f'\nPMC parse complete: {title_count} title(s), {section_count} section(s).')
 
 
+# ── PSD1 crawler (Pasco School District local PDF export) ────────────────────
+#
+# Reads all policy-*.pdf and procedure-*.pdf files from a local folder.
+# Filename format:  policy-3300-student-discipline.pdf
+#                   procedure-3300p-student-discipline-procedures.pdf
+# Metadata (source URL, last-modified) comes from manifest.json in the same folder.
+#
+# Filter mapping:  --titles 3000     → all 3xxx policies/procedures
+#                  --titles 3000,4000 → student + personnel
+#                  --chapters 3300   → only policy/procedure 3300
+#
+# Section ID rules:
+#   - Unique policy/procedure  → PSD1-3300 / PSD1-3300P
+#   - Fix: procedure files missing the P suffix get it added automatically
+#   - Collision (same number, two slugs) → both get slug abbreviations:
+#       PSD1-5257-EAP  and  PSD1-5257-WW
+#     Abbreviation: first letter of each word, numerics kept intact (C19SP).
+
+def _slug_abbrev(slug: str) -> str:
+    result = ''
+    for part in slug.split('-'):
+        if part.isdigit():
+            result += part
+        elif part:
+            result += part[0].upper()
+    return result
+
+
+def crawl_psd1(
+    filter_titles:   list[str] | None = None,
+    filter_chapters: list[str] | None = None,
+    source_dir: str = PSD1_DEFAULT_DIR,
+) -> Generator[dict, None, None]:
+    try:
+        import pdfplumber
+    except ImportError:
+        sys.exit('ERROR: pdfplumber not installed.  Run: pip install pdfplumber')
+
+    import json
+
+    base          = Path(source_dir)
+    manifest_path = base / 'manifest.json'
+    manifest: dict = {}
+    if manifest_path.exists():
+        with open(manifest_path, encoding='utf-8') as f:
+            manifest = json.load(f)
+    else:
+        print(f'  Warning: no manifest.json found in {source_dir}', file=sys.stderr)
+
+    filename_re = re.compile(r'^(policy|procedure)-(\d+[pP]?)-(.+)$')
+
+    # ── Pass 1: collect candidates, group by base section_id ─────────────────
+    candidates: dict[str, list[tuple]] = {}   # base_id -> [(pdf_path, doc_type, raw_num, slug)]
+    for pdf_path in sorted(base.glob('*.pdf')):
+        m = filename_re.match(pdf_path.stem)
+        if not m:
+            continue
+        doc_type = m.group(1)           # 'policy' or 'procedure'
+        raw_num  = m.group(2).upper()   # '3300' or '3300P'
+        slug     = m.group(3)           # 'student-discipline'
+
+        # Fix district naming error: procedure files missing the P suffix
+        if doc_type == 'procedure' and not raw_num.endswith('P'):
+            raw_num = raw_num + 'P'
+
+        base_num   = raw_num.rstrip('P')
+        series_num = base_num[0] + '000'
+
+        if filter_titles and series_num not in filter_titles and base_num not in filter_titles:
+            continue
+        if filter_chapters and base_num not in filter_chapters:
+            continue
+
+        base_id = f'PSD1-{raw_num}'
+        candidates.setdefault(base_id, []).append((pdf_path, doc_type, raw_num, slug))
+
+    # ── Pass 2: yield sections with unique, human-readable IDs ───────────────
+    section_count = 0
+    for base_id, docs in sorted(candidates.items()):
+        needs_abbrev = len(docs) > 1
+        if needs_abbrev:
+            print(f'  NOTE: {base_id} has {len(docs)} documents — using slug abbreviations',
+                  file=sys.stderr)
+
+        for pdf_path, doc_type, raw_num, slug in docs:
+            base_num    = raw_num.rstrip('P')
+            series_key  = base_num[0]
+            series_num  = series_key + '000'
+            series_name = (f'Series {series_num} — '
+                           f'{PSD1_SERIES_NAMES.get(series_key, "General")}')
+
+            title   = slug.replace('-', ' ').title()
+            heading = title + (' (Procedure)' if doc_type == 'procedure' else '')
+
+            if needs_abbrev:
+                abbrev     = _slug_abbrev(slug)
+                section_id = f'{base_id}-{abbrev}'
+                heading    = f'{heading} [{abbrev}]'
+            else:
+                section_id = base_id
+
+            source_url = manifest.get(pdf_path.stem, {}).get('policy_page', '')
+
+            try:
+                with pdfplumber.open(pdf_path) as pdf:
+                    pages = [p.extract_text() for p in pdf.pages]
+                    content = '\n\n'.join(t.strip() for t in pages if t)
+            except Exception as e:
+                print(f'  PDF error {pdf_path.name}: {e}', file=sys.stderr)
+                continue
+
+            content = content.strip()
+            if not content:
+                print(f'  Skipping (no text): {pdf_path.name}', file=sys.stderr)
+                continue
+
+            section_count += 1
+            print(f'  {section_id}: {heading} ({section_count} so far)')
+
+            yield {
+                'corpus':          'psd1',
+                'title_num':       series_num,
+                'title_name':      series_name,
+                'chapter_num':     base_num,
+                'chapter_name':    title,
+                'section_num':     raw_num,
+                'section_id':      section_id,
+                'section_heading': heading,
+                'content':         content,
+                'source_url':      source_url,
+            }
+
+    print(f'\nPSD1 parse complete: {section_count} document(s) read.')
+
+
 # ── Chunking ──────────────────────────────────────────────────────────────────
 
 def build_chunks(sections: list[dict]) -> list[dict]:
@@ -1235,6 +1383,7 @@ def insert_chunks(sb, chunks: list[dict], embeddings: list[list[float]]) -> int:
 
 def main():
     global CRAWL_DELAY_SEC, INSERT_DELAY_SEC   # must be declared before first use in this function
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
     parser = argparse.ArgumentParser(
         description='Scrape WA Legislature website → embed → store in Supabase.\n'
@@ -1252,6 +1401,10 @@ def main():
     parser.add_argument('--pmc-file', default=PMC_DEFAULT_HTML,
                         help='Path to Pasco-Municipal-Code.html for --corpus pmc '
                              f'(default: {PMC_DEFAULT_HTML})')
+    parser.add_argument('--psd1-dir', default=PSD1_DEFAULT_DIR,
+                        dest='psd1_dir',
+                        help='Folder containing PSD1 policy/procedure PDFs and manifest.json '
+                             f'(default: {PSD1_DEFAULT_DIR})')
     parser.add_argument('--dry-run', action='store_true',
                         help='Crawl and parse without embedding or inserting. '
                              'Use this first to verify selectors are working.')
@@ -1314,6 +1467,7 @@ def main():
         'cfr': crawl_cfr,
         'usc': crawl_usc,
         'pmc': lambda titles, chapters: crawl_pmc(titles, chapters, args.pmc_file),
+        'psd1': lambda titles, chapters: crawl_psd1(titles, chapters, args.psd1_dir),
     }[args.corpus](filter_titles, filter_chapters)
 
     # Fetch existing hashes once — avoids a full-table SELECT on every flush
@@ -1327,8 +1481,7 @@ def main():
         section_count += 1
         chunks = build_chunks([section])
         all_chunks.extend(chunks)
-        print(f'  {section["section_id"]} ({len(chunks)} chunk(s), {section_count} sections so far)',
-              end='\r', flush=True)
+        print(f'  {section["section_id"]} ({len(chunks)} chunk(s), {section_count} sections so far)')
 
         # Stream inserts in small batches to stay under Supabase statement timeout.
         if not args.dry_run and len(all_chunks) >= 200:
@@ -1336,7 +1489,7 @@ def main():
             existing_hashes.update(new_hashes)
             all_chunks = []
 
-    print(f'\nCrawl complete: {section_count} sections → {len(all_chunks)} remaining chunks')
+    print(f'\nCrawl complete: {section_count} sections -> {len(all_chunks)} remaining chunks')
 
     if args.dry_run:
         # Print sample output to verify parsing
@@ -1369,6 +1522,7 @@ def main():
             if stats.data:
                 d = stats.data
                 print(f'  Corpus totals: '
+                      f'{d.get("psd1_chunks",0):,} PSD1  '
                       f'{d.get("pmc_chunks",0):,} PMC  '
                       f'{d.get("rcw_chunks",0):,} RCW  '
                       f'{d.get("wac_chunks",0):,} WAC  '

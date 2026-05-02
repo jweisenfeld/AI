@@ -1094,7 +1094,8 @@ function renderSources(sources) {
     if (s.similarity_pct != null) {
       const sim = document.createElement('span');
       sim.className = 'sim-badge';
-      sim.textContent = `${s.similarity_pct}%`;
+      sim.textContent = s.bm25_only ? 'text match' : `${s.similarity_pct}%`;
+      if (s.bm25_only) sim.style.color = '#8a9aaa';
       card.appendChild(sim);
     }
     block.appendChild(card);

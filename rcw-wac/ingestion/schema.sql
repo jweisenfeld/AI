@@ -267,3 +267,28 @@ alter table rcw_wac_chunks
 alter table rcw_wac_chunks
     add constraint rcw_wac_chunks_corpus_check
     check (corpus in ('pmc', 'rcw', 'wac', 'usc', 'cfr', 'psd1'));
+
+-- ── Migration v5: add psd1 to rcw_wac_stats() RPC ────────────────────────────
+-- Run once in Supabase SQL Editor after ingesting psd1 documents.
+-- The About page and ingest.py summary both read from this function.
+
+create or replace function rcw_wac_stats()
+returns json language sql security definer as $$
+    select json_build_object(
+        'psd1_chunks', (select count(*) from rcw_wac_chunks where corpus = 'psd1'),
+        'pmc_chunks',  (select count(*) from rcw_wac_chunks where corpus = 'pmc'),
+        'rcw_chunks',  (select count(*) from rcw_wac_chunks where corpus = 'rcw'),
+        'wac_chunks',  (select count(*) from rcw_wac_chunks where corpus = 'wac'),
+        'usc_chunks',  (select count(*) from rcw_wac_chunks where corpus = 'usc'),
+        'cfr_chunks',  (select count(*) from rcw_wac_chunks where corpus = 'cfr'),
+        'total_chunks',(select count(*) from rcw_wac_chunks),
+        'psd1_titles', (select count(distinct title_num) from rcw_wac_chunks where corpus = 'psd1'),
+        'pmc_titles',  (select count(distinct title_num) from rcw_wac_chunks where corpus = 'pmc'),
+        'rcw_titles',  (select count(distinct title_num) from rcw_wac_chunks where corpus = 'rcw'),
+        'wac_titles',  (select count(distinct title_num) from rcw_wac_chunks where corpus = 'wac'),
+        'usc_titles',  (select count(distinct title_num) from rcw_wac_chunks where corpus = 'usc'),
+        'cfr_titles',  (select count(distinct title_num) from rcw_wac_chunks where corpus = 'cfr'),
+        'total_queries',    (select count(*) from rcw_wac_query_log),
+        'zero_hit_queries', (select count(*) from rcw_wac_query_log where result_count = 0)
+    );
+$$;

@@ -149,12 +149,17 @@ class RcwWacProxy
      * @param  array<int,array<string,mixed>> $results  rows from searchSupabase()
      * @return array{ context: string, sources: list<array> }
      */
-    public function buildContext(array $results): array
+    public function buildContext(array $results, int $maxSections = 8): array
     {
         $context = '';
         $sources = [];
+        $seenSections = [];   // deduplicate: keep highest-ranked chunk per section_id
 
         foreach ($results as $i => $r) {
+            $sid = $r['section_id'] ?? '';
+            if (isset($seenSections[$sid])) continue;
+            $seenSections[$sid] = true;
+            if (count($sources) >= $maxSections) break;
             $sectionId   = $r['section_id']      ?? '';
             $heading     = $r['section_heading'] ?? '';
             $corpusLabel = match($r['corpus'] ?? '') {
@@ -166,7 +171,9 @@ class RcwWacProxy
             $chapterName = $r['chapter_name'] ?? '';
             $content     = $r['content']      ?? '';
             $sourceUrl   = $r['source_url']   ?? '';
-            $similarity  = isset($r['similarity']) ? round((float)$r['similarity'] * 100) : null;
+            $rawSim      = isset($r['similarity']) ? (float)$r['similarity'] : null;
+            $similarity  = $rawSim !== null ? round($rawSim * 100) : null;
+            $bm25Only    = $rawSim !== null && $rawSim < 0.05;  // text match, not semantic
 
             // Context for Claude
             $label   = $sectionId . ($heading ? " — $heading" : '');
@@ -182,6 +189,7 @@ class RcwWacProxy
                 'chapter_name'    => $chapterName,
                 'source_url'      => $sourceUrl,
                 'similarity_pct'  => $similarity,
+                'bm25_only'       => $bm25Only,
             ];
         }
 

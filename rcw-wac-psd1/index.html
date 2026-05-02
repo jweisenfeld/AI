@@ -826,6 +826,22 @@ const copyPromptBtn = document.getElementById('copy-prompt-btn');
 
 let aboutLoaded = false;
 
+async function copyText(str) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try { await navigator.clipboard.writeText(str); return; } catch (_) {}
+  }
+  // Fallback for iOS Safari and non-secure contexts
+  const ta = document.createElement('textarea');
+  ta.value = str;
+  ta.setAttribute('readonly', '');
+  ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
+  document.body.appendChild(ta);
+  ta.setSelectionRange(0, str.length);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+}
+
 function openAbout() {
   aboutOverlay.classList.add('open');
   if (!aboutLoaded) { loadAboutData(); aboutLoaded = true; }
@@ -901,8 +917,7 @@ async function loadAboutData() {
 }
 
 copyPromptBtn.addEventListener('click', () => {
-  const text = promptBox.textContent;
-  navigator.clipboard.writeText(text).then(() => {
+  copyText(promptBox.textContent).then(() => {
     copyPromptBtn.textContent = 'Copied!';
     setTimeout(() => { copyPromptBtn.textContent = 'Copy'; }, 1800);
   }).catch(() => {
@@ -921,7 +936,7 @@ document.querySelectorAll('.about-tab-btn').forEach(btn => {
 
 document.getElementById('copy-sql-btn').addEventListener('click', function() {
   const sql = document.querySelector('.sql-health-block').textContent;
-  navigator.clipboard.writeText(sql).then(() => {
+  copyText(sql).then(() => {
     this.textContent = 'Copied!';
     setTimeout(() => { this.textContent = 'Copy SQL'; }, 1800);
   }).catch(() => { this.textContent = 'Error'; });
@@ -1279,7 +1294,7 @@ async function sendMessage() {
         parts.push('SOURCES:\n' + srcLines.join('\n'));
       }
       const clip = parts.join('\n\n---\n\n');
-      navigator.clipboard.writeText(clip).then(() => {
+      copyText(clip).then(() => {
         copyBtn.textContent = 'Copied!';
         setTimeout(() => { copyBtn.textContent = 'Copy reply'; }, 1800);
       }).catch(() => { copyBtn.textContent = 'Error'; });

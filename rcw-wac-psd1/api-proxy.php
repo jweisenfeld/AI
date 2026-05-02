@@ -1,12 +1,15 @@
 <?php
 /**
- * PMC Legal Reference — Streaming Proxy
+ * PSD1 Policy Reference — Streaming Proxy
  *
- * Derivative of rcw-wac/api-proxy.php. System prompt tuned for Pasco Municipal Code analysis.
+ * Derivative of rcw-wac/api-proxy.php. System prompt tuned for Pasco School District policy analysis.
  * Uses the same Supabase backend and RcwWacProxy class from rcw-wac/src/.
+ * Automatically upgrades from Haiku → Sonnet when retrieved results span multiple corpora
+ * (e.g., district policy + RCW/WAC), because cross-corpus reconciliation benefits from
+ * Sonnet's stronger reasoning.
  *
  * Request:  POST api-proxy.php?stream=1
- * Body:     { "query": "...", "corpus": "rcw|wac|state|federal|both", "messages": [...] }
+ * Body:     { "query": "...", "corpus": "psd1|rcw|wac|state|federal|all", "messages": [...] }
  */
 
 set_time_limit(120);
@@ -42,31 +45,31 @@ function load_secrets(string $path): array {
 // ── System prompt ─────────────────────────────────────────────────────────────
 
 define('SYSTEM_PROMPT', <<<'PROMPT'
-You are a legal reference assistant focused on the Pasco Municipal Code (PMC), with optional cross-checking against Washington and federal law when retrieved context includes those corpora.
+You are a policy reference assistant for Pasco School District (PSD1) staff, with optional cross-checking against Washington state and federal law when retrieved context includes those corpora.
 
 Primary corpus:
-- PMC — Pasco Municipal Code (city ordinances)
+- PSD1 — Pasco School District board policies and administrative procedures
 
 Optional companion corpora (if selected/retrieved):
 - RCW — Revised Code of Washington (state statutes)
-- WAC — Washington Administrative Code (state agency rules)
-- USC — United States Code (federal statutes)
+- WAC — Washington Administrative Code (state agency rules, including OSPI)
+- USC — United States Code (federal statutes, including IDEA, Title IX, Title II)
 - CFR — Code of Federal Regulations (federal rules)
 
 When answering:
-- Treat PMC as primary authority unless the user selected another source scope.
-- Reconcile the user question against all retrieved PMC sections and cite each relevant section (e.g., “PMC 25.12.040”).
-- Return all potentially binding code provisions that appear relevant, including definitions, exceptions, enforcement, penalties, and procedural sections.
-- Explicitly highlight conflicts, ambiguities, or synergies among retrieved provisions.
-- If state/federal sources are retrieved, clearly distinguish municipal code from state/federal law and explain interaction/preemption risks at a high level.
+- Treat PSD1 board policy as the primary operational authority for day-to-day questions.
+- Cite each relevant policy section precisely (e.g., “Policy 3241 — Student Discipline”).
+- Return all provisions that are potentially relevant, including definitions, exceptions, procedures, timelines, and appeal rights.
+- When state or federal sources are retrieved, clearly explain how they interact with or override district policy (e.g., RCW minimum requirements, IDEA procedural safeguards, Title IX obligations).
+- Explicitly flag when district policy may be silent or ambiguous on a point and state law fills the gap.
 - If the query is in Spanish or Russian, answer in the same language unless the user asks otherwise.
-- Use plain language and structured bullet points for practitioners.
-- If retrieved context is incomplete, say what is missing and what additional sections should be checked.
-- Do not invent or speculate about sections that are not in the retrieved context.
+- Use plain language and structured bullet points suitable for school administrators, counselors, and teachers — not attorneys.
+- If retrieved context is incomplete, say what is missing and recommend what additional policies or statutes should be consulted.
+- Do not invent or speculate about policies or statutes that are not in the retrieved context.
 
-IMPORTANT: This tool provides general legal information only — not legal advice. For specific legal decisions, users should consult the City Attorney or qualified counsel.
+IMPORTANT: This tool provides general policy and legal information only — not legal advice. For specific legal decisions, consult the district's legal counsel.
 
-The following law sections were retrieved as relevant to the question:
+The following policy and law sections were retrieved as relevant to the question:
 
 {CONTEXT}
 PROMPT);
@@ -153,7 +156,7 @@ if (isset($_GET['prompt'])) {
 if (isset($_GET['catalog'])) {
     header('Content-Type: application/json');
     $corp = $_GET['catalog'];
-    if (!in_array($corp, ['pmc','rcw','wac','usc','cfr'], true)) {
+    if (!in_array($corp, ['psd1','pmc','rcw','wac','usc','cfr'], true)) {
         echo json_encode(['error' => 'Invalid corpus']); exit;
     }
     $secrets = load_secrets($secretsFile);
@@ -215,7 +218,7 @@ proxy_log($requestId, 'request_start', ['path' => $_SERVER['REQUEST_URI'] ?? '',
 
 $query     = trim($data['query'] ?? $data['messages'][array_key_last($data['messages'] ?? [])]['content'] ?? '');
 $corpusRaw = $data['corpus'] ?? null;
-$corpus    = in_array($corpusRaw, ['pmc', 'rcw', 'wac', 'usc', 'cfr', 'state', 'federal', 'local'], true) ? $corpusRaw : null;
+$corpus    = in_array($corpusRaw, ['psd1', 'pmc', 'rcw', 'wac', 'usc', 'cfr', 'state', 'federal', 'local'], true) ? $corpusRaw : null;
 $messages  = $data['messages'] ?? [];
 
 if (!$query) { proxy_log($requestId, 'request_invalid', ['reason' => 'no_query']); sse_error('No query provided.'); exit; }
@@ -246,7 +249,18 @@ $built   = $proxy->buildContext($results);
 $context = $built['context'];
 $sources = $built['sources'];
 
+// Upgrade to Sonnet when results cross corpus boundaries — district policy + statute
+// reconciliation requires stronger reasoning than a single-corpus factual lookup.
+$uniqueCorpora = array_unique(array_column($results, 'corpus'));
+$crossCorpus   = count($uniqueCorpora) > 1;
+$model         = $crossCorpus ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001';
+$modelLabel    = $crossCorpus ? 'sonnet' : 'haiku';
+if ($crossCorpus) {
+    proxy_log($requestId, 'model_upgrade', ['model' => $model, 'corpora' => array_values($uniqueCorpora)]);
+}
+
 sse(['sources' => $sources]);
+if ($crossCorpus) { sse(['model' => $modelLabel]); }
 
 $logId = 0;
 try { $logId = $proxy->logQuery($query, $corpus, count($results)); } catch (\Throwable $e) {}
@@ -281,7 +295,7 @@ if (empty($claudeMessages)) {
 }
 
 $payload = json_encode([
-    'model'      => 'claude-haiku-4-5-20251001',
+    'model'      => $model,
     'max_tokens' => MAX_OUTPUT_TOKENS,
     'stream'     => true,
     'system'     => [['type' => 'text', 'text' => $systemText]],
@@ -374,12 +388,12 @@ curl_close($ch);
 
 if ($curlErrno) {
     proxy_log($requestId, 'anthropic_curl_error', ['errno' => $curlErrno, 'error' => $curlError]);
-    sse(['error' => "haiku processing of reply failed: curl error $curlErrno: $curlError"]);
+    sse(['error' => "{$modelLabel} processing of reply failed: curl error $curlErrno: $curlError"]);
 } elseif ($st['httpCode'] !== 200) {
     $body = json_decode($st['errBody'], true);
     $msg = $body['error']['message'] ?? "Anthropic returned HTTP {$st['httpCode']}";
     proxy_log($requestId, 'anthropic_http_error', ['http_code' => $st['httpCode'], 'error' => $msg]);
-    sse(['error' => "haiku processing of reply failed: {$msg}"]);
+    sse(['error' => "{$modelLabel} processing of reply failed: {$msg}"]);
 } elseif ($st['textChars'] === 0 && !$st['sawErrorEvent']) {
     $reason = $st['stopReason'] ?: 'unknown';
     $fallback = "I couldn't generate a full narrative answer for this request "
@@ -397,7 +411,7 @@ if ($curlErrno) {
         $fallback .= "No source sections were retrieved. Try broadening your query or switching Source scope.";
     }
     sse(['text' => $fallback]);
-    sse(['error' => "haiku processing of reply failed: model returned no text content (stop_reason={$reason})."]);
+    sse(['error' => "{$modelLabel} processing of reply failed: model returned no text content (stop_reason={$reason})."]);
     proxy_log($requestId, 'anthropic_no_text', ['stop_reason' => $reason, 'result_count' => count($results)]);
 }
 proxy_log($requestId, 'request_done', ['http_code' => $st['httpCode'], 'text_chars' => $st['textChars'], 'stop_reason' => $st['stopReason'], 'out_tokens' => $st['outTok']]);
@@ -409,6 +423,7 @@ sse(['meta' => [
     'cacheWrite'   => $st['cacheWrite'],
     'resultCount'  => count($results),
     'stopReason'   => $st['stopReason'],
+    'model'        => $modelLabel,
 ]]);
 echo "data: [DONE]\n\n";
 flush();

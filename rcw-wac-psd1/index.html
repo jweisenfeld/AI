@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PMC Legal Reference — Pasco Municipal Code</title>
+<title>PSD1 Policy Reference — Pasco School District</title>
 <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
 <style>
   :root {
@@ -17,6 +17,7 @@
     --bot-fg:       #1a1a2e;
     --source-bg:    #eef2f8;
     --source-border:#c0cfd8;
+    --psd1-badge:   #8b1a1a;   /* district crimson */
     --rcw-badge:    #1a3a5c;
     --wac-badge:    #2e6b3e;
     --usc-badge:    #7b2d2d;
@@ -164,6 +165,7 @@
     padding: 1px 6px; border-radius: 3px;
     color: #fff; flex-shrink: 0;
   }
+  .corpus-badge.psd1 { background: var(--psd1-badge); }
   .corpus-badge.pmc { background: var(--primary-md); }
   .corpus-badge.rcw { background: var(--rcw-badge); }
   .corpus-badge.wac { background: var(--wac-badge); }
@@ -588,16 +590,15 @@
 <body>
 
 <header>
-  <div class="header-badge">🏛️</div>
+  <div class="header-badge">🏫</div>
   <div>
-    <h1>PMC Legal Reference</h1>
-    <div class="subtitle">Pasco Municipal Code with optional WA/Federal cross-checks</div>
+    <h1>PSD1 Policy Reference</h1>
+    <div class="subtitle">Pasco School District policies with optional WA/Federal cross-checks</div>
   </div>
   <div class="sources-dropdown">
-    <button id="source-btn" type="button" aria-expanded="false">Source: PMC ▾</button>
+    <button id="source-btn" type="button" aria-expanded="false">Source: PSD1 ▾</button>
     <div id="source-menu" class="source-menu" role="menu">
-      <label><input type="radio" name="source-corpus" value="pmc" checked> PMC (default)</label>
-      <label><input type="radio" name="source-corpus" value="local"> Local + WA + Federal</label>
+      <label><input type="radio" name="source-corpus" value="psd1" checked> PSD1 District Policies (default)</label>
       <label><input type="radio" name="source-corpus" value="state"> Washington State (RCW+WAC)</label>
       <label><input type="radio" name="source-corpus" value="federal"> Federal (USC+CFR)</label>
       <label><input type="radio" name="source-corpus" value="null"> All corpora</label>
@@ -610,7 +611,7 @@
 <div id="about-overlay" role="dialog" aria-modal="true" aria-labelledby="about-title">
   <div id="about-modal">
     <div class="about-header">
-      <h2 id="about-title">🏛️ About PMC Legal Reference</h2>
+      <h2 id="about-title">🏫 About PSD1 Policy Reference</h2>
       <button id="about-close" aria-label="Close">✕</button>
     </div>
     <div class="about-tabs">
@@ -642,8 +643,8 @@
             </div>
             <span class="pipe-arrow">→</span>
             <div class="pipe-step">
-              <strong>Claude Haiku</strong>
-              <span>synthesis + citations<br>streaming SSE</span>
+              <strong>Claude Haiku / Sonnet</strong>
+              <span>Haiku (single corpus)<br>Sonnet (cross-corpus)</span>
             </div>
           </div>
         </div>
@@ -672,21 +673,21 @@
           <h3>Technical Notes</h3>
           <dl class="tech-notes">
             <dt>Inference model</dt>
-            <dd>Claude Haiku 4.5 (<code>claude-haiku-4-5-20251001</code>) — fast, cheap RAG synthesis</dd>
+            <dd>Claude Haiku 4.5 (single-corpus queries) · Sonnet 4.6 (cross-corpus queries) — auto-selected based on retrieved results</dd>
             <dt>Embedding model</dt>
             <dd>OpenAI <code>text-embedding-3-small</code> — 1536 dimensions, used at ingest and at query time</dd>
             <dt>Chunk size</dt>
-            <dd>~800 tokens per section chunk (PMC primary, plus optional RCW/WAC/USC/CFR)</dd>
+            <dd>~800 tokens per section chunk (PSD1 primary, plus optional RCW/WAC/USC/CFR)</dd>
             <dt>Retrieval</dt>
             <dd>Top 8 results via Reciprocal Rank Fusion (k=60) of vector cosine + BM25 full-text lanes</dd>
             <dt>Max output</dt>
             <dd>2,000 tokens per response</dd>
             <dt>Corpus sources</dt>
-            <dd>PMC (Pasco corpus), RCW/WAC (WA Legislature), USC (Cornell LII), CFR (eCFR.gov XML)</dd>
+            <dd>PSD1 (board policies + admin procedures), RCW/WAC (WA Legislature), USC (Cornell LII), CFR (eCFR.gov XML)</dd>
             <dt>Vector store</dt>
             <dd>Supabase + pgvector, HNSW index (m=16, ef_construction=64)</dd>
             <dt>Project repo</dt>
-            <dd>jweisenfeld/AI — <code>rcw-wac-pmc/</code> (UI) · <code>rcw-wac/</code> (shared proxy + ingestion)</dd>
+            <dd>jweisenfeld/AI — <code>rcw-wac-psd1/</code> (UI) · <code>rcw-wac/</code> (shared proxy + ingestion)</dd>
           </dl>
         </div>
         <div class="about-section">
@@ -714,15 +715,15 @@ ORDER BY indexrelname;</div>
 
       <div class="about-tab-panel" data-tab="samples">
         <div class="about-section">
-          <h3>Sample Queries — Pasco Municipal Code Scenarios</h3>
-          <p class="sample-queries-intro">Six high-value municipal-code prompts (including Spanish and Russian) that test zoning, permitting, enforcement, and cross-section reconciliation. Click any query to run it.</p>
+          <h3>Sample Queries — PSD1 Policy Scenarios</h3>
+          <p class="sample-queries-intro">Six high-value prompts (including Spanish and Russian) covering student discipline, special education, staff conduct, and cross-corpus policy/statute reconciliation. Click any query to run it.</p>
           <div id="sample-queries-list">
-            <button class="sample-query-btn" data-query="Which Pasco Municipal Code sections apply to opening a food truck, and what permit sequence should I follow?"><span class="sample-q-num">1.</span> Which Pasco Municipal Code sections apply to opening a food truck, and what permit sequence should I follow?</button>
-            <button class="sample-query-btn" data-query="I want to build an ADU in Pasco. Identify all potentially binding code sections, lot constraints, and any internal conflicts."><span class="sample-q-num">2.</span> I want to build an ADU in Pasco. Identify all potentially binding code sections, lot constraints, and any internal conflicts.</button>
-            <button class="sample-query-btn" data-query="For a downtown mixed-use project, reconcile zoning, parking, signage, and design standards from the PMC."><span class="sample-q-num">3.</span> For a downtown mixed-use project, reconcile zoning, parking, signage, and design standards from the PMC.</button>
-            <button class="sample-query-btn" data-query="Compare enforcement and penalty pathways for repeated code violations under the PMC, including notice and appeal rights."><span class="sample-q-num">4.</span> Compare enforcement and penalty pathways for repeated code violations under the PMC, including notice and appeal rights.</button>
-            <button class="sample-query-btn" data-query="¿Qué secciones del Código Municipal de Pasco debo revisar antes de convertir una casa en un uso comercial?"><span class="sample-q-num">5.</span> ¿Qué secciones del Código Municipal de Pasco debo revisar antes de convertir una casa en un uso comercial?</button>
-            <button class="sample-query-btn" data-query="Какие разделы Муниципального кодекса Паско регулируют шум, часы работы бизнеса и порядок обжалования штрафа?"><span class="sample-q-num">6.</span> Какие разделы Муниципального кодекса Паско регулируют шум, часы работы бизнеса и порядок обжалования штрафа?</button>
+            <button class="sample-query-btn" data-query="What does district policy say about student suspension and expulsion, and what RCW sections govern the minimum procedural requirements?"><span class="sample-q-num">1.</span> What does district policy say about student suspension and expulsion, and what RCW sections govern the minimum procedural requirements?</button>
+            <button class="sample-query-btn" data-query="Walk me through the IEP process under district policy, IDEA, and OSPI WAC rules — what timelines and procedural safeguards apply?"><span class="sample-q-num">2.</span> Walk me through the IEP process under district policy, IDEA, and OSPI WAC rules — what timelines and procedural safeguards apply?</button>
+            <button class="sample-query-btn" data-query="What are the district's Title IX obligations for responding to a harassment complaint, and how does federal CFR interact with board policy?"><span class="sample-q-num">3.</span> What are the district's Title IX obligations for responding to a harassment complaint, and how does federal CFR interact with board policy?</button>
+            <button class="sample-query-btn" data-query="What policy sections apply to staff use of electronic devices and social media, and are there any conflicts or gaps between the policies?"><span class="sample-q-num">4.</span> What policy sections apply to staff use of electronic devices and social media, and are there any conflicts or gaps between the policies?</button>
+            <button class="sample-query-btn" data-query="¿Qué dice la política del distrito sobre el acceso de estudiantes inmigrantes a la escuela y cuáles son las protecciones legales estatales y federales?"><span class="sample-q-num">5.</span> ¿Qué dice la política del distrito sobre el acceso de estudiantes inmigrantes a la escuela y cuáles son las protecciones legales estatales y federales?</button>
+            <button class="sample-query-btn" data-query="Какова политика округа в отношении применения физической силы к учащимся и каковы требования закона штата Вашингтон?"><span class="sample-q-num">6.</span> Какова политика округа в отношении применения физической силы к учащимся и каковы требования закона штата Вашингтон?</button>
           </div></div>
         </div>
       </div>
@@ -744,25 +745,25 @@ ORDER BY indexrelname;</div>
 
 <div id="messages">
   <div class="welcome" id="welcome">
-    <div class="shield">🏛️</div>
-    <h2>Pasco Municipal Code Reference Assistant</h2>
-    <p class="tagline">Ask plain-language questions about the Pasco Municipal Code. The assistant cites sections and can optionally cross-check WA/federal sources.</p>
+    <div class="shield">🏫</div>
+    <h2>PSD1 Policy Reference Assistant</h2>
+    <p class="tagline">Ask plain-language questions about Pasco School District board policies and procedures. The assistant cites policy sections and can cross-check WA state law and federal regulations.</p>
     <div class="examples">
-      <span class="example-chip">What PMC sections govern home occupations in Pasco?</span>
-      <span class="example-chip">Show all code provisions for a fence and corner-lot visibility triangle</span>
-      <span class="example-chip">What are the permit and inspection steps for a tenant improvement?</span>
-      <span class="example-chip">Identify conflicting PMC sections on short-term rentals</span>
-      <span class="example-chip">¿Qué código municipal aplica para abrir un negocio en casa?</span>
-      <span class="example-chip">Какие нормы PMC нужно проверить перед установкой вывески?</span>
+      <span class="example-chip">What is the district policy on student cell phone use?</span>
+      <span class="example-chip">What are the suspension and expulsion procedures and appeal rights?</span>
+      <span class="example-chip">What does policy say about employee background checks and hiring?</span>
+      <span class="example-chip">What are the IEP timeline requirements under district policy and IDEA?</span>
+      <span class="example-chip">¿Cuál es la política del distrito sobre disciplina estudiantil?</span>
+      <span class="example-chip">Какова политика округа в отношении издевательств и домогательств?</span>
     </div>
   </div>
 </div>
 
 <div id="input-area">
-  <textarea id="query" rows="1" placeholder="Ask about the Pasco Municipal Code…"></textarea>
+  <textarea id="query" rows="1" placeholder="Ask about PSD1 policies and procedures…"></textarea>
   <button id="send-btn">Ask</button>
 </div>
-<div class="disclaimer">General legal information only — not legal advice. Consult the Pasco City Attorney or qualified counsel for specific legal decisions.</div>
+<div class="disclaimer">General policy and legal information only — not legal advice. Consult district legal counsel for specific legal decisions.</div>
 
 <script>
 const messagesEl = document.getElementById('messages');
@@ -770,7 +771,7 @@ const queryEl    = document.getElementById('query');
 const sendBtn    = document.getElementById('send-btn');
 
 let history = [];
-let corpus  = 'pmc';   // default corpus
+let corpus  = 'psd1';   // default corpus
 
 // ── Source dropdown (radio corpus selector) ─────────────────────────────────
 const sourceBtn = document.getElementById('source-btn');
@@ -786,7 +787,7 @@ document.addEventListener('click', (e) => {
   }
 });
 
-const sourceLabels = { pmc:'PMC', local:'Local+WA+Federal', state:'State', federal:'Federal', null:'All' };
+const sourceLabels = { psd1:'PSD1', state:'State (RCW+WAC)', federal:'Federal', null:'All' };
 document.querySelectorAll('input[name="source-corpus"]').forEach(r => {
   r.addEventListener('change', () => {
     corpus = r.value === 'null' ? null : r.value;
@@ -843,14 +844,14 @@ async function loadAboutData() {
     const rows = await resp.json();
     if (rows.error) throw new Error(rows.error);
 
-    const order  = ['pmc','rcw','wac','usc','cfr'];
-    const labels = { pmc:'PMC', rcw:'RCW', wac:'WAC', usc:'USC', cfr:'CFR' };
+    const order  = ['psd1','rcw','wac','usc','cfr'];
+    const labels = { psd1:'PSD1', rcw:'RCW', wac:'WAC', usc:'USC', cfr:'CFR' };
     const descs  = {
-      pmc: 'Pasco Municipal Code',
-      rcw: 'Revised Code of WA',
-      wac: 'WA Admin Code',
-      usc: 'US Code',
-      cfr: 'Code of Federal Regs',
+      psd1: 'Pasco School District Policies',
+      rcw:  'Revised Code of WA',
+      wac:  'WA Admin Code',
+      usc:  'US Code',
+      cfr:  'Code of Federal Regs',
     };
 
     // stats() returns a single flat row: {rcw_chunks, wac_chunks, usc_chunks, cfr_chunks, ...}
@@ -941,7 +942,7 @@ const catalogTitle   = document.getElementById('catalog-title');
 const catalogBody    = document.getElementById('catalog-body');
 const catalogClose   = document.getElementById('catalog-close');
 
-const corpusLabels = { pmc:'PMC', rcw:'RCW', wac:'WAC', usc:'USC', cfr:'CFR' };
+const corpusLabels = { psd1:'PSD1', pmc:'PMC', rcw:'RCW', wac:'WAC', usc:'USC', cfr:'CFR' };
 const catalogCache = {};
 
 function openCatalog(corpus) {

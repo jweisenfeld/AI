@@ -256,3 +256,14 @@ alter table rcw_wac_chunks
 alter table rcw_wac_chunks
     add constraint rcw_wac_chunks_corpus_check
     check (corpus in ('pmc', 'rcw', 'wac', 'usc', 'cfr'));
+
+-- ── Migration v4: add psd1 corpus (Pasco School District policies) ────────────
+-- Run once in Supabase SQL Editor before ingesting --corpus psd1 documents.
+-- Safe to run multiple times.
+
+alter table rcw_wac_chunks
+    drop constraint if exists rcw_wac_chunks_corpus_check;
+
+alter table rcw_wac_chunks
+    add constraint rcw_wac_chunks_corpus_check
+    check (corpus in ('pmc', 'rcw', 'wac', 'usc', 'cfr', 'psd1'));

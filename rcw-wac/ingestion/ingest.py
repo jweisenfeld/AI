@@ -75,7 +75,10 @@ EMBED_BATCH_SIZE = 100
 INSERT_BATCH     = 10    # small batches — HNSW index update time grows with table size
 
 # Polite crawl delay — the legislature server is publicly funded; be a good citizen
-CRAWL_DELAY_SEC  = 0.4   # seconds between HTTP requests
+CRAWL_DELAY_SEC  = 0.4   # seconds between HTTP requests (overridden by --delay)
+
+# IO throttle — Supabase free tier has a daily Disk IO budget; increase for large corpora
+INSERT_DELAY_SEC = 0.5   # seconds between DB insert batches (overridden by --insert-delay)
 
 ENC = None
 
@@ -1223,7 +1226,7 @@ def insert_chunks(sb, chunks: list[dict], embeddings: list[list[float]]) -> int:
                 time.sleep(wait)
         inserted += len(rows)
         print(f'  Inserted {inserted}/{len(chunks)} rows...', end='\r', flush=True)
-        time.sleep(0.5)  # throttle IO — free tier has a daily Disk IO budget
+        time.sleep(INSERT_DELAY_SEC)
     print()
     return inserted
 
@@ -1231,15 +1234,16 @@ def insert_chunks(sb, chunks: list[dict], embeddings: list[list[float]]) -> int:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    global CRAWL_DELAY_SEC   # must be declared before first use in this function
+    global CRAWL_DELAY_SEC, INSERT_DELAY_SEC   # must be declared before first use in this function
 
     parser = argparse.ArgumentParser(
         description='Scrape WA Legislature website → embed → store in Supabase.\n'
                     'Run once to build the database; queries go to Supabase, not leg.wa.gov.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument('--corpus', required=True, choices=['rcw', 'wac', 'cfr', 'usc', 'pmc'],
-                        help='Which code to crawl  (pmc = Pasco Municipal Code local HTML)')
+    parser.add_argument('--corpus', required=True, choices=['rcw', 'wac', 'cfr', 'usc', 'pmc', 'psd1'],
+                        help='Which code to crawl  (pmc = Pasco Municipal Code local HTML; '
+                             'psd1 = Pasco School District policies local HTML)')
     parser.add_argument('--titles', metavar='28A,42.56,180',
                         help='Comma-separated title numbers to limit the crawl. Omit for full corpus.')
     parser.add_argument('--chapters', metavar='392-172A,28A.400',
@@ -1256,9 +1260,15 @@ def main():
                              '(useful after a law update)')
     parser.add_argument('--delay', type=float, default=CRAWL_DELAY_SEC,
                         help=f'Seconds between HTTP requests (default {CRAWL_DELAY_SEC})')
+    parser.add_argument('--insert-delay', type=float, default=INSERT_DELAY_SEC,
+                        dest='insert_delay',
+                        help=f'Seconds between DB insert batches (default {INSERT_DELAY_SEC}). '
+                             'Raise to 3–10 when ingesting large corpora on a Supabase free tier '
+                             'to avoid exhausting the daily Disk IO budget.')
     args = parser.parse_args()
 
-    CRAWL_DELAY_SEC = args.delay
+    CRAWL_DELAY_SEC  = args.delay
+    INSERT_DELAY_SEC = args.insert_delay
 
     filter_titles   = [t.strip() for t in args.titles.split(',')]   if args.titles   else None
     filter_chapters = [c.strip() for c in args.chapters.split(',')] if args.chapters else None

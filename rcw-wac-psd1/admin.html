@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PMC Proxy Admin</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 20px; background: #f4f7fb; color: #1a2a3a; }
+    h1 { margin: 0 0 12px; }
+    .card { background: #fff; border: 1px solid #d0d8e2; border-radius: 8px; padding: 12px 14px; margin: 10px 0; }
+    button { padding: 7px 12px; border-radius: 6px; border: 1px solid #4a6a8a; background: #1a3a5c; color: #fff; cursor: pointer; }
+    button:disabled { opacity: .55; cursor: default; }
+    pre { background: #f0f4f9; border: 1px solid #d0d8e2; border-radius: 6px; padding: 10px; overflow-x: auto; font-size: 12px; }
+    .ok { color: #1c7c34; font-weight: 700; }
+    .err { color: #b12a2a; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <h1>PMC Admin</h1>
+  <div class="card">
+    <button id="run">Run Diagnostics</button>
+    <span id="status"></span>
+  </div>
+  <div class="card">
+    <h3>Stats RPC (?stats=1)</h3>
+    <div id="statsResult"></div>
+  </div>
+  <div class="card">
+    <h3>Prompt route (?prompt=1)</h3>
+    <div id="promptResult"></div>
+  </div>
+  <div class="card">
+    <h3>SSE test route (?stream=test)</h3>
+    <div id="streamResult"></div>
+  </div>
+
+  <script>
+    const runBtn = document.getElementById('run');
+    const statusEl = document.getElementById('status');
+    const statsEl = document.getElementById('statsResult');
+    const promptEl = document.getElementById('promptResult');
+    const streamEl = document.getElementById('streamResult');
+
+    function ok(msg) { return `<span class="ok">OK</span> ${msg}`; }
+    function err(msg) { return `<span class="err">ERROR</span> ${msg}`; }
+    function pretty(v) { return `<pre>${JSON.stringify(v, null, 2)}</pre>`; }
+
+    async function run() {
+      runBtn.disabled = true;
+      statusEl.textContent = ' Running...';
+      statsEl.innerHTML = promptEl.innerHTML = streamEl.innerHTML = '';
+
+      try {
+        // Stats check
+        try {
+          const resp = await fetch('api-proxy.php?stats=1');
+          const data = await resp.json();
+          statsEl.innerHTML = ok('stats route reachable') + pretty(data);
+        } catch (e) {
+          statsEl.innerHTML = err(e.message);
+        }
+
+        // Prompt check
+        try {
+          const resp = await fetch('api-proxy.php?prompt=1');
+          const data = await resp.json();
+          const p = data.prompt || '';
+          promptEl.innerHTML = ok(`prompt route reachable (${p.length} chars)`);
+        } catch (e) {
+          promptEl.innerHTML = err(e.message);
+        }
+
+        // Stream test check (use EventSource instead of fetch text to avoid
+        // proxy/server content-encoding quirks that can look like binary noise)
+        try {
+          const streamResult = await new Promise((resolve, reject) => {
+            const chunks = [];
+            let sawDone = false;
+            let settled = false;
+            const es = new EventSource('api-proxy.php?stream=test');
+            const timer = setTimeout(() => {
+              if (settled) return;
+              settled = true;
+              es.close();
+              reject(new Error('SSE timeout after 15s'));
+            }, 15000);
+
+            es.onmessage = (evt) => {
+              if (evt.data === '[DONE]') {
+                sawDone = true;
+                settled = true;
+                clearTimeout(timer);
+                es.close();
+                resolve({ chunks, sawDone });
+                return;
+              }
+              try {
+                const parsed = JSON.parse(evt.data);
+                if (parsed?.text) chunks.push(parsed.text);
+              } catch {
+                // ignore non-json event payloads
+              }
+            };
+
+            es.onerror = () => {
+              if (settled) return;
+              clearTimeout(timer);
+              es.close();
+              // Some servers close the stream immediately after the final
+              // message and browsers surface that close as "error". If we
+              // already captured stream text, treat this as success.
+              if (chunks.length > 0) {
+                settled = true;
+                resolve({ chunks, sawDone });
+              } else {
+                settled = true;
+                reject(new Error('EventSource connection failed'));
+              }
+            };
+          });
+
+          const joined = streamResult.chunks.join('');
+          const hasText = joined.trim().length > 0;
+          streamEl.innerHTML = (streamResult.sawDone && hasText)
+            ? ok('stream test emitted text + DONE')
+            : err('stream test did not emit both text and DONE');
+          streamEl.innerHTML += `<pre>${JSON.stringify({
+            saw_done: streamResult.sawDone,
+            text_preview: joined.slice(0, 200),
+            text_chars: joined.length
+          }, null, 2)}</pre>`;
+        } catch (e) {
+          streamEl.innerHTML = err(e.message);
+        }
+      } finally {
+        statusEl.textContent = ' Finished';
+        runBtn.disabled = false;
+      }
+    }
+
+    runBtn.addEventListener('click', run);
+  </script>
+</body>
+</html>

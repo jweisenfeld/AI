@@ -1137,9 +1137,9 @@ async function sendMessage() {
     if (thinkEl.parentNode) thinkEl.remove();
   }
 
-  let fullText       = '';
-  let sourcesRendered = false;
-  let metaDiv        = null;
+  let fullText        = '';
+  let pendingSources  = null;   // rendered after stream completes, not during
+  let metaDiv         = null;
   let textStarted    = false;
   let hadError       = false;
   let logId          = 0;
@@ -1195,13 +1195,10 @@ async function sendMessage() {
 
         if (evt.log_id) logId = evt.log_id;
 
-        if (evt.sources && !sourcesRendered) {
-          const block = renderSources(evt.sources);
-          if (block) botWrap.insertBefore(block, thinkEl);
+        if (evt.sources) {
+          pendingSources = evt.sources;
           const lbl = thinkEl.querySelector('.think-label');
           if (lbl) lbl.firstChild.textContent = 'Generating';
-          sourcesRendered = true;
-          scrollBottom();
         }
 
         if (Object.prototype.hasOwnProperty.call(evt, 'text')) {
@@ -1247,6 +1244,13 @@ async function sendMessage() {
   }
 
   stopThinking();
+
+  if (pendingSources) {
+    const block = renderSources(pendingSources);
+    if (block) botWrap.appendChild(block);
+    scrollBottom();
+  }
+
   patchLog();
 
   if (!hadError && !fullText.trim()) {
@@ -1261,7 +1265,21 @@ async function sendMessage() {
     copyBtn.className = 'copy-reply-btn';
     copyBtn.textContent = 'Copy reply';
     copyBtn.addEventListener('click', () => {
-      navigator.clipboard.writeText(fullText).then(() => {
+      const parts = [];
+      parts.push('QUESTION:\n' + text);
+      parts.push('ANSWER:\n' + fullText);
+      if (pendingSources?.length) {
+        const srcLines = pendingSources.map((s, i) => {
+          const label  = s.corpus_label + ' ' + s.section_id;
+          const hdg    = s.section_heading ? ' — ' + s.section_heading : '';
+          const sim    = s.bm25_only ? ' (text match)' : (s.similarity_pct != null ? ` (${s.similarity_pct}%)` : '');
+          const url    = s.source_url ? '\n    ' + s.source_url : '';
+          return `[${i + 1}] ${label}${hdg}${sim}${url}`;
+        });
+        parts.push('SOURCES:\n' + srcLines.join('\n'));
+      }
+      const clip = parts.join('\n\n---\n\n');
+      navigator.clipboard.writeText(clip).then(() => {
         copyBtn.textContent = 'Copied!';
         setTimeout(() => { copyBtn.textContent = 'Copy reply'; }, 1800);
       }).catch(() => { copyBtn.textContent = 'Error'; });

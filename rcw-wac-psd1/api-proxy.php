@@ -238,7 +238,8 @@ try {
 proxy_log($requestId, 'embedding_ok');
 
 try {
-    $results = $proxy->searchSupabase($embedding, $corpus, 16, $query);
+    $minSim  = ($corpus === 'psd1') ? 0.05 : 0.25;
+    $results = $proxy->searchSupabase($embedding, $corpus, 16, $query, $minSim);
 } catch (SupabaseException $e) {
     proxy_log($requestId, 'supabase_error', ['error' => $e->getMessage(), 'corpus' => $corpus]);
     sse_error('SupaBase server leg failed: ' . $e->getMessage()); exit;

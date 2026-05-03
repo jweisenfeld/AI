@@ -101,7 +101,7 @@ class RcwWacProxy
             'match_count'     => max(1, min($limit, 20)),
             'min_similarity'  => $minSimilarity,
         ];
-        if ($corpus && in_array($corpus, ['pmc', 'rcw', 'wac', 'usc', 'cfr', 'state', 'federal', 'local'], true)) {
+        if ($corpus && in_array($corpus, ['psd1', 'pmc', 'rcw', 'wac', 'usc', 'cfr', 'state', 'federal', 'local'], true)) {
             $params['filter_corpus'] = $corpus;
         }
         if ($queryText) {

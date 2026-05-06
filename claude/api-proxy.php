@@ -90,7 +90,10 @@ if (isset($requestData['action']) && $requestData['action'] === 'verify_login') 
             trim($row[2]) === trim($requestData['student_id'] ?? '') &&
             trim($row[6]) === trim($requestData['password'] ?? '')) {
             $found = true;
-            $studentName = $row[9] ?? $row[2];
+            $studentName  = $row[9] ?? $row[2];
+            $loginFreeHrs = strtolower(trim($row[10] ?? ''));
+            $loginTopicLk = strtolower(trim($row[11] ?? ''));
+            $isUnlimited  = ($loginFreeHrs === 'unlimited' && $loginTopicLk === 'unlimited');
             break;
         }
     }
@@ -109,7 +112,7 @@ if (isset($requestData['action']) && $requestData['action'] === 'verify_login') 
             'created_at'    => time(),
             'last_used'     => time(),
         ]), LOCK_EX);
-        echo json_encode(['success' => true, 'student_name' => $studentName, 'token' => $token]);
+        echo json_encode(['success' => true, 'student_name' => $studentName, 'token' => $token, 'is_unlimited' => $isUnlimited ?? false]);
     } else {
         http_response_code(401);
         echo json_encode(['error' => 'Invalid credentials.']);
@@ -176,7 +179,9 @@ $restrictions = getStudentRestrictions($studentFile, $studentId);
 // Determine whether we are currently inside a free-topic window.
 // When true, the TopicLock (if any) is lifted for this request.
 $inFreeHours = false;
-if ($restrictions['free_hours'] !== '') {
+if ($restrictions['free_hours'] === 'unlimited') {
+    $inFreeHours = true;  // bypass school-hours throttle and topic lock 24/7
+} elseif ($restrictions['free_hours'] !== '') {
     $restrictTz   = new DateTimeZone('America/Los_Angeles');
     $restrictNow  = new DateTime('now', $restrictTz);
     $restrictMins = (int)$restrictNow->format('G') * 60 + (int)$restrictNow->format('i');
@@ -258,7 +263,8 @@ $dayOfWeek = (int)$nowLocal->format('N'); // 1=Mon, 7=Sun
 $isSchoolHours = ($dayOfWeek >= 1 && $dayOfWeek <= 5 && $hour >= 7 && $hour < 17);
 
 // Outside school hours: only allow Haiku, and reduce rate limit
-if (!$isSchoolHours) {
+// Exception: free_hours="unlimited" bypasses school-hours restrictions entirely.
+if (!$isSchoolHours && $restrictions['free_hours'] !== 'unlimited') {
     // Force model to haiku outside school hours
     if ($requestData['model'] !== 'haiku') {
         $requestData['model'] = 'haiku';
@@ -325,13 +331,16 @@ if (!$requestHasImages && $inputBytes > $MAX_INPUT_BYTES) {
 }
 
 // ============================================
-// OPUS: FIRST EXCHANGE ONLY
+// OPUS: FIRST EXCHANGE ONLY (waived for unlimited users)
 // ============================================
 // Opus is allowed only on the first message (msg_count == 1) so students
 // can paste a screenshot and get one high-quality answer.  After that,
 // the server downgrades to Sonnet.  The frontend grays out the button.
+// Exception: users with both free_hours="unlimited" AND topic_lock="unlimited"
+// may use Opus for the entire conversation.
+$isUnlimitedUser = ($restrictions['free_hours'] === 'unlimited' && $restrictions['topic_lock'] === 'unlimited');
 $opusDowngraded = false;
-if ($requestData['model'] === 'opus' && $messageCount > 1) {
+if ($requestData['model'] === 'opus' && $messageCount > 1 && !$isUnlimitedUser) {
     $requestData['model'] = 'sonnet';
     $opusDowngraded = true;
 }
@@ -377,7 +386,7 @@ if (isset($requestData['system']) && is_string($requestData['system'])) {
 //   "subject-tutor"  e.g. "physics-tutor"           → Socratic mode (guide, don't give away)
 //
 // Any subject word works — the constraint is built dynamically.
-if ($restrictions['topic_lock'] !== '' && !$inFreeHours) {
+if ($restrictions['topic_lock'] !== '' && $restrictions['topic_lock'] !== 'unlimited' && !$inFreeHours) {
     $rawLock     = $restrictions['topic_lock'];
     $isTutor     = (substr($rawLock, -6) === '-tutor');
     $subject     = $isTutor ? substr($rawLock, 0, -6) : $rawLock;

@@ -790,6 +790,18 @@
             opacity: 0.8;
         }
 
+        .unlimited-badge {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: #e0e7ff;
+            color: #3730a3;
+            border: 1px solid #a5b4fc;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            display: none;
+        }
+
         /* Login overlay */
         .login-overlay {
             position: fixed;
@@ -907,6 +919,7 @@
                 <label for="student-id">Logged in as:</label>
                 <input type="text" id="student-id" readonly style="background:#fff8e1; cursor:default;">
                 <span class="student-hint" id="student-name-display"></span>
+                <span class="unlimited-badge" id="unlimited-badge" title="Unlimited access: any topic, any time, Opus for full conversation">∞ Unlimited</span>
                 <button onclick="clearSession()" style="margin-left:auto; padding:4px 12px; font-size:0.8rem; background:#b45309; color:white; border:none; border-radius:6px; cursor:pointer;">Sign Out</button>
             </div>
 
@@ -1043,15 +1056,22 @@
         let STUDENT_ID    = null;
         let STUDENT_NAME  = null;
         let SESSION_TOKEN = null;
+        let IS_UNLIMITED  = false;
 
-        function applySession(id, name, token) {
+        function applySession(id, name, token, unlimited = false) {
             STUDENT_ID    = id;
             STUDENT_NAME  = name;
             SESSION_TOKEN = token;
+            IS_UNLIMITED  = !!unlimited;
             document.getElementById('login-modal').style.display = 'none';
             document.getElementById('student-id').value = id;
             document.getElementById('student-name-display').textContent = name;
             document.getElementById('student-id-bar').style.display = 'flex';
+            document.getElementById('unlimited-badge').style.display = IS_UNLIMITED ? 'inline-block' : 'none';
+            if (IS_UNLIMITED) {
+                const opusBtn = document.querySelector('.model-btn[data-model="opus"]');
+                if (opusBtn) opusBtn.title = 'Unlimited — Opus available for entire conversation';
+            }
         }
 
         function clearSession() {
@@ -1081,9 +1101,9 @@
                 const data = await res.json();
                 if (data.success) {
                     localStorage.setItem('claude_session', JSON.stringify({
-                        student_id: id, student_name: data.student_name, token: data.token
+                        student_id: id, student_name: data.student_name, token: data.token, is_unlimited: !!data.is_unlimited
                     }));
-                    applySession(id, data.student_name, data.token);
+                    applySession(id, data.student_name, data.token, data.is_unlimited);
                 } else {
                     err.textContent = 'Invalid credentials. Please try again.';
                 }
@@ -1106,7 +1126,7 @@
                     body: JSON.stringify({ action: 'validate_session', student_id: saved.student_id, session_token: saved.token })
                 });
                 if (res.ok) {
-                    applySession(saved.student_id, saved.student_name, saved.token);
+                    applySession(saved.student_id, saved.student_name, saved.token, saved.is_unlimited);
                 } else {
                     localStorage.removeItem('claude_session'); // password changed or expired
                 }
@@ -1398,8 +1418,8 @@
                     updateStatus('Ready');
                 }
 
-                // Gray out Opus after first exchange (server enforces too)
-                if (data._opus_limited || messages.length > 1) {
+                // Gray out Opus after first exchange (server enforces too) — skip for unlimited users
+                if (!IS_UNLIMITED && (data._opus_limited || messages.length > 1)) {
                     disableOpusButton();
                     showTip('opus-limited', 'Opus is available for your first message only. Click <strong>Clear Chat</strong> or refresh the page to start a new Opus session.');
                 }

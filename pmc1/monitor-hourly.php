@@ -244,30 +244,34 @@ if (!empty($issues)) {
 }
 $body = implode("\n", $bodyLines) . "\n";
 
-if (!file_exists($secretsFile)) {
-    monitor_log('ERROR: SMTP credentials file missing at ' . $secretsFile);
-    monitor_log('Status: ' . $status . ' (email not sent)');
-    exit(1);
-}
-require_once $secretsFile;
+if ($status === 'FAIL') {
+    if (!file_exists($secretsFile)) {
+        monitor_log('ERROR: SMTP credentials file missing at ' . $secretsFile);
+        monitor_log('Status: ' . $status . ' (email not sent)');
+        exit(1);
+    }
+    require_once $secretsFile;
 
-$smtp = [
-    'host' => $SMTP_HOST ?? '',
-    'port' => $SMTP_PORT ?? 587,
-    'user' => $SMTP_USER ?? '',
-    'pass' => $SMTP_PASS ?? '',
-    'from' => $SMTP_FROM ?? '',
-    'from_name' => $SMTP_FROM_NAME ?? 'pmc1 monitor',
-];
-$to = 'jweisenfeld@psd1.org';
-$cc = $TEACHER_CC ?? null;
+    $smtp = [
+        'host' => $SMTP_HOST ?? '',
+        'port' => $SMTP_PORT ?? 587,
+        'user' => $SMTP_USER ?? '',
+        'pass' => $SMTP_PASS ?? '',
+        'from' => $SMTP_FROM ?? '',
+        'from_name' => $SMTP_FROM_NAME ?? 'pmc1 monitor',
+    ];
+    $to = 'jweisenfeld@psd1.org';
+    $cc = $TEACHER_CC ?? null;
 
-try {
-    send_smtp_mail($smtp, $to, $subject, $body, $cc);
-    monitor_log("Email sent to {$to}" . ($cc ? " (cc {$cc})" : '') . " with status {$status}");
-} catch (Throwable $e) {
-    monitor_log('ERROR sending email: ' . $e->getMessage());
-    exit(1);
+    try {
+        send_smtp_mail($smtp, $to, $subject, $body, $cc);
+        monitor_log("Email sent to {$to}" . ($cc ? " (cc {$cc})" : '') . " with status {$status}");
+    } catch (Throwable $e) {
+        monitor_log('ERROR sending email: ' . $e->getMessage());
+        exit(1);
+    }
+} else {
+    monitor_log("Status PASS — no email sent");
 }
 
 monitor_log('Monitor completed with status: ' . $status);

@@ -43,7 +43,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from tqdm import tqdm
 
-load_dotenv()
+load_dotenv(override=True)
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 
@@ -573,7 +573,14 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     all_embeddings = []
     for i in range(0, len(texts), 100):
         batch = texts[i : i + 100]
-        response = get_openai().embeddings.create(input=batch, model=EMBEDDING_MODEL)
+        try:
+            response = get_openai().embeddings.create(input=batch, model=EMBEDDING_MODEL)
+        except Exception as e:
+            key = os.environ.get("OPENAI_API_KEY", "NOT SET")
+            key_hint = f"{key[:8]}...{key[-4:]}" if len(key) > 12 else key
+            print(f"\n  [OPENAI ERROR] {e}")
+            print(f"  OPENAI_API_KEY in use: {key_hint}\n")
+            raise
         all_embeddings.extend([item.embedding for item in response.data])
     return all_embeddings
 

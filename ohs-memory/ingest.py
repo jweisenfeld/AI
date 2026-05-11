@@ -284,8 +284,9 @@ def _extract_text_from_docx(path: Path) -> str:
         if not text:
             continue
         # Prefix headings so structure is visible in chunks
-        if para.style.name.startswith("Heading"):
-            level = para.style.name.split()[-1] if para.style.name.split()[-1].isdigit() else "1"
+        style_name = para.style.name if para.style else ""
+        if style_name.startswith("Heading"):
+            level = style_name.split()[-1] if style_name.split()[-1].isdigit() else "1"
             parts.append(f"{'#' * int(level)} {text}")
         else:
             parts.append(text)

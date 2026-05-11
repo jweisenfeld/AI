@@ -589,29 +589,144 @@ def format_vector(v: list[float]) -> str:
     return "[" + ",".join(f"{x:.8f}" for x in v) + "]"
 
 
+# ── Auto-inference helpers ────────────────────────────────────────────────────
+
+_SUBJECT_KEYWORDS = [
+    "physics", "economics", "math", "mathematics", "english", "history",
+    "science", "chemistry", "biology", "humanities", "social studies",
+    "all-staff", "all staff", "admin", "hr", "budget", "operations",
+]
+
+_DOCTYPE_PATTERNS = [
+    (["notes", "minutes", "agenda"],                    "meeting_notes"),
+    (["policy", "policies", "handbook", "guidelines"],  "policy"),
+    (["lesson", "slides", "presentation", "deck"],      "lesson_plan"),
+]
+
+
+def _get_file_author(path: Path) -> str | None:
+    """Read the author/creator from Office or PDF file metadata."""
+    suffix = path.suffix.lower()
+    try:
+        if suffix == ".docx":
+            from docx import Document
+            return Document(str(path)).core_properties.author or None
+        if suffix == ".pptx":
+            from pptx import Presentation
+            return Presentation(str(path)).core_properties.author or None
+        if suffix == ".xlsx":
+            import openpyxl
+            wb = openpyxl.load_workbook(str(path), read_only=True)
+            author = wb.properties.creator
+            wb.close()
+            return author or None
+        if suffix == ".pdf":
+            import pdfplumber
+            with pdfplumber.open(str(path)) as pdf:
+                meta = pdf.metadata or {}
+                return meta.get("Author") or meta.get("Creator") or None
+    except Exception:
+        pass
+    return None
+
+
+def auto_infer_metadata(path: Path) -> dict:
+    """
+    Infer document metadata from path, filename, file mtime, and embedded metadata.
+    Returns only the fields that could be determined with reasonable confidence.
+    """
+    name_lower = path.name.lower()
+    suffix = path.suffix.lower()
+    path_lower = str(path).lower()
+    inferred: dict = {}
+
+    # doc_type: extension takes priority, then filename keywords
+    if suffix == ".msg":
+        inferred["doc_type"] = "email"
+    elif suffix == ".pptx" or any(k in name_lower for k in ("presentation", "slides", "deck")):
+        inferred["doc_type"] = "meeting_notes" if any(k in name_lower for k in ("meeting", "notes", "minutes")) else "lesson_plan"
+    else:
+        for keywords, dtype in _DOCTYPE_PATTERNS:
+            if any(k in name_lower for k in keywords):
+                inferred["doc_type"] = dtype
+                break
+
+    # subject: scan the full path for known subject/department keywords
+    for kw in _SUBJECT_KEYWORDS:
+        if kw in path_lower:
+            inferred["subject"] = kw.title().replace(" ", "-") if "-" not in kw else kw.title()
+            break
+
+    # school_year: derive from file modification time
+    try:
+        mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+        year = detect_school_year(mtime)
+        if year:
+            inferred["school_year"] = year
+    except Exception:
+        pass
+
+    # teacher: read from embedded file metadata (Office core properties / PDF metadata)
+    author = _get_file_author(path)
+    if author and author.strip():
+        inferred["teacher"] = author.strip()
+
+    # unit: filename stem is a reasonable default topic label
+    clean_stem = re.sub(r"[-_]+", " ", path.stem).strip()
+    if clean_stem:
+        inferred["unit"] = clean_stem
+
+    return inferred
+
+
 # ── Interactive metadata prompt ───────────────────────────────────────────────
 
-def prompt_metadata(filename: str) -> dict:
-    print(f"\n  Metadata for: {filename}")
-    print("  (Press Enter to skip any field)\n")
+def prompt_metadata(filename: str, defaults: dict | None = None) -> dict:
+    """
+    Prompt interactively for any metadata fields not already in `defaults`.
+    Auto-detected values are shown in brackets — press Enter to accept them.
+    """
+    defaults = defaults or {}
+    missing = [k for k in ("subject", "school_year", "teacher", "doc_type", "unit")
+               if not defaults.get(k)]
 
-    def ask(prompt, options=None):
-        if options:
+    if not missing:
+        # Everything was auto-detected — show a summary and confirm
+        print(f"\n  Auto-detected metadata for: {filename}")
+        for k in ("subject", "school_year", "teacher", "doc_type", "unit"):
+            print(f"    {k}: {defaults.get(k) or '—'}")
+        confirm = input("\n  Accept? [Y/n]: ").strip().lower()
+        if confirm in ("", "y", "yes"):
+            return {**defaults, "notes": None}
+        # Fall through to let the user edit
+        missing = ["subject", "school_year", "teacher", "doc_type", "unit"]
+
+    print(f"\n  Metadata for: {filename}  (Enter = accept auto-detected value)")
+
+    def ask(label, key, options=None):
+        current = defaults.get(key)
+        hint = f" [{current}]" if current else ""
+        if options and not current:
             print(f"     Options: {', '.join(options)}")
-        value = input(f"  {prompt}: ").strip()
-        return value if value else None
+        value = input(f"  {label}{hint}: ").strip()
+        return value if value else current
 
-    subject     = ask("Subject (e.g. Economics, Physics, All-Staff)")
-    school_year = ask("School year (e.g. 2025-26, pre-opening)")
-    teacher     = ask("Teacher/author (e.g. Weisenfeld)")
-    doc_type    = ask("Document type", ["lesson_plan", "meeting_notes", "policy", "email", "other"])
+    subject     = ask("Subject (e.g. Physics, Economics, All-Staff)", "subject")
+    school_year = ask("School year (e.g. 2025-26, pre-opening)",       "school_year")
+    teacher     = ask("Teacher/author (e.g. Weisenfeld)",              "teacher")
+    doc_type    = ask("Document type", "doc_type",
+                      ["lesson_plan", "meeting_notes", "policy", "email", "other"])
     if doc_type and doc_type not in ("lesson_plan", "meeting_notes", "policy", "email", "other"):
         doc_type = "other"
-    unit  = ask("Unit/topic (e.g. Supply and Demand)")
-    notes = ask("Any notes about this document")
+    unit = ask("Unit/topic", "unit")
+
     return {
-        "subject": subject, "school_year": school_year, "teacher": teacher,
-        "doc_type": doc_type or "other", "unit": unit, "notes": notes,
+        "subject":     subject,
+        "school_year": school_year,
+        "teacher":     teacher,
+        "doc_type":    doc_type or defaults.get("doc_type") or "other",
+        "unit":        unit,
+        "notes":       None,
     }
 
 
@@ -670,19 +785,21 @@ def ingest_file(path: Path, metadata: dict | None = None,
         token_count = len(get_tokenizer().encode(raw_text))
         print(f"  Extracted {token_count:,} tokens")
 
-        # 3. Resolve metadata: auto_meta fills gaps in CLI metadata
+        # 3. Resolve metadata
+        #    Priority: CLI flags > auto_meta (from .msg headers) > file-based inference
+        inferred = auto_infer_metadata(path)
+        # auto_meta (from .msg) is authoritative for emails; merge into inferred
+        for key, val in auto_meta.items():
+            if val:
+                inferred[key] = val
+
         if metadata is None:
-            if path.suffix.lower() == ".msg" and auto_meta:
-                resolved = {
-                    "subject": None, "school_year": auto_meta.get("school_year"),
-                    "teacher": auto_meta.get("teacher"), "doc_type": "email",
-                    "unit": None, "notes": auto_meta.get("notes"),
-                }
-            else:
-                resolved = prompt_metadata(path.name)
+            # Interactive mode — prompt only for fields we couldn't determine
+            resolved = prompt_metadata(path.name, defaults=inferred)
         else:
+            # Batch/CLI mode — fill gaps silently, no prompting
             resolved = dict(metadata)
-            for key, val in auto_meta.items():
+            for key, val in inferred.items():
                 if not resolved.get(key):
                     resolved[key] = val
 

@@ -52,7 +52,9 @@
       "Bash(__NEW_LINE_7a1eb7637cf098cd__ python:*)",
       "Bash(__NEW_LINE_e204c7bc039264dd__ python:*)",
       "Bash(__NEW_LINE_1d1d1825fe2dc1c6__ python:*)",
-      "Bash(powershell -Command \"Add-Type -AssemblyName PresentationFramework; Write-Host ''wpf ok''\")"
+      "Bash(powershell -Command \"Add-Type -AssemblyName PresentationFramework; Write-Host ''wpf ok''\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\johnw\\\\Documents\\\\GitHub\\\\AI\\\\claude\" -Force)",
+      "Bash(Select-Object Name, Attributes)"
     ]
   }
 }

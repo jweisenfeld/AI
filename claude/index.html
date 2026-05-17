@@ -1071,6 +1071,10 @@
             if (IS_UNLIMITED) {
                 const opusBtn = document.querySelector('.model-btn[data-model="opus"]');
                 if (opusBtn) opusBtn.title = 'Unlimited — Opus available for entire conversation';
+                // Apply saved model preference, defaulting to Opus for unlimited users
+                const savedModel = localStorage.getItem('claude_model_' + id) || 'opus';
+                const modelBtn = document.querySelector('.model-btn[data-model="' + savedModel + '"]');
+                if (modelBtn && !modelBtn.disabled) selectModel(modelBtn);
             }
         }
 
@@ -1224,6 +1228,9 @@
             document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             currentModel = btn.dataset.model;
+            if (IS_UNLIMITED && STUDENT_ID) {
+                localStorage.setItem('claude_model_' + STUDENT_ID, currentModel);
+            }
         }
 
         // ============================================

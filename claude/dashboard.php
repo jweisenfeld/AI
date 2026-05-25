@@ -405,7 +405,7 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
 
         let currentSort = {};
 
-        // Pricing per 1M tokens — updated 2026-02-20 from platform.claude.com/docs/en/about-claude/pricing
+        // Pricing per 1M tokens — updated 2026-05-24 from platform.claude.com/docs/en/about-claude/pricing
         const COSTS = {
             'claude-haiku-4-5-20251001': { input: 1.00,  output: 5.00 },
             'claude-haiku-4-5':          { input: 1.00,  output: 5.00 },
@@ -415,6 +415,7 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
             'claude-sonnet-4-5-20250929':{ input: 3.00,  output: 15.00 },
             'claude-sonnet-4-5':         { input: 3.00,  output: 15.00 },
             'claude-sonnet-4-20250514':  { input: 3.00,  output: 15.00 },
+            'claude-opus-4-7':           { input: 5.00,  output: 25.00 },
             'claude-opus-4-6':           { input: 5.00,  output: 25.00 },
             'claude-opus-4-5-20251101':  { input: 5.00,  output: 25.00 },
             'claude-opus-4-5':           { input: 5.00,  output: 25.00 },

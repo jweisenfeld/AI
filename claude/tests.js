@@ -558,7 +558,7 @@ runTest('opus pricing reflects current 4.5/4.6 rates (not old 3.x/4.0)', () => {
 runTest('all primary models use current generation IDs', () => {
     assertContains('haiku-4-5', modelConfig.tiers.haiku.primary, 'Haiku primary should be 4.5 series');
     assertContains('sonnet-4-6', modelConfig.tiers.sonnet.primary, 'Sonnet primary should be 4.6');
-    assertContains('opus-4-6', modelConfig.tiers.opus.primary, 'Opus primary should be 4.6');
+    assertContains('opus-4-7', modelConfig.tiers.opus.primary, 'Opus primary should be 4.7');
 });
 
 runTest('fallbacks are non-empty for all tiers', () => {
@@ -707,6 +707,7 @@ const COSTS = {
     'claude-sonnet-4-5-20250929':{ input: 3.00,  output: 15.00 },
     'claude-sonnet-4-5':         { input: 3.00,  output: 15.00 },
     'claude-sonnet-4-20250514':  { input: 3.00,  output: 15.00 },
+    'claude-opus-4-7':           { input: 5.00,  output: 25.00 },
     'claude-opus-4-6':           { input: 5.00,  output: 25.00 },
     'claude-opus-4-5-20251101':  { input: 5.00,  output: 25.00 },
     'claude-opus-4-5':           { input: 5.00,  output: 25.00 },
@@ -719,7 +720,12 @@ function estimateCost(model, inputTokens, outputTokens) {
     return (inputTokens / 1e6) * rates.input + (outputTokens / 1e6) * rates.output;
 }
 
-runTest('opus 4.6 cost estimate uses $5/$25 (not old $15/$75)', () => {
+runTest('opus 4.7 primary cost estimate uses $5/$25', () => {
+    const cost = estimateCost('claude-opus-4-7', 1000000, 0);
+    assertEquals(5.00, cost, 'Opus 4.7 1M input tokens should cost $5');
+});
+
+runTest('opus 4.6 fallback cost estimate uses $5/$25 (not old $15/$75)', () => {
     const cost = estimateCost('claude-opus-4-6', 1000000, 0);
     assertEquals(5.00, cost, 'Opus 4.6 1M input tokens should cost $5');
 });
@@ -741,7 +747,7 @@ runTest('unknown model falls back to sonnet pricing', () => {
 
 runTest('cost calculation for typical student session', () => {
     // Jessica-style: 1 Opus request with ~5K input, ~1K output
-    const cost = estimateCost('claude-opus-4-6', 5000, 1000);
+    const cost = estimateCost('claude-opus-4-7', 5000, 1000);
     // (5000/1M)*5 + (1000/1M)*25 = 0.025 + 0.025 = 0.05
     assertTrue(cost < 0.10, `Single Opus question should cost < $0.10 (got $${cost.toFixed(4)})`);
 });

@@ -1,6 +1,6 @@
 {
   "_comment": "Model configuration for Claude API proxy. Updated automatically by update_models.php or manually.",
-  "_updated": "2026-02-20T00:00:00Z",
+  "_updated": "2026-05-24T00:00:00Z",
   "_source": "https://platform.claude.com/docs/en/about-claude/models",
   "tiers": {
     "haiku": {
@@ -27,8 +27,9 @@
       }
     },
     "opus": {
-      "primary": "claude-opus-4-6",
+      "primary": "claude-opus-4-7",
       "fallbacks": [
+        "claude-opus-4-6",
         "claude-opus-4-5-20251101",
         "claude-opus-4-5",
         "claude-opus-4-1-20250805"

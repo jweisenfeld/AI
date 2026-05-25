@@ -311,8 +311,8 @@ function getDefaultConfig(): array
                 'pricing' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00],
             ],
             'opus' => [
-                'primary' => 'claude-opus-4-6',
-                'fallbacks' => ['claude-opus-4-5-20251101', 'claude-opus-4-5', 'claude-opus-4-1-20250805'],
+                'primary' => 'claude-opus-4-7',
+                'fallbacks' => ['claude-opus-4-6', 'claude-opus-4-5-20251101', 'claude-opus-4-5', 'claude-opus-4-1-20250805'],
                 'pricing' => ['input_per_mtok' => 5.00, 'output_per_mtok' => 25.00],
             ],
         ],

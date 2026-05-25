@@ -139,8 +139,8 @@ function loadModelConfig(string $configPath): array
                 'pricing'   => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00],
             ],
             'opus'   => [
-                'primary'   => 'claude-opus-4-6',
-                'fallbacks' => ['claude-opus-4-5-20251101', 'claude-opus-4-5', 'claude-opus-4-1-20250805'],
+                'primary'   => 'claude-opus-4-7',
+                'fallbacks' => ['claude-opus-4-6', 'claude-opus-4-5-20251101', 'claude-opus-4-5', 'claude-opus-4-1-20250805'],
                 'pricing'   => ['input_per_mtok' => 5.00, 'output_per_mtok' => 25.00],
             ],
         ]
@@ -682,7 +682,7 @@ runTest('all primary models use current generation IDs', function() {
     // Should be snapshot or alias IDs, not deprecated models
     assertContains('haiku-4-5', $haikuPrimary, 'Haiku primary should be 4.5 series');
     assertContains('sonnet-4-6', $sonnetPrimary, 'Sonnet primary should be 4.6');
-    assertContains('opus-4-6', $opusPrimary, 'Opus primary should be 4.6');
+    assertContains('opus-4-7', $opusPrimary, 'Opus primary should be 4.7');
 });
 
 runTest('fallbacks are non-empty for all tiers', function() {

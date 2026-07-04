@@ -110,7 +110,7 @@ function isValidTier(string $tier): bool
         }
     }
     // Fallback: check hardcoded tiers
-    return in_array($tier, ['haiku', 'sonnet', 'opus'], true);
+    return in_array($tier, ['haiku', 'sonnet', 'opus', 'fable'], true);
 }
 
 /**
@@ -134,13 +134,18 @@ function loadModelConfig(string $configPath): array
                 'pricing'   => ['input_per_mtok' => 1.00, 'output_per_mtok' => 5.00],
             ],
             'sonnet' => [
-                'primary'   => 'claude-sonnet-4-6',
-                'fallbacks' => ['claude-sonnet-4-5-20250929', 'claude-sonnet-4-5', 'claude-sonnet-4-20250514'],
+                'primary'   => 'claude-sonnet-5',
+                'fallbacks' => ['claude-sonnet-4-6', 'claude-sonnet-4-5-20250929', 'claude-sonnet-4-5', 'claude-sonnet-4-20250514'],
                 'pricing'   => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00],
             ],
             'opus'   => [
-                'primary'   => 'claude-opus-4-7',
-                'fallbacks' => ['claude-opus-4-6', 'claude-opus-4-5-20251101', 'claude-opus-4-5', 'claude-opus-4-1-20250805'],
+                'primary'   => 'claude-opus-4-8',
+                'fallbacks' => ['claude-opus-4-7', 'claude-opus-4-6', 'claude-opus-4-5-20251101', 'claude-opus-4-5', 'claude-opus-4-1-20250805'],
+                'pricing'   => ['input_per_mtok' => 5.00, 'output_per_mtok' => 25.00],
+            ],
+            'fable'  => [
+                'primary'   => 'claude-fable-5',
+                'fallbacks' => [],
                 'pricing'   => ['input_per_mtok' => 5.00, 'output_per_mtok' => 25.00],
             ],
         ]
@@ -244,6 +249,10 @@ runTest('accepts sonnet tier', function() {
 
 runTest('accepts opus tier', function() {
     assertTrue(isValidTier('opus'), 'Opus should be a valid tier');
+});
+
+runTest('accepts fable tier', function() {
+    assertTrue(isValidTier('fable'), 'Fable should be a valid tier');
 });
 
 runTest('rejects invalid tier', function() {
@@ -637,12 +646,13 @@ runTest('model_config.json exists and is valid JSON', function() {
     assertArrayHasKey('tiers', $config, 'Config should have tiers');
 });
 
-runTest('model_config.json has all three tiers', function() {
+runTest('model_config.json has all four tiers', function() {
     $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
     assertArrayHasKey('haiku', $config['tiers'], 'Should have haiku tier');
     assertArrayHasKey('sonnet', $config['tiers'], 'Should have sonnet tier');
     assertArrayHasKey('opus', $config['tiers'], 'Should have opus tier');
-    assertEquals(3, count($config['tiers']), 'Should have exactly 3 tiers');
+    assertArrayHasKey('fable', $config['tiers'], 'Should have fable tier');
+    assertEquals(4, count($config['tiers']), 'Should have exactly 4 tiers');
 });
 
 runTest('each tier has pricing information', function() {
@@ -679,15 +689,20 @@ runTest('all primary models use current generation IDs', function() {
     $haikuPrimary = $config['tiers']['haiku']['primary'];
     $sonnetPrimary = $config['tiers']['sonnet']['primary'];
     $opusPrimary = $config['tiers']['opus']['primary'];
+    $fablePrimary = $config['tiers']['fable']['primary'];
     // Should be snapshot or alias IDs, not deprecated models
     assertContains('haiku-4-5', $haikuPrimary, 'Haiku primary should be 4.5 series');
-    assertContains('sonnet-4-6', $sonnetPrimary, 'Sonnet primary should be 4.6');
-    assertContains('opus-4-7', $opusPrimary, 'Opus primary should be 4.7');
+    assertContains('sonnet-5', $sonnetPrimary, 'Sonnet primary should be 5');
+    assertContains('opus-4-8', $opusPrimary, 'Opus primary should be 4.8');
+    assertContains('fable-5', $fablePrimary, 'Fable primary should be 5');
 });
 
-runTest('fallbacks are non-empty for all tiers', function() {
+runTest('fallbacks are non-empty for all tiers except fable', function() {
+    // Fable has no known-good fallback model ID yet (single-generation model),
+    // so an empty fallback list is intentional rather than an oversight.
     $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
     foreach ($config['tiers'] as $tier => $info) {
+        if ($tier === 'fable') continue;
         assertTrue(count($info['fallbacks']) >= 1, "{$tier} should have at least 1 fallback");
     }
 });
@@ -706,7 +721,7 @@ runTest('hardcoded fallback matches model_config.json', function() {
     // Load hardcoded fallback (by passing a nonexistent path)
     $hardcoded = loadModelConfig('/nonexistent/path');
 
-    foreach (['haiku', 'sonnet', 'opus'] as $tier) {
+    foreach (['haiku', 'sonnet', 'opus', 'fable'] as $tier) {
         assertEquals(
             $fileConfig['tiers'][$tier]['primary'],
             $hardcoded['tiers'][$tier]['primary'],
@@ -780,6 +795,45 @@ runTest('non-opus model not affected by restriction', function() {
     }
     assertEquals('sonnet', $model, 'Sonnet should remain sonnet');
     assertFalse($opusDowngraded, 'Should not flag downgrade for non-opus');
+});
+
+// --- Fable First-Exchange Restriction Tests ---
+echo "\nFable First-Exchange Restriction:\n";
+
+runTest('fable allowed on first message (msg_count == 1)', function() {
+    $model = 'fable';
+    $messageCount = 1;
+    $fableDowngraded = false;
+    if ($model === 'fable' && $messageCount > 1) {
+        $model = 'sonnet';
+        $fableDowngraded = true;
+    }
+    assertEquals('fable', $model, 'Fable should be allowed on first message');
+    assertFalse($fableDowngraded, 'Should not be downgraded on first message');
+});
+
+runTest('fable downgraded on second exchange (msg_count == 3)', function() {
+    $model = 'fable';
+    $messageCount = 3;
+    $fableDowngraded = false;
+    if ($model === 'fable' && $messageCount > 1) {
+        $model = 'sonnet';
+        $fableDowngraded = true;
+    }
+    assertEquals('sonnet', $model, 'Fable should be downgraded to sonnet after first exchange');
+    assertTrue($fableDowngraded, 'fableDowngraded flag should be set');
+});
+
+runTest('non-fable model not affected by fable restriction', function() {
+    $model = 'sonnet';
+    $messageCount = 25;
+    $fableDowngraded = false;
+    if ($model === 'fable' && $messageCount > 1) {
+        $model = 'sonnet';
+        $fableDowngraded = true;
+    }
+    assertEquals('sonnet', $model, 'Sonnet should remain sonnet');
+    assertFalse($fableDowngraded, 'Should not flag downgrade for non-fable');
 });
 
 // --- Conversation Length Cap Tests ---

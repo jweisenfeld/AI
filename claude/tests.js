@@ -78,7 +78,7 @@ function hasImages(messages) {
  * Validate model tier name
  */
 function isValidTier(tier) {
-    const validTiers = ['haiku', 'sonnet', 'opus'];
+    const validTiers = ['haiku', 'sonnet', 'opus', 'fable'];
     return validTiers.includes(tier);
 }
 
@@ -523,11 +523,12 @@ runTest('model_config.json exists and is valid JSON', () => {
     assertArrayHasKey('tiers', modelConfig, 'Config should have tiers');
 });
 
-runTest('model_config.json has all three tiers', () => {
+runTest('model_config.json has all four tiers', () => {
     assertArrayHasKey('haiku', modelConfig.tiers, 'Should have haiku tier');
     assertArrayHasKey('sonnet', modelConfig.tiers, 'Should have sonnet tier');
     assertArrayHasKey('opus', modelConfig.tiers, 'Should have opus tier');
-    assertEquals(3, Object.keys(modelConfig.tiers).length, 'Should have exactly 3 tiers');
+    assertArrayHasKey('fable', modelConfig.tiers, 'Should have fable tier');
+    assertEquals(4, Object.keys(modelConfig.tiers).length, 'Should have exactly 4 tiers');
 });
 
 runTest('each tier has pricing information', () => {
@@ -557,12 +558,15 @@ runTest('opus pricing reflects current 4.5/4.6 rates (not old 3.x/4.0)', () => {
 
 runTest('all primary models use current generation IDs', () => {
     assertContains('haiku-4-5', modelConfig.tiers.haiku.primary, 'Haiku primary should be 4.5 series');
-    assertContains('sonnet-4-6', modelConfig.tiers.sonnet.primary, 'Sonnet primary should be 4.6');
-    assertContains('opus-4-7', modelConfig.tiers.opus.primary, 'Opus primary should be 4.7');
+    assertContains('sonnet-5', modelConfig.tiers.sonnet.primary, 'Sonnet primary should be 5');
+    assertContains('opus-4-8', modelConfig.tiers.opus.primary, 'Opus primary should be 4.8');
+    assertContains('fable-5', modelConfig.tiers.fable.primary, 'Fable primary should be 5');
 });
 
-runTest('fallbacks are non-empty for all tiers', () => {
+runTest('fallbacks are non-empty for all tiers except fable', () => {
+    // Fable has no known-good fallback model ID yet (single-generation model).
     for (const [tier, info] of Object.entries(modelConfig.tiers)) {
+        if (tier === 'fable') continue;
         assertTrue(info.fallbacks.length >= 1, `${tier} should have at least 1 fallback`);
     }
 });
@@ -626,6 +630,45 @@ runTest('non-opus model not affected by restriction', () => {
     }
     assertEquals('sonnet', model, 'Sonnet should remain sonnet');
     assertFalse(opusDowngraded, 'Should not flag downgrade for non-opus');
+});
+
+// --- Fable First-Exchange Restriction Tests ---
+console.log('\nFable First-Exchange Restriction:');
+
+runTest('fable allowed on first message (msg_count == 1)', () => {
+    let model = 'fable';
+    const messageCount = 1;
+    let fableDowngraded = false;
+    if (model === 'fable' && messageCount > 1) {
+        model = 'sonnet';
+        fableDowngraded = true;
+    }
+    assertEquals('fable', model, 'Fable should be allowed on first message');
+    assertFalse(fableDowngraded, 'Should not be downgraded on first message');
+});
+
+runTest('fable downgraded on second exchange (msg_count == 3)', () => {
+    let model = 'fable';
+    const messageCount = 3;
+    let fableDowngraded = false;
+    if (model === 'fable' && messageCount > 1) {
+        model = 'sonnet';
+        fableDowngraded = true;
+    }
+    assertEquals('sonnet', model, 'Fable should be downgraded to sonnet after first exchange');
+    assertTrue(fableDowngraded, 'fableDowngraded flag should be set');
+});
+
+runTest('non-fable model not affected by fable restriction', () => {
+    let model = 'sonnet';
+    const messageCount = 25;
+    let fableDowngraded = false;
+    if (model === 'fable' && messageCount > 1) {
+        model = 'sonnet';
+        fableDowngraded = true;
+    }
+    assertEquals('sonnet', model, 'Sonnet should remain sonnet');
+    assertFalse(fableDowngraded, 'Should not flag downgrade for non-fable');
 });
 
 // --- Conversation Length Cap Tests ---
@@ -703,16 +746,20 @@ const COSTS = {
     'claude-haiku-4-5':          { input: 1.00,  output: 5.00 },
     'claude-3-haiku-20240307':   { input: 0.25,  output: 1.25 },
     'claude-haiku-3-5-20241022': { input: 0.80,  output: 4.00 },
+    'claude-sonnet-5':           { input: 3.00,  output: 15.00 },
     'claude-sonnet-4-6':         { input: 3.00,  output: 15.00 },
     'claude-sonnet-4-5-20250929':{ input: 3.00,  output: 15.00 },
     'claude-sonnet-4-5':         { input: 3.00,  output: 15.00 },
     'claude-sonnet-4-20250514':  { input: 3.00,  output: 15.00 },
+    'claude-opus-4-8':           { input: 5.00,  output: 25.00 },
     'claude-opus-4-7':           { input: 5.00,  output: 25.00 },
     'claude-opus-4-6':           { input: 5.00,  output: 25.00 },
     'claude-opus-4-5-20251101':  { input: 5.00,  output: 25.00 },
     'claude-opus-4-5':           { input: 5.00,  output: 25.00 },
     'claude-opus-4-1-20250805':  { input: 15.00, output: 75.00 },
     'claude-opus-4-20250514':    { input: 15.00, output: 75.00 },
+    // Placeholder rate — confirm real pricing, matched to Opus for now.
+    'claude-fable-5':            { input: 5.00,  output: 25.00 },
 };
 
 function estimateCost(model, inputTokens, outputTokens) {

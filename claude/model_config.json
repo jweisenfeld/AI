@@ -1,6 +1,6 @@
 {
   "_comment": "Model configuration for Claude API proxy. Updated automatically by update_models.php or manually.",
-  "_updated": "2026-05-24T00:00:00Z",
+  "_updated": "2026-07-03T00:00:00Z",
   "_source": "https://platform.claude.com/docs/en/about-claude/models",
   "tiers": {
     "haiku": {
@@ -15,8 +15,9 @@
       }
     },
     "sonnet": {
-      "primary": "claude-sonnet-4-6",
+      "primary": "claude-sonnet-5",
       "fallbacks": [
+        "claude-sonnet-4-6",
         "claude-sonnet-4-5-20250929",
         "claude-sonnet-4-5",
         "claude-sonnet-4-20250514"
@@ -27,13 +28,23 @@
       }
     },
     "opus": {
-      "primary": "claude-opus-4-7",
+      "primary": "claude-opus-4-8",
       "fallbacks": [
+        "claude-opus-4-7",
         "claude-opus-4-6",
         "claude-opus-4-5-20251101",
         "claude-opus-4-5",
         "claude-opus-4-1-20250805"
       ],
+      "pricing": {
+        "input_per_mtok": 5.00,
+        "output_per_mtok": 25.00
+      }
+    },
+    "fable": {
+      "_comment": "Pricing is a placeholder (matched to Opus) — confirm real per-token rate before relying on dashboard cost totals.",
+      "primary": "claude-fable-5",
+      "fallbacks": [],
       "pricing": {
         "input_per_mtok": 5.00,
         "output_per_mtok": 25.00

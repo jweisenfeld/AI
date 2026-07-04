@@ -243,6 +243,7 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
         .bar-fill.haiku { background: var(--success); }
         .bar-fill.sonnet { background: var(--accent); }
         .bar-fill.opus { background: var(--danger); }
+        .bar-fill.fable { background: var(--accent2); }
         .bar-fill.default { background: var(--blue); }
 
         /* Cost estimate */
@@ -405,22 +406,26 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
 
         let currentSort = {};
 
-        // Pricing per 1M tokens — updated 2026-05-24 from platform.claude.com/docs/en/about-claude/pricing
+        // Pricing per 1M tokens — updated 2026-07-03 from platform.claude.com/docs/en/about-claude/pricing
         const COSTS = {
             'claude-haiku-4-5-20251001': { input: 1.00,  output: 5.00 },
             'claude-haiku-4-5':          { input: 1.00,  output: 5.00 },
             'claude-3-haiku-20240307':   { input: 0.25,  output: 1.25 },
             'claude-haiku-3-5-20241022': { input: 0.80,  output: 4.00 },
+            'claude-sonnet-5':           { input: 3.00,  output: 15.00 },
             'claude-sonnet-4-6':         { input: 3.00,  output: 15.00 },
             'claude-sonnet-4-5-20250929':{ input: 3.00,  output: 15.00 },
             'claude-sonnet-4-5':         { input: 3.00,  output: 15.00 },
             'claude-sonnet-4-20250514':  { input: 3.00,  output: 15.00 },
+            'claude-opus-4-8':           { input: 5.00,  output: 25.00 },
             'claude-opus-4-7':           { input: 5.00,  output: 25.00 },
             'claude-opus-4-6':           { input: 5.00,  output: 25.00 },
             'claude-opus-4-5-20251101':  { input: 5.00,  output: 25.00 },
             'claude-opus-4-5':           { input: 5.00,  output: 25.00 },
             'claude-opus-4-1-20250805':  { input: 15.00, output: 75.00 },
             'claude-opus-4-20250514':    { input: 15.00, output: 75.00 },
+            // Placeholder rate — confirm real pricing, matched to Opus for now.
+            'claude-fable-5':            { input: 5.00,  output: 25.00 },
         };
 
         function estimateCost(model, inputTokens, outputTokens) {
@@ -604,7 +609,7 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
             document.getElementById('model-chart').innerHTML = Object.entries(byModel)
                 .sort((a, b) => b[1].cost - a[1].cost)
                 .map(([model, d]) => {
-                    const tier = model.includes('haiku') ? 'haiku' : model.includes('opus') ? 'opus' : 'sonnet';
+                    const tier = model.includes('haiku') ? 'haiku' : model.includes('opus') ? 'opus' : model.includes('fable') ? 'fable' : 'sonnet';
                     return `<div class="bar-row">
                         <div class="bar-label" style="min-width:200px; font-size:0.8rem">${model}</div>
                         <div class="bar-track">

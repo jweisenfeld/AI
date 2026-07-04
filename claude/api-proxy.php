@@ -345,6 +345,20 @@ if ($requestData['model'] === 'opus' && $messageCount > 1 && !$isUnlimitedUser) 
     $opusDowngraded = true;
 }
 
+// ============================================
+// FABLE: FIRST EXCHANGE ONLY (waived for unlimited users)
+// ============================================
+// Same one-time-treat pattern as Opus above: Fable is allowed only on the
+// first message of a conversation, then the server downgrades to Sonnet.
+// Note: this only limits which model answers — the TopicLock content
+// constraint (see below) still applies, so a tutor-locked student picking
+// Fable still gets redirected away from creative writing/roleplay.
+$fableDowngraded = false;
+if ($requestData['model'] === 'fable' && $messageCount > 1 && !$isUnlimitedUser) {
+    $requestData['model'] = 'sonnet';
+    $fableDowngraded = true;
+}
+
 // Load model config from JSON file (with hardcoded fallback)
 $configPath = __DIR__ . '/model_config.json';
 $config = loadModelConfig($configPath);
@@ -455,6 +469,9 @@ if (isset($modelDowngraded) && $modelDowngraded) {
 if ($opusDowngraded) {
     $logEntry['opus_downgraded'] = true;
 }
+if ($fableDowngraded) {
+    $logEntry['fable_downgraded'] = true;
+}
 
 // --- Make API call with auto-healing fallback ---
 list($httpCode, $response, $curlError) = callAnthropicApi($apiRequest, $ANTHROPIC_API_KEY);
@@ -542,6 +559,11 @@ if (isset($modelDowngraded) && $modelDowngraded && is_array($responseData)) {
 if ($opusDowngraded && is_array($responseData)) {
     $responseData['_opus_limited'] = true;
     $responseData['_notice'] = 'Opus is available for your first message only. Switched to Sonnet for follow-ups. Clear chat to use Opus again.';
+    $response = json_encode($responseData);
+}
+if ($fableDowngraded && is_array($responseData)) {
+    $responseData['_fable_limited'] = true;
+    $responseData['_notice'] = 'Fable is available for your first message only. Switched to Sonnet for follow-ups. Clear chat to use Fable again.';
     $response = json_encode($responseData);
 }
 
@@ -696,7 +718,7 @@ function loadModelConfig(string $configPath): array
     }
     // Hardcoded fallback if JSON is missing/corrupt.
     // Keep in sync with model_config.json and update_models.php
-    // Last verified: 2026-02-20 from https://platform.claude.com/docs/en/about-claude/models
+    // Last verified: 2026-07-03 from https://platform.claude.com/docs/en/about-claude/models
     return [
         'tiers' => [
             'haiku'  => [
@@ -705,13 +727,18 @@ function loadModelConfig(string $configPath): array
                 'pricing'   => ['input_per_mtok' => 1.00, 'output_per_mtok' => 5.00],
             ],
             'sonnet' => [
-                'primary'   => 'claude-sonnet-4-6',
-                'fallbacks' => ['claude-sonnet-4-5-20250929', 'claude-sonnet-4-5', 'claude-sonnet-4-20250514'],
+                'primary'   => 'claude-sonnet-5',
+                'fallbacks' => ['claude-sonnet-4-6', 'claude-sonnet-4-5-20250929', 'claude-sonnet-4-5', 'claude-sonnet-4-20250514'],
                 'pricing'   => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00],
             ],
             'opus'   => [
-                'primary'   => 'claude-opus-4-7',
-                'fallbacks' => ['claude-opus-4-6', 'claude-opus-4-5-20251101', 'claude-opus-4-5', 'claude-opus-4-1-20250805'],
+                'primary'   => 'claude-opus-4-8',
+                'fallbacks' => ['claude-opus-4-7', 'claude-opus-4-6', 'claude-opus-4-5-20251101', 'claude-opus-4-5', 'claude-opus-4-1-20250805'],
+                'pricing'   => ['input_per_mtok' => 5.00, 'output_per_mtok' => 25.00],
+            ],
+            'fable'  => [
+                'primary'   => 'claude-fable-5',
+                'fallbacks' => [],
                 'pricing'   => ['input_per_mtok' => 5.00, 'output_per_mtok' => 25.00],
             ],
         ]

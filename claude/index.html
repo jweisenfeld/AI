@@ -891,7 +891,7 @@
                 </div>
                 <div class="feature-item" data-feature="models" onclick="selectFeature('models')">
                     <h3>Model Selection</h3>
-                    <p>Choose between Opus, Sonnet, and Haiku</p>
+                    <p>Choose between Opus, Sonnet, Haiku, and Fable</p>
                 </div>
                 <div class="feature-item" data-feature="temperature" onclick="selectFeature('temperature')">
                     <h3>Temperature Control</h3>
@@ -961,6 +961,10 @@
                     <button class="model-btn" data-model="opus" onclick="selectModel(this)" title="Best for physics screenshots &amp; tough questions. Available for first message only.">
                         <span class="model-name">Opus</span>
                         <span class="model-desc">Best - $$$</span>
+                    </button>
+                    <button class="model-btn" data-model="fable" onclick="selectModel(this)" title="Creative storytelling model. Available for first message only.">
+                        <span class="model-name">Fable</span>
+                        <span class="model-desc">Creative - $$$</span>
                     </button>
                 </div>
                 <div class="settings-row">
@@ -1071,6 +1075,8 @@
             if (IS_UNLIMITED) {
                 const opusBtn = document.querySelector('.model-btn[data-model="opus"]');
                 if (opusBtn) opusBtn.title = 'Unlimited — Opus available for entire conversation';
+                const fableBtn = document.querySelector('.model-btn[data-model="fable"]');
+                if (fableBtn) fableBtn.title = 'Unlimited — Fable available for entire conversation';
                 // Apply saved model preference, defaulting to Opus for unlimited users
                 const savedModel = localStorage.getItem('claude_model_' + id) || 'opus';
                 const modelBtn = document.querySelector('.model-btn[data-model="' + savedModel + '"]');
@@ -1164,7 +1170,7 @@
             },
             models: {
                 title: 'Model Selection',
-                description: 'Choose the right model for your task: Haiku (fastest, cheapest), Sonnet (balanced), or Opus (most capable).',
+                description: 'Choose the right model for your task: Haiku (fastest, cheapest), Sonnet (balanced), Opus (most capable), or Fable (creative storytelling).',
                 prompt: 'Switch models above and ask the same question to compare responses.'
             },
             temperature: {
@@ -1429,6 +1435,12 @@
                 if (!IS_UNLIMITED && (data._opus_limited || messages.length > 1)) {
                     disableOpusButton();
                     showTip('opus-limited', 'Opus is available for your first message only. Click <strong>Clear Chat</strong> or refresh the page to start a new Opus session.');
+                }
+
+                // Gray out Fable after first exchange (server enforces too) — skip for unlimited users
+                if (!IS_UNLIMITED && (data._fable_limited || messages.length > 1)) {
+                    disableFableButton();
+                    showTip('fable-limited', 'Fable is available for your first message only. Click <strong>Clear Chat</strong> or refresh the page to start a new Fable session.');
                 }
 
                 // Warn if conversation is getting long (cap is 50 messages server-side)
@@ -1713,6 +1725,7 @@
             sessionTokens = { total: 0, lastInput: 0, lastOutput: 0 };
             updateTokenDisplay();
             enableOpusButton();
+            enableFableButton();
             clearAllTips();
             shownTips.clear();
         }
@@ -1739,6 +1752,31 @@
                 opusBtn.style.opacity = '1';
                 opusBtn.style.cursor = 'pointer';
                 opusBtn.title = 'Best for physics screenshots & tough questions. Available for first message only.';
+            }
+        }
+
+        function disableFableButton() {
+            const fableBtn = document.querySelector('.model-btn[data-model="fable"]');
+            if (fableBtn) {
+                fableBtn.disabled = true;
+                fableBtn.style.opacity = '0.4';
+                fableBtn.style.cursor = 'not-allowed';
+                fableBtn.title = 'Fable is for your first message only. Click "Clear Chat" or refresh the page to start a new Fable session.';
+                // If Fable was active, switch to Haiku
+                if (currentModel === 'fable') {
+                    const haikuBtn = document.querySelector('.model-btn[data-model="haiku"]');
+                    if (haikuBtn) selectModel(haikuBtn);
+                }
+            }
+        }
+
+        function enableFableButton() {
+            const fableBtn = document.querySelector('.model-btn[data-model="fable"]');
+            if (fableBtn) {
+                fableBtn.disabled = false;
+                fableBtn.style.opacity = '1';
+                fableBtn.style.cursor = 'pointer';
+                fableBtn.title = 'Creative storytelling model. Available for first message only.';
             }
         }
 

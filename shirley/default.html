@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily Psalms &amp; Proverbs</title>
+<style>
+  :root {
+    --bg: #faf7f0;
+    --card: #ffffff;
+    --ink: #2b2721;
+    --muted: #7a7166;
+    --accent: #8a6d3b;
+    --rule: #e6ded0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1815;
+      --card: #232019;
+      --ink: #ece6db;
+      --muted: #9c9385;
+      --accent: #cfa96a;
+      --rule: #3a352c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 2rem 1rem 4rem;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+    line-height: 1.65;
+  }
+  .wrap { max-width: 46rem; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 2rem; }
+  h1 {
+    font-size: 1.9rem;
+    font-weight: normal;
+    letter-spacing: .02em;
+    margin: 0 0 .35rem;
+  }
+  .date { color: var(--muted); font-size: .95rem; }
+
+  .streak {
+    display: inline-flex;
+    align-items: baseline;
+    gap: .5rem;
+    margin-top: 1rem;
+    padding: .5rem 1.1rem;
+    border: 1px solid var(--rule);
+    border-radius: 2rem;
+    background: var(--card);
+  }
+  .streak .num { font-size: 1.5rem; color: var(--accent); }
+  .streak .lbl { font-size: .85rem; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+
+  section {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: .5rem;
+    padding: 1.5rem 1.75rem;
+    margin-bottom: 1.5rem;
+  }
+  h2 {
+    font-size: 1.25rem;
+    font-weight: normal;
+    margin: 0 0 1rem;
+    padding-bottom: .5rem;
+    border-bottom: 1px solid var(--rule);
+    color: var(--accent);
+  }
+  .meditation { border-left: 4px solid var(--accent); }
+  .meditation h2 { border-bottom: none; padding-bottom: 0; }
+  .meditation p {
+    font-size: 1.2rem;
+    font-style: italic;
+    margin: 0;
+  }
+  .meditation cite {
+    display: block;
+    margin-top: .75rem;
+    font-style: normal;
+    font-size: .9rem;
+    color: var(--muted);
+    letter-spacing: .05em;
+  }
+
+  .verse { margin: 0 0 .55rem; }
+  .verse .n {
+    font-size: .7rem;
+    color: var(--accent);
+    vertical-align: super;
+    margin-right: .3rem;
+    font-family: system-ui, sans-serif;
+  }
+  .verse i { color: var(--muted); font-style: italic; }
+
+  .note { color: var(--muted); font-size: .9rem; font-style: italic; }
+  footer { text-align: center; color: var(--muted); font-size: .8rem; margin-top: 2rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Daily Psalms &amp; Proverbs</h1>
+    <div class="date" id="today"></div>
+    <div class="streak">
+      <span class="num" id="streak-num">–</span>
+      <span class="lbl" id="streak-lbl">day streak</span>
+    </div>
+  </header>
+
+  <main id="content"></main>
+
+  <footer>King James Version &middot; public domain</footer>
+</div>
+
+<script src="bible-data.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var now = new Date();
+
+  /* ---------- 0. Streak (stored in a cookie) ---------- */
+
+  function ymd(d) {
+    return d.getFullYear() + "-" +
+           String(d.getMonth() + 1).padStart(2, "0") + "-" +
+           String(d.getDate()).padStart(2, "0");
+  }
+
+  function readCookie(name) {
+    var parts = document.cookie.split("; ");
+    for (var i = 0; i < parts.length; i++) {
+      var eq = parts[i].indexOf("=");
+      if (parts[i].slice(0, eq) === name) return decodeURIComponent(parts[i].slice(eq + 1));
+    }
+    return null;
+  }
+
+  function writeCookie(name, value, days) {
+    var exp = new Date(now.getTime() + days * 86400000);
+    document.cookie = name + "=" + encodeURIComponent(value) +
+      "; expires=" + exp.toUTCString() + "; path=/; SameSite=Lax";
+  }
+
+  function updateStreak() {
+    var today = ymd(now);
+    var yesterday = ymd(new Date(now.getTime() - 86400000));
+    var stored = readCookie("shirley_streak");   // format: "count|YYYY-MM-DD"
+    var count = 1;
+
+    if (stored) {
+      var bits = stored.split("|");
+      var prevCount = parseInt(bits[0], 10);
+      var prevDate = bits[1];
+      if (isNaN(prevCount) || prevCount < 1) prevCount = 1;
+
+      if (prevDate === today) {
+        count = prevCount;            // already visited today
+      } else if (prevDate === yesterday) {
+        count = prevCount + 1;        // consecutive day
+      }                               // otherwise the streak resets to 1
+    }
+
+    writeCookie("shirley_streak", count + "|" + today, 400);
+    return count;
+  }
+
+  var streak = updateStreak();
+  document.getElementById("streak-num").textContent = streak;
+  document.getElementById("streak-lbl").textContent = (streak === 1 ? "day" : "days") + " in a row";
+
+  /* ---------- 1. N = day of month, M = day of year ---------- */
+
+  var N = now.getDate();
+  var startOfYear = new Date(now.getFullYear(), 0, 1);
+  var M = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - startOfYear) / 86400000) + 1;
+
+  document.getElementById("today").textContent =
+    now.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" }) +
+    " · day " + M + " of the year";
+
+  /* ---------- text helpers ---------- */
+
+  // The KJV source marks translator-supplied words with {curly braces}.
+  function markup(text) {
+    var div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML.replace(/\{([^}]*)\}/g, "<i>$1</i>");
+  }
+
+  function chapterSection(title, verses, subtitle) {
+    var sec = document.createElement("section");
+    var h = document.createElement("h2");
+    h.textContent = title;
+    sec.appendChild(h);
+    if (subtitle) {
+      var s = document.createElement("p");
+      s.className = "note";
+      s.textContent = subtitle;
+      sec.appendChild(s);
+    }
+    verses.forEach(function (v, i) {
+      var p = document.createElement("p");
+      p.className = "verse";
+      p.innerHTML = '<span class="n">' + (i + 1) + "</span>" + markup(v);
+      sec.appendChild(p);
+    });
+    return sec;
+  }
+
+  /* ---------- 2. The Psalm 119 verse for today ---------- */
+
+  var PS119 = BIBLE.psalms[118];        // 176 verses
+  var verseNum;
+  if (M <= 176) {
+    verseNum = M;
+  } else if (M <= 352) {
+    verseNum = M - 176;
+  } else {
+    verseNum = Math.floor(Math.random() * 176) + 1;   // days 353+ get a random verse
+  }
+  var verseText = PS119[verseNum - 1];
+
+  function meditation(heading) {
+    var sec = document.createElement("section");
+    sec.className = "meditation";
+    sec.innerHTML =
+      "<h2>" + heading + "</h2>" +
+      "<p>" + markup(verseText) + "</p>" +
+      "<cite>Psalm 119:" + verseNum + "</cite>";
+    return sec;
+  }
+
+  var content = document.getElementById("content");
+
+  content.appendChild(meditation("Today&rsquo;s Verse"));
+
+  /* ---------- 3. Psalms N, N+30, N+60, N+90, N+120 ---------- */
+
+  for (var k = 0; k <= 120; k += 30) {
+    var num = N + k;
+    if (num > 150) continue;           // e.g. day 31 would ask for Psalm 151, which does not exist
+    content.appendChild(chapterSection("Psalm " + num, BIBLE.psalms[num - 1]));
+  }
+
+  /* ---------- 4. Proverbs chapter N ---------- */
+
+  content.appendChild(chapterSection("Proverbs " + N, BIBLE.proverbs[N - 1]));
+
+  /* ---------- 5. Repeat the verse for meditation ---------- */
+
+  content.appendChild(meditation("For Meditation"));
+})();
+</script>
+</body>
+</html>

@@ -54,7 +54,10 @@
       "Bash(__NEW_LINE_1d1d1825fe2dc1c6__ python:*)",
       "Bash(powershell -Command \"Add-Type -AssemblyName PresentationFramework; Write-Host ''wpf ok''\")",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\johnw\\\\Documents\\\\GitHub\\\\AI\\\\claude\" -Force)",
-      "Bash(Select-Object Name, Attributes)"
+      "Bash(Select-Object Name, Attributes)",
+      "Bash(git ls-tree *)",
+      "Bash(git rm *)",
+      "Bash(powershell -Command \"Stop-Process -Id \\(Get-NetTCPConnection -LocalPort 8731 -State Listen\\).OwningProcess -Force\")"
     ]
   }
 }

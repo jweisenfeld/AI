@@ -117,6 +117,15 @@ $changed = false;
 $results = [];
 
 foreach ($config['tiers'] as $tier => $tierConfig) {
+    // This script only knows how to probe Anthropic's API. Non-Anthropic
+    // tiers (e.g. "glm", served by Z.AI) are configured/verified manually.
+    if (($tierConfig['provider'] ?? 'anthropic') !== 'anthropic') {
+        output("--- Tier: $tier ---");
+        output("  Skipped (provider: {$tierConfig['provider']}, not Anthropic).");
+        $results[$tier] = ['status' => 'skipped_non_anthropic', 'model' => $tierConfig['primary']];
+        continue;
+    }
+
     $primary = $tierConfig['primary'];
     $fallbacks = $tierConfig['fallbacks'] ?? [];
 
@@ -314,6 +323,12 @@ function getDefaultConfig(): array
                 'primary' => 'claude-opus-4-7',
                 'fallbacks' => ['claude-opus-4-6', 'claude-opus-4-5-20251101', 'claude-opus-4-5', 'claude-opus-4-1-20250805'],
                 'pricing' => ['input_per_mtok' => 5.00, 'output_per_mtok' => 25.00],
+            ],
+            'glm' => [
+                'provider' => 'zai',
+                'primary' => 'glm-5.3',
+                'fallbacks' => [],
+                'pricing' => ['input_per_mtok' => 1.40, 'output_per_mtok' => 4.40],
             ],
         ],
     ];

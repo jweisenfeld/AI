@@ -39,6 +39,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 $accountRoot  = dirname($_SERVER['DOCUMENT_ROOT']);   // e.g. /home2/fikrttmy
 $secretsDir   = $accountRoot . '/.secrets';
 $secretsFile  = $secretsDir . '/claudekey.php';
+$zaiSecretsFile = $secretsDir . '/zaikey.php';
 $studentFile  = $secretsDir . '/student_roster.csv';
 $smtpFile     = $secretsDir . '/smtp_credentials.php';  // shared with wheel3/coach6
 define('ALERT_TO', 'jweisenfeld@psd1.org');
@@ -61,6 +62,14 @@ if (!$ANTHROPIC_API_KEY) {
     error_log("ANTHROPIC_API_KEY missing in secrets file: $secretsFile");
     echo json_encode(['error' => 'Server configuration error (API key missing).']);
     exit;
+}
+
+// Z.AI (GLM) key is optional at boot — only required if a student actually
+// picks the "glm" tier. Missing/unreadable file just means that tier is down.
+$ZAI_API_KEY = null;
+if (is_readable($zaiSecretsFile)) {
+    $zaiSecrets = require $zaiSecretsFile;
+    $ZAI_API_KEY = $zaiSecrets['ZAI_API_KEY'] ?? null;
 }
 
 // Read and validate JSON request body
@@ -345,20 +354,6 @@ if ($requestData['model'] === 'opus' && $messageCount > 1 && !$isUnlimitedUser) 
     $opusDowngraded = true;
 }
 
-// ============================================
-// FABLE: FIRST EXCHANGE ONLY (waived for unlimited users)
-// ============================================
-// Same one-time-treat pattern as Opus above: Fable is allowed only on the
-// first message of a conversation, then the server downgrades to Sonnet.
-// Note: this only limits which model answers — the TopicLock content
-// constraint (see below) still applies, so a tutor-locked student picking
-// Fable still gets redirected away from creative writing/roleplay.
-$fableDowngraded = false;
-if ($requestData['model'] === 'fable' && $messageCount > 1 && !$isUnlimitedUser) {
-    $requestData['model'] = 'sonnet';
-    $fableDowngraded = true;
-}
-
 // Load model config from JSON file (with hardcoded fallback)
 $configPath = __DIR__ . '/model_config.json';
 $config = loadModelConfig($configPath);
@@ -379,6 +374,27 @@ if (!isset($modelMap[$requestedModel])) {
     exit;
 }
 $resolvedModel = $modelMap[$requestedModel];
+$provider = $config['tiers'][$requestedModel]['provider'] ?? 'anthropic';
+
+// GLM (Z.AI) is text-only for now — the frontend sends Anthropic-shaped
+// image blocks that Z.AI's OpenAI-compatible endpoint doesn't understand.
+if ($provider === 'zai' && $requestHasImages) {
+    http_response_code(400);
+    echo json_encode([
+        'error' => [
+            'type' => 'unsupported_model',
+            'message' => 'GLM 5.3 doesn\'t support images yet. Switch to Sonnet or Opus to send a photo or screenshot.'
+        ]
+    ]);
+    exit;
+}
+
+if ($provider === 'zai' && !$ZAI_API_KEY) {
+    http_response_code(500);
+    error_log("ZAI_API_KEY missing in secrets file: $zaiSecretsFile");
+    echo json_encode(['error' => 'Server configuration error (GLM API key missing).']);
+    exit;
+}
 
 // Build the API request
 $apiRequest = [
@@ -469,58 +485,74 @@ if (isset($modelDowngraded) && $modelDowngraded) {
 if ($opusDowngraded) {
     $logEntry['opus_downgraded'] = true;
 }
-if ($fableDowngraded) {
-    $logEntry['fable_downgraded'] = true;
-}
+$logEntry['provider'] = $provider;
 
-// --- Make API call with auto-healing fallback ---
-list($httpCode, $response, $curlError) = callAnthropicApi($apiRequest, $ANTHROPIC_API_KEY);
-
-if ($curlError) {
-    http_response_code(500);
-    echo json_encode(['error' => 'Failed to connect to API: ' . $curlError]);
-    exit;
-}
-
-$responseData = json_decode($response, true);
-
-// Auto-healing: if model error, try fallbacks from config
+// --- Make API call ---
 $modelHealed = false;
-if (isModelError($httpCode, $responseData)) {
-    $tierConfig = $config['tiers'][$requestedModel] ?? null;
-    $fallbacks  = $tierConfig['fallbacks'] ?? [];
+if ($provider === 'zai') {
+    // GLM (Z.AI): OpenAI-compatible endpoint, no auto-healing (single model, no fallbacks configured).
+    $zaiRequest = buildZaiRequest($apiRequest, $resolvedModel);
+    list($httpCode, $rawResponse, $curlError) = callZaiApi($zaiRequest, $ZAI_API_KEY);
 
-    // Cooldown: skip fallback if config was updated in last 60 seconds
-    $configMtime = @filemtime($configPath);
-    $cooldownActive = $configMtime && (time() - $configMtime < 60);
+    if ($curlError) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Failed to connect to GLM API: ' . $curlError]);
+        exit;
+    }
 
-    if (!$cooldownActive && !empty($fallbacks)) {
-        error_log("Model healing: primary '{$resolvedModel}' failed for tier '{$requestedModel}', trying fallbacks");
+    $responseData = normalizeZaiResponse(json_decode($rawResponse, true), $resolvedModel);
+    if (isset($responseData['error']) && $httpCode < 400) {
+        $httpCode = 502; // Z.AI returned 2xx but no usable content — treat as an upstream failure
+    }
+    $response = json_encode($responseData);
+} else {
+    // Anthropic: auto-healing fallback across tier's configured backup models.
+    list($httpCode, $response, $curlError) = callAnthropicApi($apiRequest, $ANTHROPIC_API_KEY);
 
-        foreach ($fallbacks as $fallbackModel) {
-            $apiRequest['model'] = $fallbackModel;
-            list($fbHttpCode, $fbResponse, $fbCurlError) = callAnthropicApi($apiRequest, $ANTHROPIC_API_KEY);
+    if ($curlError) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Failed to connect to API: ' . $curlError]);
+        exit;
+    }
 
-            if ($fbCurlError) continue;
+    $responseData = json_decode($response, true);
 
-            $fbResponseData = json_decode($fbResponse, true);
+    if (isModelError($httpCode, $responseData)) {
+        $tierConfig = $config['tiers'][$requestedModel] ?? null;
+        $fallbacks  = $tierConfig['fallbacks'] ?? [];
 
-            if (!isModelError($fbHttpCode, $fbResponseData)) {
-                // This model worked (or failed for a non-model reason)
-                $httpCode      = $fbHttpCode;
-                $response      = $fbResponse;
-                $responseData  = $fbResponseData;
-                $resolvedModel = $fallbackModel;
-                $modelHealed   = true;
+        // Cooldown: skip fallback if config was updated in last 60 seconds
+        $configMtime = @filemtime($configPath);
+        $cooldownActive = $configMtime && (time() - $configMtime < 60);
 
-                // Update config so future requests use this model
-                if ($fbHttpCode === 200) {
-                    updateModelConfig($configPath, $requestedModel, $fallbackModel);
-                    error_log("Model healing: updated tier '{$requestedModel}' primary to '{$fallbackModel}'");
+        if (!$cooldownActive && !empty($fallbacks)) {
+            error_log("Model healing: primary '{$resolvedModel}' failed for tier '{$requestedModel}', trying fallbacks");
+
+            foreach ($fallbacks as $fallbackModel) {
+                $apiRequest['model'] = $fallbackModel;
+                list($fbHttpCode, $fbResponse, $fbCurlError) = callAnthropicApi($apiRequest, $ANTHROPIC_API_KEY);
+
+                if ($fbCurlError) continue;
+
+                $fbResponseData = json_decode($fbResponse, true);
+
+                if (!isModelError($fbHttpCode, $fbResponseData)) {
+                    // This model worked (or failed for a non-model reason)
+                    $httpCode      = $fbHttpCode;
+                    $response      = $fbResponse;
+                    $responseData  = $fbResponseData;
+                    $resolvedModel = $fallbackModel;
+                    $modelHealed   = true;
+
+                    // Update config so future requests use this model
+                    if ($fbHttpCode === 200) {
+                        updateModelConfig($configPath, $requestedModel, $fallbackModel);
+                        error_log("Model healing: updated tier '{$requestedModel}' primary to '{$fallbackModel}'");
+                    }
+                    break;
                 }
-                break;
-            }
         }
+    }
     }
 }
 
@@ -561,12 +593,6 @@ if ($opusDowngraded && is_array($responseData)) {
     $responseData['_notice'] = 'Opus is available for your first message only. Switched to Sonnet for follow-ups. Clear chat to use Opus again.';
     $response = json_encode($responseData);
 }
-if ($fableDowngraded && is_array($responseData)) {
-    $responseData['_fable_limited'] = true;
-    $responseData['_notice'] = 'Fable is available for your first message only. Switched to Sonnet for follow-ups. Clear chat to use Fable again.';
-    $response = json_encode($responseData);
-}
-
 // Send the response to the client before doing any email work.
 // The SMTP call can block for up to 30 s on a slow/unreachable server; if it
 // runs before echo the browser receives an empty body and throws
@@ -736,10 +762,11 @@ function loadModelConfig(string $configPath): array
                 'fallbacks' => ['claude-opus-4-7', 'claude-opus-4-6', 'claude-opus-4-5-20251101', 'claude-opus-4-5', 'claude-opus-4-1-20250805'],
                 'pricing'   => ['input_per_mtok' => 5.00, 'output_per_mtok' => 25.00],
             ],
-            'fable'  => [
-                'primary'   => 'claude-fable-5',
+            'glm'    => [
+                'provider'  => 'zai',
+                'primary'   => 'glm-5.3',
                 'fallbacks' => [],
-                'pricing'   => ['input_per_mtok' => 5.00, 'output_per_mtok' => 25.00],
+                'pricing'   => ['input_per_mtok' => 1.40, 'output_per_mtok' => 4.40],
             ],
         ]
     ];
@@ -768,6 +795,106 @@ function callAnthropicApi(array $apiRequest, string $apiKey): array
     $curlError = curl_error($ch);
     curl_close($ch);
     return [$httpCode, $response, $curlError];
+}
+
+/**
+ * Convert an Anthropic-shaped request (built for callAnthropicApi) into the
+ * OpenAI-compatible body Z.AI's chat/completions endpoint expects: a flat
+ * messages array (system prompt becomes a leading {role: 'system'} message)
+ * with plain-string content instead of Anthropic content blocks.
+ */
+function buildZaiRequest(array $apiRequest, string $model): array
+{
+    $messages = [];
+    if (isset($apiRequest['system'])) {
+        $messages[] = ['role' => 'system', 'content' => $apiRequest['system']];
+    }
+    foreach ($apiRequest['messages'] as $msg) {
+        $messages[] = [
+            'role'    => $msg['role'] ?? 'user',
+            'content' => extractZaiText($msg['content'] ?? ''),
+        ];
+    }
+    return [
+        'model'       => $model,
+        'messages'    => $messages,
+        'max_tokens'  => $apiRequest['max_tokens'],
+        'temperature' => $apiRequest['temperature'] ?? 1.0,
+    ];
+}
+
+/**
+ * Flatten an Anthropic-style message content value (string, or an array of
+ * content blocks) down to a plain string of its text blocks. Non-text
+ * blocks (e.g. images) are dropped — callers must reject image requests
+ * before reaching here, since silently dropping a photo is confusing.
+ */
+function extractZaiText($content): string
+{
+    if (is_string($content)) return $content;
+    if (!is_array($content)) return '';
+    $parts = [];
+    foreach ($content as $block) {
+        if (($block['type'] ?? '') === 'text') {
+            $parts[] = $block['text'] ?? '';
+        }
+    }
+    return implode("\n", $parts);
+}
+
+/**
+ * Make a single API call to Z.AI's OpenAI-compatible chat completions endpoint.
+ * Returns [httpCode, response, curlError].
+ */
+function callZaiApi(array $body, string $apiKey): array
+{
+    $ch = curl_init('https://api.z.ai/api/paas/v4/chat/completions');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode($body),
+        CURLOPT_HTTPHEADER     => [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $apiKey,
+        ],
+        CURLOPT_TIMEOUT        => 120,
+    ]);
+    $response  = curl_exec($ch);
+    $httpCode  = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+    return [$httpCode, $response, $curlError];
+}
+
+/**
+ * Convert a Z.AI (OpenAI-shaped) chat completion response into the same
+ * {content: [...], usage: {...}, model} shape callAnthropicApi() returns,
+ * so the rest of this file (logging, alert scanning, the frontend) can
+ * treat both providers identically.
+ */
+function normalizeZaiResponse(?array $raw, string $fallbackModel): array
+{
+    if (!is_array($raw)) {
+        return ['error' => ['type' => 'api_error', 'message' => 'Invalid response from GLM API.']];
+    }
+    if (isset($raw['error'])) {
+        $err = $raw['error'];
+        $message = is_array($err) ? ($err['message'] ?? 'GLM API error.') : (string)$err;
+        $type = is_array($err) ? ($err['type'] ?? 'api_error') : 'api_error';
+        return ['error' => ['type' => $type, 'message' => $message]];
+    }
+    $text = $raw['choices'][0]['message']['content'] ?? null;
+    if ($text === null) {
+        return ['error' => ['type' => 'api_error', 'message' => 'GLM API returned no response content.']];
+    }
+    return [
+        'content' => [['type' => 'text', 'text' => $text]],
+        'usage'   => [
+            'input_tokens'  => $raw['usage']['prompt_tokens'] ?? 0,
+            'output_tokens' => $raw['usage']['completion_tokens'] ?? 0,
+        ],
+        'model' => $raw['model'] ?? $fallbackModel,
+    ];
 }
 
 /**

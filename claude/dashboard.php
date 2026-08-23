@@ -243,7 +243,7 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
         .bar-fill.haiku { background: var(--success); }
         .bar-fill.sonnet { background: var(--accent); }
         .bar-fill.opus { background: var(--danger); }
-        .bar-fill.fable { background: var(--accent2); }
+        .bar-fill.glm { background: var(--accent2); }
         .bar-fill.default { background: var(--blue); }
 
         /* Cost estimate */
@@ -424,8 +424,8 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
             'claude-opus-4-5':           { input: 5.00,  output: 25.00 },
             'claude-opus-4-1-20250805':  { input: 15.00, output: 75.00 },
             'claude-opus-4-20250514':    { input: 15.00, output: 75.00 },
-            // Placeholder rate — confirm real pricing, matched to Opus for now.
-            'claude-fable-5':            { input: 5.00,  output: 25.00 },
+            // Z.AI (GLM tier), per-1M-token pricing from z.ai/model-api.
+            'glm-5.3':                   { input: 1.40,  output: 4.40 },
         };
 
         function estimateCost(model, inputTokens, outputTokens) {
@@ -609,7 +609,7 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
             document.getElementById('model-chart').innerHTML = Object.entries(byModel)
                 .sort((a, b) => b[1].cost - a[1].cost)
                 .map(([model, d]) => {
-                    const tier = model.includes('haiku') ? 'haiku' : model.includes('opus') ? 'opus' : model.includes('fable') ? 'fable' : 'sonnet';
+                    const tier = model.includes('haiku') ? 'haiku' : model.includes('opus') ? 'opus' : model.includes('glm') ? 'glm' : 'sonnet';
                     return `<div class="bar-row">
                         <div class="bar-label" style="min-width:200px; font-size:0.8rem">${model}</div>
                         <div class="bar-track">

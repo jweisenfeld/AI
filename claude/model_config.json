@@ -41,13 +41,14 @@
         "output_per_mtok": 25.00
       }
     },
-    "fable": {
-      "_comment": "Pricing is a placeholder (matched to Opus) — confirm real per-token rate before relying on dashboard cost totals.",
-      "primary": "claude-fable-5",
+    "glm": {
+      "_comment": "Non-Anthropic model served by Z.AI (Zhipu), via an OpenAI-compatible endpoint. Replaces the old Fable tier as the default — see api-proxy.php callZaiApi().",
+      "provider": "zai",
+      "primary": "glm-5.3",
       "fallbacks": [],
       "pricing": {
-        "input_per_mtok": 5.00,
-        "output_per_mtok": 25.00
+        "input_per_mtok": 1.40,
+        "output_per_mtok": 4.40
       }
     }
   }

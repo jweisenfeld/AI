@@ -110,7 +110,7 @@ function isValidTier(string $tier): bool
         }
     }
     // Fallback: check hardcoded tiers
-    return in_array($tier, ['haiku', 'sonnet', 'opus', 'fable'], true);
+    return in_array($tier, ['haiku', 'sonnet', 'opus', 'glm'], true);
 }
 
 /**
@@ -143,10 +143,11 @@ function loadModelConfig(string $configPath): array
                 'fallbacks' => ['claude-opus-4-7', 'claude-opus-4-6', 'claude-opus-4-5-20251101', 'claude-opus-4-5', 'claude-opus-4-1-20250805'],
                 'pricing'   => ['input_per_mtok' => 5.00, 'output_per_mtok' => 25.00],
             ],
-            'fable'  => [
-                'primary'   => 'claude-fable-5',
+            'glm'    => [
+                'provider'  => 'zai',
+                'primary'   => 'glm-5.3',
                 'fallbacks' => [],
-                'pricing'   => ['input_per_mtok' => 5.00, 'output_per_mtok' => 25.00],
+                'pricing'   => ['input_per_mtok' => 1.40, 'output_per_mtok' => 4.40],
             ],
         ]
     ];
@@ -251,8 +252,8 @@ runTest('accepts opus tier', function() {
     assertTrue(isValidTier('opus'), 'Opus should be a valid tier');
 });
 
-runTest('accepts fable tier', function() {
-    assertTrue(isValidTier('fable'), 'Fable should be a valid tier');
+runTest('accepts glm tier', function() {
+    assertTrue(isValidTier('glm'), 'GLM should be a valid tier');
 });
 
 runTest('rejects invalid tier', function() {
@@ -651,7 +652,7 @@ runTest('model_config.json has all four tiers', function() {
     assertArrayHasKey('haiku', $config['tiers'], 'Should have haiku tier');
     assertArrayHasKey('sonnet', $config['tiers'], 'Should have sonnet tier');
     assertArrayHasKey('opus', $config['tiers'], 'Should have opus tier');
-    assertArrayHasKey('fable', $config['tiers'], 'Should have fable tier');
+    assertArrayHasKey('glm', $config['tiers'], 'Should have glm tier');
     assertEquals(4, count($config['tiers']), 'Should have exactly 4 tiers');
 });
 
@@ -689,20 +690,25 @@ runTest('all primary models use current generation IDs', function() {
     $haikuPrimary = $config['tiers']['haiku']['primary'];
     $sonnetPrimary = $config['tiers']['sonnet']['primary'];
     $opusPrimary = $config['tiers']['opus']['primary'];
-    $fablePrimary = $config['tiers']['fable']['primary'];
+    $glmPrimary = $config['tiers']['glm']['primary'];
     // Should be snapshot or alias IDs, not deprecated models
     assertContains('haiku-4-5', $haikuPrimary, 'Haiku primary should be 4.5 series');
     assertContains('sonnet-5', $sonnetPrimary, 'Sonnet primary should be 5');
     assertContains('opus-4-8', $opusPrimary, 'Opus primary should be 4.8');
-    assertContains('fable-5', $fablePrimary, 'Fable primary should be 5');
+    assertContains('glm-5.3', $glmPrimary, 'GLM primary should be 5.3');
 });
 
-runTest('fallbacks are non-empty for all tiers except fable', function() {
-    // Fable has no known-good fallback model ID yet (single-generation model),
-    // so an empty fallback list is intentional rather than an oversight.
+runTest('glm tier is marked with the zai provider', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    assertEquals('zai', $config['tiers']['glm']['provider'] ?? null, 'GLM tier should declare provider=zai');
+});
+
+runTest('fallbacks are non-empty for all tiers except glm', function() {
+    // GLM is served by Z.AI, not Anthropic — the Anthropic auto-healing
+    // fallback chain doesn't apply, so an empty fallback list is intentional.
     $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
     foreach ($config['tiers'] as $tier => $info) {
-        if ($tier === 'fable') continue;
+        if ($tier === 'glm') continue;
         assertTrue(count($info['fallbacks']) >= 1, "{$tier} should have at least 1 fallback");
     }
 });
@@ -721,7 +727,7 @@ runTest('hardcoded fallback matches model_config.json', function() {
     // Load hardcoded fallback (by passing a nonexistent path)
     $hardcoded = loadModelConfig('/nonexistent/path');
 
-    foreach (['haiku', 'sonnet', 'opus', 'fable'] as $tier) {
+    foreach (['haiku', 'sonnet', 'opus', 'glm'] as $tier) {
         assertEquals(
             $fileConfig['tiers'][$tier]['primary'],
             $hardcoded['tiers'][$tier]['primary'],
@@ -797,43 +803,52 @@ runTest('non-opus model not affected by restriction', function() {
     assertFalse($opusDowngraded, 'Should not flag downgrade for non-opus');
 });
 
-// --- Fable First-Exchange Restriction Tests ---
-echo "\nFable First-Exchange Restriction:\n";
+// --- GLM (Z.AI) Tier Tests ---
+echo "\nGLM (Z.AI) Tier:\n";
 
-runTest('fable allowed on first message (msg_count == 1)', function() {
-    $model = 'fable';
-    $messageCount = 1;
-    $fableDowngraded = false;
-    if ($model === 'fable' && $messageCount > 1) {
-        $model = 'sonnet';
-        $fableDowngraded = true;
-    }
-    assertEquals('fable', $model, 'Fable should be allowed on first message');
-    assertFalse($fableDowngraded, 'Should not be downgraded on first message');
-});
-
-runTest('fable downgraded on second exchange (msg_count == 3)', function() {
-    $model = 'fable';
-    $messageCount = 3;
-    $fableDowngraded = false;
-    if ($model === 'fable' && $messageCount > 1) {
-        $model = 'sonnet';
-        $fableDowngraded = true;
-    }
-    assertEquals('sonnet', $model, 'Fable should be downgraded to sonnet after first exchange');
-    assertTrue($fableDowngraded, 'fableDowngraded flag should be set');
-});
-
-runTest('non-fable model not affected by fable restriction', function() {
-    $model = 'sonnet';
+runTest('glm is not downgraded by message count (no first-exchange restriction)', function() {
+    // Unlike the old Fable tier, GLM has no "first message only" gate —
+    // it's the cheap default, so it should survive a long conversation.
+    $model = 'glm';
     $messageCount = 25;
-    $fableDowngraded = false;
-    if ($model === 'fable' && $messageCount > 1) {
-        $model = 'sonnet';
-        $fableDowngraded = true;
-    }
-    assertEquals('sonnet', $model, 'Sonnet should remain sonnet');
-    assertFalse($fableDowngraded, 'Should not flag downgrade for non-fable');
+    assertEquals('glm', $model, 'GLM should remain glm regardless of message count');
+});
+
+runTest('zai provider + image request is rejected before calling the API', function() {
+    // Mirrors the guard in api-proxy.php: buildZaiRequest()/callZaiApi() are
+    // never reached when images are present, since the OpenAI-compatible
+    // endpoint doesn't understand Anthropic-style image content blocks.
+    $provider = 'zai';
+    $requestHasImages = true;
+    $rejected = ($provider === 'zai' && $requestHasImages);
+    assertTrue($rejected, 'A GLM request containing images should be rejected');
+});
+
+runTest('extractZaiText flattens Anthropic content blocks to plain text', function() {
+    // Local copy of api-proxy.php's extractZaiText() — kept here rather than
+    // included, since api-proxy.php runs top-level request handling on load.
+    $extractZaiText = function ($content) {
+        if (is_string($content)) return $content;
+        if (!is_array($content)) return '';
+        $parts = [];
+        foreach ($content as $block) {
+            if (($block['type'] ?? '') === 'text') {
+                $parts[] = $block['text'] ?? '';
+            }
+        }
+        return implode("\n", $parts);
+    };
+
+    assertEquals('hello', $extractZaiText('hello'), 'Plain strings should pass through unchanged');
+    assertEquals(
+        "What's this?\nfollow-up",
+        $extractZaiText([
+            ['type' => 'text', 'text' => "What's this?"],
+            ['type' => 'image', 'source' => ['type' => 'base64', 'data' => 'xxx']],
+            ['type' => 'text', 'text' => 'follow-up'],
+        ]),
+        'Text blocks should be joined; image blocks dropped'
+    );
 });
 
 // --- Conversation Length Cap Tests ---

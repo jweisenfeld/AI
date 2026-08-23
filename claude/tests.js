@@ -78,7 +78,7 @@ function hasImages(messages) {
  * Validate model tier name
  */
 function isValidTier(tier) {
-    const validTiers = ['haiku', 'sonnet', 'opus', 'fable'];
+    const validTiers = ['haiku', 'sonnet', 'opus', 'glm'];
     return validTiers.includes(tier);
 }
 
@@ -527,7 +527,7 @@ runTest('model_config.json has all four tiers', () => {
     assertArrayHasKey('haiku', modelConfig.tiers, 'Should have haiku tier');
     assertArrayHasKey('sonnet', modelConfig.tiers, 'Should have sonnet tier');
     assertArrayHasKey('opus', modelConfig.tiers, 'Should have opus tier');
-    assertArrayHasKey('fable', modelConfig.tiers, 'Should have fable tier');
+    assertArrayHasKey('glm', modelConfig.tiers, 'Should have glm tier');
     assertEquals(4, Object.keys(modelConfig.tiers).length, 'Should have exactly 4 tiers');
 });
 
@@ -560,13 +560,17 @@ runTest('all primary models use current generation IDs', () => {
     assertContains('haiku-4-5', modelConfig.tiers.haiku.primary, 'Haiku primary should be 4.5 series');
     assertContains('sonnet-5', modelConfig.tiers.sonnet.primary, 'Sonnet primary should be 5');
     assertContains('opus-4-8', modelConfig.tiers.opus.primary, 'Opus primary should be 4.8');
-    assertContains('fable-5', modelConfig.tiers.fable.primary, 'Fable primary should be 5');
+    assertContains('glm-5.3', modelConfig.tiers.glm.primary, 'GLM primary should be 5.3');
 });
 
-runTest('fallbacks are non-empty for all tiers except fable', () => {
-    // Fable has no known-good fallback model ID yet (single-generation model).
+runTest('glm tier is marked with the zai provider', () => {
+    assertEquals('zai', modelConfig.tiers.glm.provider, 'GLM tier should declare provider=zai');
+});
+
+runTest('fallbacks are non-empty for all tiers except glm', () => {
+    // GLM is served by Z.AI, not Anthropic — no auto-healing fallback chain applies.
     for (const [tier, info] of Object.entries(modelConfig.tiers)) {
-        if (tier === 'fable') continue;
+        if (tier === 'glm') continue;
         assertTrue(info.fallbacks.length >= 1, `${tier} should have at least 1 fallback`);
     }
 });
@@ -632,43 +636,47 @@ runTest('non-opus model not affected by restriction', () => {
     assertFalse(opusDowngraded, 'Should not flag downgrade for non-opus');
 });
 
-// --- Fable First-Exchange Restriction Tests ---
-console.log('\nFable First-Exchange Restriction:');
+// --- GLM (Z.AI) Tier Tests ---
+console.log('\nGLM (Z.AI) Tier:');
 
-runTest('fable allowed on first message (msg_count == 1)', () => {
-    let model = 'fable';
-    const messageCount = 1;
-    let fableDowngraded = false;
-    if (model === 'fable' && messageCount > 1) {
-        model = 'sonnet';
-        fableDowngraded = true;
-    }
-    assertEquals('fable', model, 'Fable should be allowed on first message');
-    assertFalse(fableDowngraded, 'Should not be downgraded on first message');
-});
-
-runTest('fable downgraded on second exchange (msg_count == 3)', () => {
-    let model = 'fable';
-    const messageCount = 3;
-    let fableDowngraded = false;
-    if (model === 'fable' && messageCount > 1) {
-        model = 'sonnet';
-        fableDowngraded = true;
-    }
-    assertEquals('sonnet', model, 'Fable should be downgraded to sonnet after first exchange');
-    assertTrue(fableDowngraded, 'fableDowngraded flag should be set');
-});
-
-runTest('non-fable model not affected by fable restriction', () => {
-    let model = 'sonnet';
+runTest('glm is not downgraded by message count (no first-exchange restriction)', () => {
+    // Unlike the old Fable tier, GLM is the cheap default and has no
+    // "first message only" gate — it should survive a long conversation.
+    const model = 'glm';
     const messageCount = 25;
-    let fableDowngraded = false;
-    if (model === 'fable' && messageCount > 1) {
-        model = 'sonnet';
-        fableDowngraded = true;
-    }
-    assertEquals('sonnet', model, 'Sonnet should remain sonnet');
-    assertFalse(fableDowngraded, 'Should not flag downgrade for non-fable');
+    assertEquals('glm', model, 'GLM should remain glm regardless of message count');
+});
+
+runTest('zai provider + image request is rejected before calling the API', () => {
+    // Mirrors the guard in api-proxy.php: the OpenAI-compatible endpoint
+    // doesn't understand Anthropic-style image content blocks.
+    const provider = 'zai';
+    const requestHasImages = true;
+    const rejected = (provider === 'zai' && requestHasImages);
+    assertTrue(rejected, 'A GLM request containing images should be rejected');
+});
+
+runTest('extractZaiText flattens Anthropic content blocks to plain text', () => {
+    // Local copy of api-proxy.php's extractZaiText().
+    const extractZaiText = (content) => {
+        if (typeof content === 'string') return content;
+        if (!Array.isArray(content)) return '';
+        return content
+            .filter(block => block.type === 'text')
+            .map(block => block.text || '')
+            .join('\n');
+    };
+
+    assertEquals('hello', extractZaiText('hello'), 'Plain strings should pass through unchanged');
+    assertEquals(
+        "What's this?\nfollow-up",
+        extractZaiText([
+            { type: 'text', text: "What's this?" },
+            { type: 'image', source: { type: 'base64', data: 'xxx' } },
+            { type: 'text', text: 'follow-up' },
+        ]),
+        'Text blocks should be joined; image blocks dropped'
+    );
 });
 
 // --- Conversation Length Cap Tests ---
@@ -758,8 +766,8 @@ const COSTS = {
     'claude-opus-4-5':           { input: 5.00,  output: 25.00 },
     'claude-opus-4-1-20250805':  { input: 15.00, output: 75.00 },
     'claude-opus-4-20250514':    { input: 15.00, output: 75.00 },
-    // Placeholder rate — confirm real pricing, matched to Opus for now.
-    'claude-fable-5':            { input: 5.00,  output: 25.00 },
+    // Z.AI (GLM tier), per-1M-token pricing from z.ai/model-api.
+    'glm-5.3':                   { input: 1.40,  output: 4.40 },
 };
 
 function estimateCost(model, inputTokens, outputTokens) {

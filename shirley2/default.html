@@ -56,6 +56,24 @@
   .streak .num { font-size: 1.5rem; color: var(--accent); }
   .streak .lbl { font-size: .85rem; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
 
+  .version-picker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    margin-top: 1rem;
+    font-size: .85rem;
+    color: var(--muted);
+  }
+  .version-picker select {
+    font: inherit;
+    color: var(--ink);
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: .35rem;
+    padding: .3rem .5rem;
+  }
+
   section {
     background: var(--card);
     border: 1px solid var(--rule);
@@ -110,14 +128,38 @@
       <span class="num" id="streak-num">–</span>
       <span class="lbl" id="streak-lbl">day streak</span>
     </div>
+    <div class="version-picker">
+      <label for="version-select">Version</label>
+      <select id="version-select">
+        <optgroup label="English">
+          <option value="kjv">King James Version (KJV)</option>
+          <option value="web">World English Bible (WEB)</option>
+          <option value="asv">American Standard Version (ASV)</option>
+          <option value="bsb">Berean Standard Bible (BSB)</option>
+        </optgroup>
+        <optgroup label="Deutsch">
+          <option value="luther1912">Lutherbibel 1912</option>
+          <option value="elberfelder">Unrevidierte Elberfelder</option>
+        </optgroup>
+        <optgroup label="Español">
+          <option value="bll">Biblia Libre Latinoamericana</option>
+        </optgroup>
+      </select>
+    </div>
   </header>
 
   <main id="content"></main>
 
-  <footer>King James Version &middot; public domain</footer>
+  <footer id="version-footer">King James Version &middot; public domain</footer>
 </div>
 
 <script src="bible-data.js"></script>
+<script src="bible-data-web.js"></script>
+<script src="bible-data-asv.js"></script>
+<script src="bible-data-bsb.js"></script>
+<script src="bible-data-luther1912.js"></script>
+<script src="bible-data-elberfelder.js"></script>
+<script src="bible-data-bll.js"></script>
 <script>
 (function () {
   "use strict";
@@ -174,6 +216,31 @@
   document.getElementById("streak-num").textContent = streak;
   document.getElementById("streak-lbl").textContent = (streak === 1 ? "day" : "days") + " in a row";
 
+  /* ---------- 0b. Version picker (remembered in a cookie) ---------- */
+
+  var VERSIONS = {
+    kjv:         { data: BIBLE,             footer: "King James Version · public domain" },
+    web:         { data: BIBLE_WEB,         footer: "World English Bible · public domain" },
+    asv:         { data: BIBLE_ASV,         footer: "American Standard Version (1901) · public domain" },
+    bsb:         { data: BIBLE_BSB,         footer: "Berean Standard Bible · public domain" },
+    luther1912:  { data: BIBLE_LUTHER1912,  footer: "Lutherbibel 1912 · gemeinfrei (public domain)" },
+    elberfelder: { data: BIBLE_ELBERFELDER, footer: "Unrevidierte Elberfelder (Darby) · gemeinfrei (public domain)" },
+    bll:         { data: BIBLE_BLL,         footer: "Biblia Libre Latinoamericana · dominio público" }
+  };
+
+  var versionSelect = document.getElementById("version-select");
+  var savedVersion = readCookie("shirley_version");
+  var version = VERSIONS[savedVersion] ? savedVersion : "kjv";
+  versionSelect.value = version;
+
+  versionSelect.addEventListener("change", function () {
+    writeCookie("shirley_version", versionSelect.value, 400);
+    location.reload();
+  });
+
+  document.getElementById("version-footer").textContent = VERSIONS[version].footer;
+  var BIBLE_DATA = VERSIONS[version].data;
+
   /* ---------- 1. N = day of month, M = day of year ---------- */
 
   var N = now.getDate();
@@ -215,7 +282,7 @@
 
   /* ---------- 2. The Psalm 119 verse for today ---------- */
 
-  var PS119 = BIBLE.psalms[118];        // 176 verses
+  var PS119 = BIBLE_DATA.psalms[118];   // 176 verses
   var verseNum;
   if (M <= 176) {
     verseNum = M;
@@ -245,12 +312,12 @@
   for (var k = 0; k <= 120; k += 30) {
     var num = N + k;
     if (num > 150) continue;           // e.g. day 31 would ask for Psalm 151, which does not exist
-    content.appendChild(chapterSection("Psalm " + num, BIBLE.psalms[num - 1]));
+    content.appendChild(chapterSection("Psalm " + num, BIBLE_DATA.psalms[num - 1]));
   }
 
   /* ---------- 4. Proverbs chapter N ---------- */
 
-  content.appendChild(chapterSection("Proverbs " + N, BIBLE.proverbs[N - 1]));
+  content.appendChild(chapterSection("Proverbs " + N, BIBLE_DATA.proverbs[N - 1]));
 
   /* ---------- 5. Repeat the verse for meditation ---------- */
 

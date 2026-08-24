@@ -60,6 +60,37 @@
         "input_per_mtok": 3.00,
         "output_per_mtok": 15.00
       }
+    },
+    "dsflash": {
+      "_comment": "DeepSeek V4 Flash — cheap/fast text model, OpenAI-compatible endpoint. Pricing is the off-peak cache-miss rate from api-docs.deepseek.com/quick_start/pricing (peak hours 01:00-04:00 & 06:00-10:00 UTC fall outside school hours, so off-peak is the realistic rate).",
+      "provider": "deepseek",
+      "primary": "deepseek-v4-flash",
+      "fallbacks": [],
+      "pricing": {
+        "input_per_mtok": 0.22,
+        "output_per_mtok": 0.66
+      }
+    },
+    "dspro": {
+      "_comment": "DeepSeek V4 Pro — higher-capability text model, same endpoint/provider as dsflash. Pricing is the off-peak cache-miss rate.",
+      "provider": "deepseek",
+      "primary": "deepseek-v4-pro",
+      "fallbacks": [],
+      "pricing": {
+        "input_per_mtok": 0.66,
+        "output_per_mtok": 1.98
+      }
+    },
+    "dsvision": {
+      "_comment": "DeepSeek V4 Flash Vision (experimental) — same text pricing/capability as dsflash, but supportsVision=true lets api-proxy.php translate Anthropic-style image blocks into OpenAI's image_url format instead of rejecting them. Images are billed at the input rate, up to 384 tokens each.",
+      "provider": "deepseek",
+      "primary": "deepseek-v4-flash-vision-exp",
+      "fallbacks": [],
+      "supportsVision": true,
+      "pricing": {
+        "input_per_mtok": 0.22,
+        "output_per_mtok": 0.66
+      }
     }
   }
 }

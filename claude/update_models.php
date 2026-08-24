@@ -336,6 +336,25 @@ function getDefaultConfig(): array
                 'fallbacks' => [],
                 'pricing' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00],
             ],
+            'dsflash' => [
+                'provider' => 'deepseek',
+                'primary' => 'deepseek-v4-flash',
+                'fallbacks' => [],
+                'pricing' => ['input_per_mtok' => 0.22, 'output_per_mtok' => 0.66],
+            ],
+            'dspro' => [
+                'provider' => 'deepseek',
+                'primary' => 'deepseek-v4-pro',
+                'fallbacks' => [],
+                'pricing' => ['input_per_mtok' => 0.66, 'output_per_mtok' => 1.98],
+            ],
+            'dsvision' => [
+                'provider' => 'deepseek',
+                'primary' => 'deepseek-v4-flash-vision-exp',
+                'fallbacks' => [],
+                'supportsVision' => true,
+                'pricing' => ['input_per_mtok' => 0.22, 'output_per_mtok' => 0.66],
+            ],
         ],
     ];
 }

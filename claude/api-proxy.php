@@ -63,10 +63,11 @@ if (!$ANTHROPIC_API_KEY) {
     exit;
 }
 
-// Non-Anthropic ("external") providers — Z.AI (GLM) and Moonshot (Kimi) — are
-// both OpenAI-compatible endpoints, each keyed by its own secrets file. Keys
-// are optional at boot; only required if a student actually picks that tier,
-// so a missing/unreadable file just means that one tier is down.
+// Non-Anthropic ("external") providers — Z.AI (GLM), Moonshot (Kimi), and
+// DeepSeek — are all OpenAI-compatible endpoints, each keyed by its own
+// secrets file. Keys are optional at boot; only required if a student
+// actually picks that tier, so a missing/unreadable file just means that
+// one tier is down.
 $EXTERNAL_PROVIDERS = [
     'zai' => [
         'endpoint'    => 'https://api.z.ai/api/paas/v4/chat/completions',
@@ -77,6 +78,11 @@ $EXTERNAL_PROVIDERS = [
         'endpoint'    => 'https://api.moonshot.ai/v1/chat/completions',
         'secretsFile' => $secretsDir . '/kimikey.php',
         'secretKey'   => 'KIMI_API_KEY',
+    ],
+    'deepseek' => [
+        'endpoint'    => 'https://api.deepseek.com/chat/completions',
+        'secretsFile' => $secretsDir . '/deepseekkey.php',
+        'secretKey'   => 'DEEPSEEK_API_KEY',
     ],
 ];
 
@@ -393,17 +399,20 @@ if (!isset($modelMap[$requestedModel])) {
 $resolvedModel = $modelMap[$requestedModel];
 $provider = $config['tiers'][$requestedModel]['provider'] ?? 'anthropic';
 $isExternalProvider = $provider !== 'anthropic';
+// Anthropic tiers all accept Anthropic-shaped image blocks natively. Among
+// external providers, only tiers explicitly marked supportsVision (currently
+// just DeepSeek's vision-exp model) get their images translated to OpenAI's
+// image_url format in buildOpenAiCompatibleRequest() — everyone else (GLM,
+// Kimi K3, DeepSeek flash/pro) is text-only here, even where the underlying
+// model has vision (e.g. Kimi K3), because that translation isn't built yet.
+$supportsVision = !$isExternalProvider || !empty($config['tiers'][$requestedModel]['supportsVision']);
 
-// GLM and Kimi K3 are text-only here for now — the frontend sends
-// Anthropic-shaped image blocks that neither OpenAI-compatible endpoint
-// understands (Kimi K3 itself supports vision, but via OpenAI's separate
-// image_url content-block format, which this proxy doesn't build yet).
-if ($isExternalProvider && $requestHasImages) {
+if (!$supportsVision && $requestHasImages) {
     http_response_code(400);
     echo json_encode([
         'error' => [
             'type' => 'unsupported_model',
-            'message' => 'This model doesn\'t support images yet. Switch to Sonnet or Opus to send a photo or screenshot.'
+            'message' => 'This model doesn\'t support images. Switch to Sonnet, Opus, or DeepSeek Vision to send a photo or screenshot.'
         ]
     ]);
     exit;
@@ -510,8 +519,8 @@ $logEntry['provider'] = $provider;
 // --- Make API call ---
 $modelHealed = false;
 if ($isExternalProvider) {
-    // GLM/Kimi K3: OpenAI-compatible endpoints, no auto-healing (single model, no fallbacks configured).
-    $externalRequest = buildOpenAiCompatibleRequest($apiRequest, $resolvedModel);
+    // GLM/Kimi K3/DeepSeek: OpenAI-compatible endpoints, no auto-healing (single model, no fallbacks configured).
+    $externalRequest = buildOpenAiCompatibleRequest($apiRequest, $resolvedModel, $supportsVision);
     $endpoint = $EXTERNAL_PROVIDERS[$provider]['endpoint'];
     $apiKey   = $EXTERNAL_API_KEYS[$provider];
     list($httpCode, $rawResponse, $curlError) = callOpenAiCompatibleApi($endpoint, $externalRequest, $apiKey);
@@ -801,6 +810,29 @@ function loadModelConfig(string $configPath): array
                 // cache-hit rate isn't modeled since this proxy sends no cache hints.
                 'pricing'   => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00],
             ],
+            'dsflash' => [
+                'provider'  => 'deepseek',
+                'primary'   => 'deepseek-v4-flash',
+                'fallbacks' => [],
+                // Off-peak cache-miss rate from api-docs.deepseek.com/quick_start/pricing.
+                // Peak hours (01:00-04:00 & 06:00-10:00 UTC) fall outside school hours
+                // (7AM-5PM Pacific), so off-peak is the realistic rate for real usage.
+                'pricing'   => ['input_per_mtok' => 0.22, 'output_per_mtok' => 0.66],
+            ],
+            'dspro'  => [
+                'provider'  => 'deepseek',
+                'primary'   => 'deepseek-v4-pro',
+                'fallbacks' => [],
+                'pricing'   => ['input_per_mtok' => 0.66, 'output_per_mtok' => 1.98],
+            ],
+            'dsvision' => [
+                'provider'       => 'deepseek',
+                'primary'        => 'deepseek-v4-flash-vision-exp',
+                'fallbacks'      => [],
+                'supportsVision' => true,
+                // Same rate card as dsflash — images are billed at the input rate (up to 384 tok/image).
+                'pricing'        => ['input_per_mtok' => 0.22, 'output_per_mtok' => 0.66],
+            ],
         ]
     ];
 }
@@ -832,20 +864,24 @@ function callAnthropicApi(array $apiRequest, string $apiKey): array
 
 /**
  * Convert an Anthropic-shaped request (built for callAnthropicApi) into the
- * OpenAI-compatible body Z.AI's chat/completions endpoint expects: a flat
- * messages array (system prompt becomes a leading {role: 'system'} message)
- * with plain-string content instead of Anthropic content blocks.
+ * OpenAI-compatible body Z.AI/Moonshot/DeepSeek's chat/completions endpoints
+ * expect: a flat messages array (system prompt becomes a leading
+ * {role: 'system'} message). When $supportsVision is false, message content
+ * is flattened to plain text (images dropped — callers must reject image
+ * requests before reaching here). When true, content is converted to
+ * OpenAI's content-block array so image_url blocks survive.
  */
-function buildOpenAiCompatibleRequest(array $apiRequest, string $model): array
+function buildOpenAiCompatibleRequest(array $apiRequest, string $model, bool $supportsVision = false): array
 {
     $messages = [];
     if (isset($apiRequest['system'])) {
         $messages[] = ['role' => 'system', 'content' => $apiRequest['system']];
     }
     foreach ($apiRequest['messages'] as $msg) {
+        $content = $msg['content'] ?? '';
         $messages[] = [
             'role'    => $msg['role'] ?? 'user',
-            'content' => extractPlainText($msg['content'] ?? ''),
+            'content' => $supportsVision ? convertToOpenAiContent($content) : extractPlainText($content),
         ];
     }
     return [
@@ -854,6 +890,40 @@ function buildOpenAiCompatibleRequest(array $apiRequest, string $model): array
         'max_tokens'  => $apiRequest['max_tokens'],
         'temperature' => $apiRequest['temperature'] ?? 1.0,
     ];
+}
+
+/**
+ * Convert an Anthropic-style message content value (string, or an array of
+ * content blocks) into OpenAI's content-block format: text blocks pass
+ * through as {type: text, text}, and Anthropic base64 image blocks become
+ * {type: image_url, image_url: {url: "data:<media_type>;base64,<data>"}}.
+ * Non-base64 image sources (e.g. a remote "url" source type) are dropped —
+ * this proxy only ever builds base64 image blocks itself (saveRequestImages
+ * / the frontend upload flow), so that's the only source type expected.
+ */
+function convertToOpenAiContent($content): array
+{
+    if (is_string($content)) {
+        return [['type' => 'text', 'text' => $content]];
+    }
+    if (!is_array($content)) return [];
+    $blocks = [];
+    foreach ($content as $block) {
+        $type = $block['type'] ?? '';
+        if ($type === 'text') {
+            $blocks[] = ['type' => 'text', 'text' => $block['text'] ?? ''];
+        } elseif ($type === 'image') {
+            $source = $block['source'] ?? [];
+            if (($source['type'] ?? '') === 'base64' && !empty($source['data'])) {
+                $mediaType = $source['media_type'] ?? 'image/jpeg';
+                $blocks[] = [
+                    'type' => 'image_url',
+                    'image_url' => ['url' => "data:{$mediaType};base64,{$source['data']}"],
+                ];
+            }
+        }
+    }
+    return $blocks;
 }
 
 /**

@@ -78,7 +78,7 @@ function hasImages(messages) {
  * Validate model tier name
  */
 function isValidTier(tier) {
-    const validTiers = ['haiku', 'sonnet', 'opus', 'glm', 'kimi'];
+    const validTiers = ['haiku', 'sonnet', 'opus', 'glm', 'kimi', 'dsflash', 'dspro', 'dsvision'];
     return validTiers.includes(tier);
 }
 
@@ -523,13 +523,16 @@ runTest('model_config.json exists and is valid JSON', () => {
     assertArrayHasKey('tiers', modelConfig, 'Config should have tiers');
 });
 
-runTest('model_config.json has all five tiers', () => {
+runTest('model_config.json has all eight tiers', () => {
     assertArrayHasKey('haiku', modelConfig.tiers, 'Should have haiku tier');
     assertArrayHasKey('sonnet', modelConfig.tiers, 'Should have sonnet tier');
     assertArrayHasKey('opus', modelConfig.tiers, 'Should have opus tier');
     assertArrayHasKey('glm', modelConfig.tiers, 'Should have glm tier');
     assertArrayHasKey('kimi', modelConfig.tiers, 'Should have kimi tier');
-    assertEquals(5, Object.keys(modelConfig.tiers).length, 'Should have exactly 5 tiers');
+    assertArrayHasKey('dsflash', modelConfig.tiers, 'Should have dsflash tier');
+    assertArrayHasKey('dspro', modelConfig.tiers, 'Should have dspro tier');
+    assertArrayHasKey('dsvision', modelConfig.tiers, 'Should have dsvision tier');
+    assertEquals(8, Object.keys(modelConfig.tiers).length, 'Should have exactly 8 tiers');
 });
 
 runTest('each tier has pricing information', () => {
@@ -563,6 +566,9 @@ runTest('all primary models use current generation IDs', () => {
     assertContains('opus-4-8', modelConfig.tiers.opus.primary, 'Opus primary should be 4.8');
     assertContains('glm-5.3', modelConfig.tiers.glm.primary, 'GLM primary should be 5.3');
     assertContains('kimi-k3', modelConfig.tiers.kimi.primary, 'Kimi primary should be k3');
+    assertContains('deepseek-v4-flash', modelConfig.tiers.dsflash.primary, 'dsflash primary should be deepseek-v4-flash');
+    assertContains('deepseek-v4-pro', modelConfig.tiers.dspro.primary, 'dspro primary should be deepseek-v4-pro');
+    assertContains('deepseek-v4-flash-vision-exp', modelConfig.tiers.dsvision.primary, 'dsvision primary should be the vision-exp model');
 });
 
 runTest('glm tier is marked with the zai provider', () => {
@@ -573,10 +579,24 @@ runTest('kimi tier is marked with the moonshot provider', () => {
     assertEquals('moonshot', modelConfig.tiers.kimi.provider, 'Kimi tier should declare provider=moonshot');
 });
 
-runTest('fallbacks are non-empty for all tiers except glm and kimi', () => {
-    // GLM/Kimi are served by Z.AI/Moonshot, not Anthropic — no auto-healing fallback chain applies.
+runTest('dsflash, dspro, and dsvision tiers are marked with the deepseek provider', () => {
+    assertEquals('deepseek', modelConfig.tiers.dsflash.provider, 'dsflash should declare provider=deepseek');
+    assertEquals('deepseek', modelConfig.tiers.dspro.provider, 'dspro should declare provider=deepseek');
+    assertEquals('deepseek', modelConfig.tiers.dsvision.provider, 'dsvision should declare provider=deepseek');
+});
+
+runTest('only dsvision declares supportsVision among the external providers', () => {
+    assertTrue(!!modelConfig.tiers.dsvision.supportsVision, 'dsvision should declare supportsVision=true');
+    for (const tier of ['glm', 'kimi', 'dsflash', 'dspro']) {
+        assertFalse(!!modelConfig.tiers[tier].supportsVision, `${tier} should not declare supportsVision`);
+    }
+});
+
+runTest('fallbacks are non-empty for all tiers except the external providers', () => {
+    // GLM/Kimi/DeepSeek are served by Z.AI/Moonshot/DeepSeek, not Anthropic — no auto-healing fallback chain applies.
+    const externalTiers = ['glm', 'kimi', 'dsflash', 'dspro', 'dsvision'];
     for (const [tier, info] of Object.entries(modelConfig.tiers)) {
-        if (tier === 'glm' || tier === 'kimi') continue;
+        if (externalTiers.includes(tier)) continue;
         assertTrue(info.fallbacks.length >= 1, `${tier} should have at least 1 fallback`);
     }
 });
@@ -610,6 +630,16 @@ runTest('calculateCostUsd applies separate input/output rates for kimi', () => {
 
 runTest('calculateCostUsd returns null for an unknown tier', () => {
     assertEquals(null, calculateCostUsd(modelConfig, 'not-a-real-tier', 1000, 1000), 'Unknown tier should return null, not a false cost of $0');
+});
+
+runTest("calculateCostUsd matches DeepSeek Pro's higher rate vs dsflash/dsvision", () => {
+    const flashCost = calculateCostUsd(modelConfig, 'dsflash', 1000000, 1000000);
+    const proCost = calculateCostUsd(modelConfig, 'dspro', 1000000, 1000000);
+    const visionCost = calculateCostUsd(modelConfig, 'dsvision', 1000000, 1000000);
+    assertEquals(0.22 + 0.66, flashCost, 'dsflash cost should use $0.22 input + $0.66 output per MTok');
+    assertEquals(0.66 + 1.98, proCost, 'dspro cost should use $0.66 input + $1.98 output per MTok');
+    assertEquals(flashCost, visionCost, "dsvision shares dsflash's rate card");
+    assertTrue(proCost > flashCost, 'DeepSeek Pro should cost more than Flash for the same tokens');
 });
 
 // --- Input Size Cap Tests ---
@@ -666,8 +696,8 @@ runTest('non-opus model not affected by restriction', () => {
     assertFalse(opusDowngraded, 'Should not flag downgrade for non-opus');
 });
 
-// --- External Provider Tests (GLM / Z.AI, Kimi K3 / Moonshot) ---
-console.log('\nExternal Providers (GLM + Kimi):');
+// --- External Provider Tests (GLM / Z.AI, Kimi K3 / Moonshot, DeepSeek) ---
+console.log('\nExternal Providers (GLM + Kimi + DeepSeek):');
 
 runTest('glm is not downgraded by message count (no first-exchange restriction)', () => {
     // Unlike the old Fable tier, GLM is the cheap default and has no
@@ -677,27 +707,35 @@ runTest('glm is not downgraded by message count (no first-exchange restriction)'
     assertEquals('glm', model, 'GLM should remain glm regardless of message count');
 });
 
-runTest('kimi is not downgraded by message count (no first-exchange restriction)', () => {
-    const model = 'kimi';
-    const messageCount = 25;
-    assertEquals('kimi', model, 'Kimi should remain kimi regardless of message count');
-});
-
-runTest('any external provider + image request is rejected before calling the API', () => {
-    // Mirrors the guard in api-proxy.php: neither OpenAI-compatible endpoint
-    // gets Anthropic-style image content blocks translated for it (yet).
-    for (const provider of ['zai', 'moonshot']) {
-        const isExternalProvider = provider !== 'anthropic';
-        const requestHasImages = true;
-        assertTrue(isExternalProvider && requestHasImages, `A ${provider} request containing images should be rejected`);
+runTest('kimi and deepseek tiers are not downgraded by message count', () => {
+    for (const tier of ['kimi', 'dsflash', 'dspro', 'dsvision']) {
+        const model = tier;
+        const messageCount = 25;
+        assertEquals(tier, model, `${tier} should remain ${tier} regardless of message count`);
     }
 });
 
-runTest('anthropic provider + image request is NOT rejected by the external-provider guard', () => {
-    const provider = 'anthropic';
+// Local copy of api-proxy.php's vision-guard logic.
+function supportsVisionForTier(config, tier) {
+    const provider = config.tiers[tier]?.provider || 'anthropic';
     const isExternalProvider = provider !== 'anthropic';
-    const requestHasImages = true;
-    assertFalse(isExternalProvider && requestHasImages, 'Anthropic tiers (Opus vision) must not be blocked by this guard');
+    return !isExternalProvider || !!config.tiers[tier]?.supportsVision;
+}
+
+runTest('text-only external tiers reject image requests; dsvision does not', () => {
+    for (const tier of ['glm', 'kimi', 'dsflash', 'dspro']) {
+        const rejected = !supportsVisionForTier(modelConfig, tier) && true /* requestHasImages */;
+        assertTrue(rejected, `A ${tier} request containing images should be rejected`);
+    }
+    const dsVisionRejected = !supportsVisionForTier(modelConfig, 'dsvision') && true;
+    assertFalse(dsVisionRejected, 'dsvision should NOT reject image requests');
+});
+
+runTest('anthropic tiers are never rejected by the vision guard', () => {
+    for (const tier of ['haiku', 'sonnet', 'opus']) {
+        const rejected = !supportsVisionForTier(modelConfig, tier) && true;
+        assertFalse(rejected, `${tier} (Anthropic) must not be blocked by the vision guard`);
+    }
 });
 
 runTest('extractPlainText flattens Anthropic content blocks to plain text', () => {
@@ -721,6 +759,37 @@ runTest('extractPlainText flattens Anthropic content blocks to plain text', () =
         ]),
         'Text blocks should be joined; image blocks dropped'
     );
+});
+
+runTest('convertToOpenAiContent translates an Anthropic image block to OpenAI image_url', () => {
+    // Local copy of api-proxy.php's convertToOpenAiContent() — used for dsvision.
+    const convertToOpenAiContent = (content) => {
+        if (typeof content === 'string') return [{ type: 'text', text: content }];
+        if (!Array.isArray(content)) return [];
+        const blocks = [];
+        for (const block of content) {
+            if (block.type === 'text') {
+                blocks.push({ type: 'text', text: block.text || '' });
+            } else if (block.type === 'image') {
+                const source = block.source || {};
+                if (source.type === 'base64' && source.data) {
+                    const mediaType = source.media_type || 'image/jpeg';
+                    blocks.push({ type: 'image_url', image_url: { url: `data:${mediaType};base64,${source.data}` } });
+                }
+            }
+        }
+        return blocks;
+    };
+
+    const result = convertToOpenAiContent([
+        { type: 'text', text: 'What is this?' },
+        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'xxxBASE64xxx' } },
+    ]);
+
+    assertEquals(2, result.length, 'Should produce one text block and one image_url block');
+    assertEquals('text', result[0].type, 'First block should stay a text block');
+    assertEquals('image_url', result[1].type, 'Image block should become image_url');
+    assertEquals('data:image/png;base64,xxxBASE64xxx', result[1].image_url.url, 'image_url.url should be a data: URI with the correct media type');
 });
 
 // --- Conversation Length Cap Tests ---
@@ -814,6 +883,10 @@ const COSTS = {
     'glm-5.3':                   { input: 0.995, output: 0.995 },
     // Moonshot (Kimi tier) — standard/cache-miss rate.
     'kimi-k3':                   { input: 3.00,  output: 15.00 },
+    // DeepSeek — off-peak cache-miss rates.
+    'deepseek-v4-flash':         { input: 0.22,  output: 0.66 },
+    'deepseek-v4-pro':           { input: 0.66,  output: 1.98 },
+    'deepseek-v4-flash-vision-exp': { input: 0.22, output: 0.66 },
 };
 
 function estimateCost(model, inputTokens, outputTokens) {

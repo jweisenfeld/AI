@@ -104,6 +104,7 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
             --danger: #ef4444;
             --success: #10b981;
             --blue: #3b82f6;
+            --purple: #a855f7;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -245,6 +246,7 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
         .bar-fill.opus { background: var(--danger); }
         .bar-fill.glm { background: var(--accent2); }
         .bar-fill.kimi { background: var(--blue); }
+        .bar-fill.deepseek { background: var(--purple); }
         .bar-fill.default { background: var(--blue); }
 
         /* Cost estimate */
@@ -430,6 +432,10 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
             'glm-5.3':                   { input: 0.995, output: 0.995 },
             // Moonshot (Kimi tier) — standard/cache-miss rate from platform.kimi.ai/docs/pricing/chat-k3.
             'kimi-k3':                   { input: 3.00,  output: 15.00 },
+            // DeepSeek — off-peak cache-miss rates from api-docs.deepseek.com/quick_start/pricing.
+            'deepseek-v4-flash':         { input: 0.22,  output: 0.66 },
+            'deepseek-v4-pro':           { input: 0.66,  output: 1.98 },
+            'deepseek-v4-flash-vision-exp': { input: 0.22, output: 0.66 },
         };
 
         // Fallback estimator for log rows written before api-proxy.php started
@@ -624,7 +630,7 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
             document.getElementById('model-chart').innerHTML = Object.entries(byModel)
                 .sort((a, b) => b[1].cost - a[1].cost)
                 .map(([model, d]) => {
-                    const tier = model.includes('haiku') ? 'haiku' : model.includes('opus') ? 'opus' : model.includes('glm') ? 'glm' : model.includes('kimi') ? 'kimi' : 'sonnet';
+                    const tier = model.includes('haiku') ? 'haiku' : model.includes('opus') ? 'opus' : model.includes('glm') ? 'glm' : model.includes('kimi') ? 'kimi' : model.includes('deepseek') ? 'deepseek' : 'sonnet';
                     return `<div class="bar-row">
                         <div class="bar-label" style="min-width:200px; font-size:0.8rem">${model}</div>
                         <div class="bar-track">

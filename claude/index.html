@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Claude - Physics Chatbot</title>
+    <title>Physics - Chatbot - Tutor</title>
     <!-- KaTeX for math rendering -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
@@ -868,7 +868,7 @@
     <header class="header">
         <div class="header-content">
             <div>
-                <h1>Claude - Physics Chatbot</h1>
+                <h1>Physics - Chatbot - Tutor</h1>
                 <div class="header-subtitle">Here to help you learn physics. Conversations are logged so your teacher can make sure this tool is working for you.</div>
             </div>
             <div class="api-status">
@@ -897,7 +897,7 @@
                 </div>
                 <div class="feature-item" data-feature="models" onclick="selectFeature('models')">
                     <h3>Model Selection</h3>
-                    <p>Choose between Opus, Sonnet, Haiku, GLM 5.3, and Kimi K3</p>
+                    <p>Choose between Opus, Sonnet, Haiku, GLM 5.3, Kimi K3, and DeepSeek</p>
                 </div>
                 <div class="feature-item" data-feature="temperature" onclick="selectFeature('temperature')">
                     <h3>Temperature Control</h3>
@@ -979,6 +979,18 @@
                             <span class="model-name">Kimi K3</span>
                             <span class="model-desc">$$</span>
                         </button>
+                        <button class="model-btn" data-model="dsflash" onclick="selectModel(this)" title="DeepSeek V4 Flash. Fast and cheap. Text only — no image support yet.">
+                            <span class="model-name">DeepSeek Flash</span>
+                            <span class="model-desc">$</span>
+                        </button>
+                        <button class="model-btn" data-model="dspro" onclick="selectModel(this)" title="DeepSeek V4 Pro. More capable. Text only — no image support yet.">
+                            <span class="model-name">DeepSeek Pro</span>
+                            <span class="model-desc">$$</span>
+                        </button>
+                        <button class="model-btn" data-model="dsvision" onclick="selectModel(this)" title="DeepSeek V4 Flash Vision (experimental). Supports images!">
+                            <span class="model-name">DeepSeek Vision</span>
+                            <span class="model-desc">$ &#128247;</span>
+                        </button>
                     </div>
                 </div>
                 <div class="settings-row">
@@ -1007,7 +1019,7 @@
                         <ul>
                             <li><strong>Vision</strong> - Paste (Ctrl+V), drag & drop, or click the camera button to add images</li>
                             <li><strong>System Prompts</strong> - Click "System Prompts" to customize my behavior</li>
-                            <li><strong>Model Selection</strong> - Switch between Haiku, Sonnet, Opus, GLM 5.3, and Kimi K3 above</li>
+                            <li><strong>Model Selection</strong> - Switch between Haiku, Sonnet, Opus, GLM 5.3, Kimi K3, and 3 DeepSeek models above</li>
                             <li><strong>Temperature</strong> - Adjust the slider to control creativity</li>
                         </ul>
                     </div>
@@ -1182,7 +1194,7 @@
             },
             models: {
                 title: 'Model Selection',
-                description: 'Choose the right model for your task: Haiku (fastest, cheapest), Sonnet (balanced), Opus (most capable), GLM 5.3 (Z.AI, default), or Kimi K3 (Moonshot.ai).',
+                description: 'Choose the right model for your task: Haiku (fastest, cheapest), Sonnet (balanced), Opus (most capable), GLM 5.3 (Z.AI, default), Kimi K3 (Moonshot.ai), or DeepSeek Flash/Pro/Vision (DeepSeek Vision is the only non-Anthropic model that accepts images).',
                 prompt: 'Switch models above and ask the same question to compare responses.'
             },
             temperature: {

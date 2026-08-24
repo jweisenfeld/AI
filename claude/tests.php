@@ -110,7 +110,7 @@ function isValidTier(string $tier): bool
         }
     }
     // Fallback: check hardcoded tiers
-    return in_array($tier, ['haiku', 'sonnet', 'opus', 'glm', 'kimi'], true);
+    return in_array($tier, ['haiku', 'sonnet', 'opus', 'glm', 'kimi', 'dsflash', 'dspro', 'dsvision'], true);
 }
 
 /**
@@ -154,6 +154,25 @@ function loadModelConfig(string $configPath): array
                 'primary'   => 'kimi-k3',
                 'fallbacks' => [],
                 'pricing'   => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00],
+            ],
+            'dsflash' => [
+                'provider'  => 'deepseek',
+                'primary'   => 'deepseek-v4-flash',
+                'fallbacks' => [],
+                'pricing'   => ['input_per_mtok' => 0.22, 'output_per_mtok' => 0.66],
+            ],
+            'dspro'  => [
+                'provider'  => 'deepseek',
+                'primary'   => 'deepseek-v4-pro',
+                'fallbacks' => [],
+                'pricing'   => ['input_per_mtok' => 0.66, 'output_per_mtok' => 1.98],
+            ],
+            'dsvision' => [
+                'provider'       => 'deepseek',
+                'primary'        => 'deepseek-v4-flash-vision-exp',
+                'fallbacks'      => [],
+                'supportsVision' => true,
+                'pricing'        => ['input_per_mtok' => 0.22, 'output_per_mtok' => 0.66],
             ],
         ]
     ];
@@ -278,6 +297,12 @@ runTest('accepts glm tier', function() {
 
 runTest('accepts kimi tier', function() {
     assertTrue(isValidTier('kimi'), 'Kimi should be a valid tier');
+});
+
+runTest('accepts dsflash, dspro, and dsvision tiers', function() {
+    assertTrue(isValidTier('dsflash'), 'DeepSeek Flash should be a valid tier');
+    assertTrue(isValidTier('dspro'), 'DeepSeek Pro should be a valid tier');
+    assertTrue(isValidTier('dsvision'), 'DeepSeek Vision should be a valid tier');
 });
 
 runTest('rejects invalid tier', function() {
@@ -671,14 +696,17 @@ runTest('model_config.json exists and is valid JSON', function() {
     assertArrayHasKey('tiers', $config, 'Config should have tiers');
 });
 
-runTest('model_config.json has all five tiers', function() {
+runTest('model_config.json has all eight tiers', function() {
     $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
     assertArrayHasKey('haiku', $config['tiers'], 'Should have haiku tier');
     assertArrayHasKey('sonnet', $config['tiers'], 'Should have sonnet tier');
     assertArrayHasKey('opus', $config['tiers'], 'Should have opus tier');
     assertArrayHasKey('glm', $config['tiers'], 'Should have glm tier');
     assertArrayHasKey('kimi', $config['tiers'], 'Should have kimi tier');
-    assertEquals(5, count($config['tiers']), 'Should have exactly 5 tiers');
+    assertArrayHasKey('dsflash', $config['tiers'], 'Should have dsflash tier');
+    assertArrayHasKey('dspro', $config['tiers'], 'Should have dspro tier');
+    assertArrayHasKey('dsvision', $config['tiers'], 'Should have dsvision tier');
+    assertEquals(8, count($config['tiers']), 'Should have exactly 8 tiers');
 });
 
 runTest('each tier has pricing information', function() {
@@ -717,12 +745,18 @@ runTest('all primary models use current generation IDs', function() {
     $opusPrimary = $config['tiers']['opus']['primary'];
     $glmPrimary = $config['tiers']['glm']['primary'];
     $kimiPrimary = $config['tiers']['kimi']['primary'];
+    $dsFlashPrimary = $config['tiers']['dsflash']['primary'];
+    $dsProPrimary = $config['tiers']['dspro']['primary'];
+    $dsVisionPrimary = $config['tiers']['dsvision']['primary'];
     // Should be snapshot or alias IDs, not deprecated models
     assertContains('haiku-4-5', $haikuPrimary, 'Haiku primary should be 4.5 series');
     assertContains('sonnet-5', $sonnetPrimary, 'Sonnet primary should be 5');
     assertContains('opus-4-8', $opusPrimary, 'Opus primary should be 4.8');
     assertContains('glm-5.3', $glmPrimary, 'GLM primary should be 5.3');
     assertContains('kimi-k3', $kimiPrimary, 'Kimi primary should be k3');
+    assertContains('deepseek-v4-flash', $dsFlashPrimary, 'DeepSeek Flash primary should be deepseek-v4-flash');
+    assertContains('deepseek-v4-pro', $dsProPrimary, 'DeepSeek Pro primary should be deepseek-v4-pro');
+    assertContains('deepseek-v4-flash-vision-exp', $dsVisionPrimary, 'DeepSeek Vision primary should be the vision-exp model');
 });
 
 runTest('glm tier is marked with the zai provider', function() {
@@ -735,12 +769,29 @@ runTest('kimi tier is marked with the moonshot provider', function() {
     assertEquals('moonshot', $config['tiers']['kimi']['provider'] ?? null, 'Kimi tier should declare provider=moonshot');
 });
 
-runTest('fallbacks are non-empty for all tiers except glm and kimi', function() {
-    // GLM and Kimi are served by Z.AI/Moonshot, not Anthropic — the Anthropic
-    // auto-healing fallback chain doesn't apply, so empty fallback lists are intentional.
+runTest('dsflash, dspro, and dsvision tiers are marked with the deepseek provider', function() {
     $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    assertEquals('deepseek', $config['tiers']['dsflash']['provider'] ?? null, 'dsflash should declare provider=deepseek');
+    assertEquals('deepseek', $config['tiers']['dspro']['provider'] ?? null, 'dspro should declare provider=deepseek');
+    assertEquals('deepseek', $config['tiers']['dsvision']['provider'] ?? null, 'dsvision should declare provider=deepseek');
+});
+
+runTest('only dsvision declares supportsVision among the external providers', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    assertTrue(!empty($config['tiers']['dsvision']['supportsVision']), 'dsvision should declare supportsVision=true');
+    foreach (['glm', 'kimi', 'dsflash', 'dspro'] as $tier) {
+        assertFalse(!empty($config['tiers'][$tier]['supportsVision'] ?? false), "{$tier} should not declare supportsVision");
+    }
+});
+
+runTest('fallbacks are non-empty for all tiers except the external providers', function() {
+    // GLM/Kimi/DeepSeek are served by Z.AI/Moonshot/DeepSeek, not Anthropic —
+    // the Anthropic auto-healing fallback chain doesn't apply, so empty
+    // fallback lists are intentional.
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    $externalTiers = ['glm', 'kimi', 'dsflash', 'dspro', 'dsvision'];
     foreach ($config['tiers'] as $tier => $info) {
-        if ($tier === 'glm' || $tier === 'kimi') continue;
+        if (in_array($tier, $externalTiers, true)) continue;
         assertTrue(count($info['fallbacks']) >= 1, "{$tier} should have at least 1 fallback");
     }
 });
@@ -759,7 +810,7 @@ runTest('hardcoded fallback matches model_config.json', function() {
     // Load hardcoded fallback (by passing a nonexistent path)
     $hardcoded = loadModelConfig('/nonexistent/path');
 
-    foreach (['haiku', 'sonnet', 'opus', 'glm', 'kimi'] as $tier) {
+    foreach (['haiku', 'sonnet', 'opus', 'glm', 'kimi', 'dsflash', 'dspro', 'dsvision'] as $tier) {
         assertEquals(
             $fileConfig['tiers'][$tier]['primary'],
             $hardcoded['tiers'][$tier]['primary'],
@@ -784,6 +835,17 @@ runTest('calculateCostUsd applies separate input/output rates for kimi', functio
 runTest('calculateCostUsd returns null for an unknown tier', function() {
     $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
     assertEquals(null, calculateCostUsd($config, 'not-a-real-tier', 1000, 1000), 'Unknown tier should return null, not a false cost of $0');
+});
+
+runTest('calculateCostUsd matches DeepSeek Pro\'s higher rate vs dsflash/dsvision', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    $flashCost = calculateCostUsd($config, 'dsflash', 1000000, 1000000);
+    $proCost = calculateCostUsd($config, 'dspro', 1000000, 1000000);
+    $visionCost = calculateCostUsd($config, 'dsvision', 1000000, 1000000);
+    assertEquals(0.22 + 0.66, $flashCost, 'dsflash cost should use $0.22 input + $0.66 output per MTok');
+    assertEquals(0.66 + 1.98, $proCost, 'dspro cost should use $0.66 input + $1.98 output per MTok');
+    assertEquals($flashCost, $visionCost, 'dsvision shares dsflash\'s rate card');
+    assertTrue($proCost > $flashCost, 'DeepSeek Pro should cost more than Flash for the same tokens');
 });
 
 // --- Input Size Cap Tests ---
@@ -853,8 +915,8 @@ runTest('non-opus model not affected by restriction', function() {
     assertFalse($opusDowngraded, 'Should not flag downgrade for non-opus');
 });
 
-// --- External Provider Tests (GLM / Z.AI, Kimi K3 / Moonshot) ---
-echo "\nExternal Providers (GLM + Kimi):\n";
+// --- External Provider Tests (GLM / Z.AI, Kimi K3 / Moonshot, DeepSeek) ---
+echo "\nExternal Providers (GLM + Kimi + DeepSeek):\n";
 
 runTest('glm is not downgraded by message count (no first-exchange restriction)', function() {
     // Unlike the old Fable tier, GLM has no "first message only" gate —
@@ -864,30 +926,40 @@ runTest('glm is not downgraded by message count (no first-exchange restriction)'
     assertEquals('glm', $model, 'GLM should remain glm regardless of message count');
 });
 
-runTest('kimi is not downgraded by message count (no first-exchange restriction)', function() {
-    $model = 'kimi';
-    $messageCount = 25;
-    assertEquals('kimi', $model, 'Kimi should remain kimi regardless of message count');
-});
-
-runTest('any external provider + image request is rejected before calling the API', function() {
-    // Mirrors the guard in api-proxy.php: buildOpenAiCompatibleRequest()/
-    // callOpenAiCompatibleApi() are never reached when images are present,
-    // since neither OpenAI-compatible endpoint gets Anthropic-style image
-    // content blocks translated for it (yet).
-    foreach (['zai', 'moonshot'] as $provider) {
-        $isExternalProvider = $provider !== 'anthropic';
-        $requestHasImages = true;
-        $rejected = ($isExternalProvider && $requestHasImages);
-        assertTrue($rejected, "A $provider request containing images should be rejected");
+runTest('kimi and deepseek tiers are not downgraded by message count', function() {
+    foreach (['kimi', 'dsflash', 'dspro', 'dsvision'] as $tier) {
+        $model = $tier;
+        $messageCount = 25;
+        assertEquals($tier, $model, "{$tier} should remain {$tier} regardless of message count");
     }
 });
 
-runTest('anthropic provider + image request is NOT rejected by the external-provider guard', function() {
-    $provider = 'anthropic';
+// Local copy of api-proxy.php's vision-guard logic (config lookup + the
+// image-rejection condition), kept here rather than included, since
+// api-proxy.php runs top-level request handling on load.
+function supportsVisionForTier(array $config, string $tier): bool
+{
+    $provider = $config['tiers'][$tier]['provider'] ?? 'anthropic';
     $isExternalProvider = $provider !== 'anthropic';
-    $requestHasImages = true;
-    assertFalse($isExternalProvider && $requestHasImages, 'Anthropic tiers (Opus vision) must not be blocked by this guard');
+    return !$isExternalProvider || !empty($config['tiers'][$tier]['supportsVision']);
+}
+
+runTest('text-only external tiers reject image requests; dsvision does not', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    foreach (['glm', 'kimi', 'dsflash', 'dspro'] as $tier) {
+        $rejected = (!supportsVisionForTier($config, $tier) && true /* requestHasImages */);
+        assertTrue($rejected, "A {$tier} request containing images should be rejected");
+    }
+    $dsVisionRejected = (!supportsVisionForTier($config, 'dsvision') && true);
+    assertFalse($dsVisionRejected, 'dsvision should NOT reject image requests');
+});
+
+runTest('anthropic tiers are never rejected by the vision guard', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    foreach (['haiku', 'sonnet', 'opus'] as $tier) {
+        $rejected = (!supportsVisionForTier($config, $tier) && true);
+        assertFalse($rejected, "{$tier} (Anthropic) must not be blocked by the vision guard");
+    }
 });
 
 runTest('extractPlainText flattens Anthropic content blocks to plain text', function() {
@@ -915,6 +987,41 @@ runTest('extractPlainText flattens Anthropic content blocks to plain text', func
         ]),
         'Text blocks should be joined; image blocks dropped'
     );
+});
+
+runTest('convertToOpenAiContent translates an Anthropic image block to OpenAI image_url', function() {
+    // Local copy of api-proxy.php's convertToOpenAiContent() — used for dsvision.
+    $convertToOpenAiContent = function ($content) {
+        if (is_string($content)) return [['type' => 'text', 'text' => $content]];
+        if (!is_array($content)) return [];
+        $blocks = [];
+        foreach ($content as $block) {
+            $type = $block['type'] ?? '';
+            if ($type === 'text') {
+                $blocks[] = ['type' => 'text', 'text' => $block['text'] ?? ''];
+            } elseif ($type === 'image') {
+                $source = $block['source'] ?? [];
+                if (($source['type'] ?? '') === 'base64' && !empty($source['data'])) {
+                    $mediaType = $source['media_type'] ?? 'image/jpeg';
+                    $blocks[] = [
+                        'type' => 'image_url',
+                        'image_url' => ['url' => "data:{$mediaType};base64,{$source['data']}"],
+                    ];
+                }
+            }
+        }
+        return $blocks;
+    };
+
+    $result = $convertToOpenAiContent([
+        ['type' => 'text', 'text' => 'What is this?'],
+        ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => 'image/png', 'data' => 'xxxBASE64xxx']],
+    ]);
+
+    assertEquals(2, count($result), 'Should produce one text block and one image_url block');
+    assertEquals('text', $result[0]['type'], 'First block should stay a text block');
+    assertEquals('image_url', $result[1]['type'], 'Image block should become image_url');
+    assertEquals('data:image/png;base64,xxxBASE64xxx', $result[1]['image_url']['url'], 'image_url.url should be a data: URI with the correct media type');
 });
 
 // --- Conversation Length Cap Tests ---

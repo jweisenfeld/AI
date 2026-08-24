@@ -197,6 +197,12 @@
             gap: 12px;
         }
 
+        .model-selector-rows {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
         .model-selector {
             display: flex;
             gap: 8px;
@@ -891,7 +897,7 @@
                 </div>
                 <div class="feature-item" data-feature="models" onclick="selectFeature('models')">
                     <h3>Model Selection</h3>
-                    <p>Choose between Opus, Sonnet, Haiku, and GLM 5.3</p>
+                    <p>Choose between Opus, Sonnet, Haiku, GLM 5.3, and Kimi K3</p>
                 </div>
                 <div class="feature-item" data-feature="temperature" onclick="selectFeature('temperature')">
                     <h3>Temperature Control</h3>
@@ -949,23 +955,31 @@
 
             <!-- Chat Header -->
             <div class="chat-header">
-                <div class="model-selector">
-                    <button class="model-btn" data-model="haiku" onclick="selectModel(this)">
-                        <span class="model-name">Haiku</span>
-                        <span class="model-desc">Fastest - $</span>
-                    </button>
-                    <button class="model-btn" data-model="sonnet" onclick="selectModel(this)">
-                        <span class="model-name">Sonnet</span>
-                        <span class="model-desc">Balanced - $$</span>
-                    </button>
-                    <button class="model-btn" data-model="opus" onclick="selectModel(this)" title="Best for physics screenshots &amp; tough questions. Available for first message only.">
-                        <span class="model-name">Opus</span>
-                        <span class="model-desc">Best - $$$</span>
-                    </button>
-                    <button class="model-btn active" data-model="glm" onclick="selectModel(this)" title="GLM 5.3 (Z.AI). Text only — no image support yet.">
-                        <span class="model-name">GLM 5.3</span>
-                        <span class="model-desc">Default - $</span>
-                    </button>
+                <div class="model-selector-rows">
+                    <div class="model-selector">
+                        <button class="model-btn" data-model="haiku" onclick="selectModel(this)">
+                            <span class="model-name">Haiku</span>
+                            <span class="model-desc">Fastest - $</span>
+                        </button>
+                        <button class="model-btn" data-model="sonnet" onclick="selectModel(this)">
+                            <span class="model-name">Sonnet</span>
+                            <span class="model-desc">Balanced - $$</span>
+                        </button>
+                        <button class="model-btn" data-model="opus" onclick="selectModel(this)" title="Best for physics screenshots &amp; tough questions. Available for first message only.">
+                            <span class="model-name">Opus</span>
+                            <span class="model-desc">Best - $$$</span>
+                        </button>
+                        <button class="model-btn active" data-model="glm" onclick="selectModel(this)" title="GLM 5.3 (Z.AI). Text only — no image support yet.">
+                            <span class="model-name">GLM 5.3</span>
+                            <span class="model-desc">Default - $</span>
+                        </button>
+                    </div>
+                    <div class="model-selector">
+                        <button class="model-btn" data-model="kimi" onclick="selectModel(this)" title="Moonshot.ai. Text only — no image support yet.">
+                            <span class="model-name">Kimi K3</span>
+                            <span class="model-desc">$$</span>
+                        </button>
+                    </div>
                 </div>
                 <div class="settings-row">
                     <div class="setting-group">
@@ -993,7 +1007,7 @@
                         <ul>
                             <li><strong>Vision</strong> - Paste (Ctrl+V), drag & drop, or click the camera button to add images</li>
                             <li><strong>System Prompts</strong> - Click "System Prompts" to customize my behavior</li>
-                            <li><strong>Model Selection</strong> - Switch between Haiku, Sonnet, Opus, and GLM 5.3 above</li>
+                            <li><strong>Model Selection</strong> - Switch between Haiku, Sonnet, Opus, GLM 5.3, and Kimi K3 above</li>
                             <li><strong>Temperature</strong> - Adjust the slider to control creativity</li>
                         </ul>
                     </div>
@@ -1168,7 +1182,7 @@
             },
             models: {
                 title: 'Model Selection',
-                description: 'Choose the right model for your task: Haiku (fastest, cheapest), Sonnet (balanced), Opus (most capable), or GLM 5.3 (Z.AI, default).',
+                description: 'Choose the right model for your task: Haiku (fastest, cheapest), Sonnet (balanced), Opus (most capable), GLM 5.3 (Z.AI, default), or Kimi K3 (Moonshot.ai).',
                 prompt: 'Switch models above and ask the same question to compare responses.'
             },
             temperature: {

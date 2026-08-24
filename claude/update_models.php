@@ -328,7 +328,13 @@ function getDefaultConfig(): array
                 'provider' => 'zai',
                 'primary' => 'glm-5.3',
                 'fallbacks' => [],
-                'pricing' => ['input_per_mtok' => 1.40, 'output_per_mtok' => 4.40],
+                'pricing' => ['input_per_mtok' => 0.995, 'output_per_mtok' => 0.995],
+            ],
+            'kimi' => [
+                'provider' => 'moonshot',
+                'primary' => 'kimi-k3',
+                'fallbacks' => [],
+                'pricing' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00],
             ],
         ],
     ];

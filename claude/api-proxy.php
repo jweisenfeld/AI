@@ -39,7 +39,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 $accountRoot  = dirname($_SERVER['DOCUMENT_ROOT']);   // e.g. /home2/fikrttmy
 $secretsDir   = $accountRoot . '/.secrets';
 $secretsFile  = $secretsDir . '/claudekey.php';
-$zaiSecretsFile = $secretsDir . '/zaikey.php';
 $studentFile  = $secretsDir . '/student_roster.csv';
 $smtpFile     = $secretsDir . '/smtp_credentials.php';  // shared with wheel3/coach6
 define('ALERT_TO', 'jweisenfeld@psd1.org');
@@ -64,12 +63,30 @@ if (!$ANTHROPIC_API_KEY) {
     exit;
 }
 
-// Z.AI (GLM) key is optional at boot — only required if a student actually
-// picks the "glm" tier. Missing/unreadable file just means that tier is down.
-$ZAI_API_KEY = null;
-if (is_readable($zaiSecretsFile)) {
-    $zaiSecrets = require $zaiSecretsFile;
-    $ZAI_API_KEY = $zaiSecrets['ZAI_API_KEY'] ?? null;
+// Non-Anthropic ("external") providers — Z.AI (GLM) and Moonshot (Kimi) — are
+// both OpenAI-compatible endpoints, each keyed by its own secrets file. Keys
+// are optional at boot; only required if a student actually picks that tier,
+// so a missing/unreadable file just means that one tier is down.
+$EXTERNAL_PROVIDERS = [
+    'zai' => [
+        'endpoint'    => 'https://api.z.ai/api/paas/v4/chat/completions',
+        'secretsFile' => $secretsDir . '/zaikey.php',
+        'secretKey'   => 'ZAI_API_KEY',
+    ],
+    'moonshot' => [
+        'endpoint'    => 'https://api.moonshot.ai/v1/chat/completions',
+        'secretsFile' => $secretsDir . '/kimikey.php',
+        'secretKey'   => 'KIMI_API_KEY',
+    ],
+];
+
+$EXTERNAL_API_KEYS = [];
+foreach ($EXTERNAL_PROVIDERS as $providerName => $providerInfo) {
+    $EXTERNAL_API_KEYS[$providerName] = null;
+    if (is_readable($providerInfo['secretsFile'])) {
+        $providerSecrets = require $providerInfo['secretsFile'];
+        $EXTERNAL_API_KEYS[$providerName] = $providerSecrets[$providerInfo['secretKey']] ?? null;
+    }
 }
 
 // Read and validate JSON request body
@@ -375,24 +392,27 @@ if (!isset($modelMap[$requestedModel])) {
 }
 $resolvedModel = $modelMap[$requestedModel];
 $provider = $config['tiers'][$requestedModel]['provider'] ?? 'anthropic';
+$isExternalProvider = $provider !== 'anthropic';
 
-// GLM (Z.AI) is text-only for now — the frontend sends Anthropic-shaped
-// image blocks that Z.AI's OpenAI-compatible endpoint doesn't understand.
-if ($provider === 'zai' && $requestHasImages) {
+// GLM and Kimi K3 are text-only here for now — the frontend sends
+// Anthropic-shaped image blocks that neither OpenAI-compatible endpoint
+// understands (Kimi K3 itself supports vision, but via OpenAI's separate
+// image_url content-block format, which this proxy doesn't build yet).
+if ($isExternalProvider && $requestHasImages) {
     http_response_code(400);
     echo json_encode([
         'error' => [
             'type' => 'unsupported_model',
-            'message' => 'GLM 5.3 doesn\'t support images yet. Switch to Sonnet or Opus to send a photo or screenshot.'
+            'message' => 'This model doesn\'t support images yet. Switch to Sonnet or Opus to send a photo or screenshot.'
         ]
     ]);
     exit;
 }
 
-if ($provider === 'zai' && !$ZAI_API_KEY) {
+if ($isExternalProvider && empty($EXTERNAL_API_KEYS[$provider])) {
     http_response_code(500);
-    error_log("ZAI_API_KEY missing in secrets file: $zaiSecretsFile");
-    echo json_encode(['error' => 'Server configuration error (GLM API key missing).']);
+    error_log("API key missing for external provider '$provider' (tier '$requestedModel'): " . $EXTERNAL_PROVIDERS[$provider]['secretsFile']);
+    echo json_encode(['error' => 'Server configuration error (API key missing for this model).']);
     exit;
 }
 
@@ -489,20 +509,22 @@ $logEntry['provider'] = $provider;
 
 // --- Make API call ---
 $modelHealed = false;
-if ($provider === 'zai') {
-    // GLM (Z.AI): OpenAI-compatible endpoint, no auto-healing (single model, no fallbacks configured).
-    $zaiRequest = buildZaiRequest($apiRequest, $resolvedModel);
-    list($httpCode, $rawResponse, $curlError) = callZaiApi($zaiRequest, $ZAI_API_KEY);
+if ($isExternalProvider) {
+    // GLM/Kimi K3: OpenAI-compatible endpoints, no auto-healing (single model, no fallbacks configured).
+    $externalRequest = buildOpenAiCompatibleRequest($apiRequest, $resolvedModel);
+    $endpoint = $EXTERNAL_PROVIDERS[$provider]['endpoint'];
+    $apiKey   = $EXTERNAL_API_KEYS[$provider];
+    list($httpCode, $rawResponse, $curlError) = callOpenAiCompatibleApi($endpoint, $externalRequest, $apiKey);
 
     if ($curlError) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to connect to GLM API: ' . $curlError]);
+        echo json_encode(['error' => "Failed to connect to $provider API: " . $curlError]);
         exit;
     }
 
-    $responseData = normalizeZaiResponse(json_decode($rawResponse, true), $resolvedModel);
+    $responseData = normalizeOpenAiCompatibleResponse(json_decode($rawResponse, true), $resolvedModel);
     if (isset($responseData['error']) && $httpCode < 400) {
-        $httpCode = 502; // Z.AI returned 2xx but no usable content — treat as an upstream failure
+        $httpCode = 502; // Provider returned 2xx but no usable content — treat as an upstream failure
     }
     $response = json_encode($responseData);
 } else {
@@ -556,10 +578,11 @@ if ($provider === 'zai') {
     }
 }
 
-// Log response token usage
+// Log response token usage and cost (tokens x $/token, per model_config.json)
 if (is_array($responseData) && isset($responseData['usage'])) {
     $logEntry['input_tokens'] = $responseData['usage']['input_tokens'] ?? 0;
     $logEntry['output_tokens'] = $responseData['usage']['output_tokens'] ?? 0;
+    $logEntry['cost_usd'] = calculateCostUsd($config, $requestedModel, $logEntry['input_tokens'], $logEntry['output_tokens']);
 }
 $logEntry['http_status'] = $httpCode;
 $logEntry['model'] = $resolvedModel;
@@ -766,7 +789,17 @@ function loadModelConfig(string $configPath): array
                 'provider'  => 'zai',
                 'primary'   => 'glm-5.3',
                 'fallbacks' => [],
-                'pricing'   => ['input_per_mtok' => 1.40, 'output_per_mtok' => 4.40],
+                // Blended rate from the actual purchased balance ($19.90 / 20M tokens),
+                // not Z.AI's published list price (input $1.40 / output $4.40 per MTok).
+                'pricing'   => ['input_per_mtok' => 0.995, 'output_per_mtok' => 0.995],
+            ],
+            'kimi'   => [
+                'provider'  => 'moonshot',
+                'primary'   => 'kimi-k3',
+                'fallbacks' => [],
+                // Moonshot's standard (cache-miss) rate; the cheaper $0.30/MTok
+                // cache-hit rate isn't modeled since this proxy sends no cache hints.
+                'pricing'   => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00],
             ],
         ]
     ];
@@ -803,7 +836,7 @@ function callAnthropicApi(array $apiRequest, string $apiKey): array
  * messages array (system prompt becomes a leading {role: 'system'} message)
  * with plain-string content instead of Anthropic content blocks.
  */
-function buildZaiRequest(array $apiRequest, string $model): array
+function buildOpenAiCompatibleRequest(array $apiRequest, string $model): array
 {
     $messages = [];
     if (isset($apiRequest['system'])) {
@@ -812,7 +845,7 @@ function buildZaiRequest(array $apiRequest, string $model): array
     foreach ($apiRequest['messages'] as $msg) {
         $messages[] = [
             'role'    => $msg['role'] ?? 'user',
-            'content' => extractZaiText($msg['content'] ?? ''),
+            'content' => extractPlainText($msg['content'] ?? ''),
         ];
     }
     return [
@@ -829,7 +862,7 @@ function buildZaiRequest(array $apiRequest, string $model): array
  * blocks (e.g. images) are dropped — callers must reject image requests
  * before reaching here, since silently dropping a photo is confusing.
  */
-function extractZaiText($content): string
+function extractPlainText($content): string
 {
     if (is_string($content)) return $content;
     if (!is_array($content)) return '';
@@ -843,12 +876,13 @@ function extractZaiText($content): string
 }
 
 /**
- * Make a single API call to Z.AI's OpenAI-compatible chat completions endpoint.
+ * Make a single API call to an OpenAI-compatible chat completions endpoint
+ * (Z.AI, Moonshot, or any other provider using the same request shape).
  * Returns [httpCode, response, curlError].
  */
-function callZaiApi(array $body, string $apiKey): array
+function callOpenAiCompatibleApi(string $endpoint, array $body, string $apiKey): array
 {
-    $ch = curl_init('https://api.z.ai/api/paas/v4/chat/completions');
+    $ch = curl_init($endpoint);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST           => true,
@@ -867,25 +901,25 @@ function callZaiApi(array $body, string $apiKey): array
 }
 
 /**
- * Convert a Z.AI (OpenAI-shaped) chat completion response into the same
- * {content: [...], usage: {...}, model} shape callAnthropicApi() returns,
- * so the rest of this file (logging, alert scanning, the frontend) can
- * treat both providers identically.
+ * Convert an OpenAI-shaped chat completion response (Z.AI, Moonshot, ...)
+ * into the same {content: [...], usage: {...}, model} shape
+ * callAnthropicApi() returns, so the rest of this file (logging, alert
+ * scanning, the frontend) can treat every provider identically.
  */
-function normalizeZaiResponse(?array $raw, string $fallbackModel): array
+function normalizeOpenAiCompatibleResponse(?array $raw, string $fallbackModel): array
 {
     if (!is_array($raw)) {
-        return ['error' => ['type' => 'api_error', 'message' => 'Invalid response from GLM API.']];
+        return ['error' => ['type' => 'api_error', 'message' => 'Invalid response from the model API.']];
     }
     if (isset($raw['error'])) {
         $err = $raw['error'];
-        $message = is_array($err) ? ($err['message'] ?? 'GLM API error.') : (string)$err;
+        $message = is_array($err) ? ($err['message'] ?? 'Model API error.') : (string)$err;
         $type = is_array($err) ? ($err['type'] ?? 'api_error') : 'api_error';
         return ['error' => ['type' => $type, 'message' => $message]];
     }
     $text = $raw['choices'][0]['message']['content'] ?? null;
     if ($text === null) {
-        return ['error' => ['type' => 'api_error', 'message' => 'GLM API returned no response content.']];
+        return ['error' => ['type' => 'api_error', 'message' => 'Model API returned no response content.']];
     }
     return [
         'content' => [['type' => 'text', 'text' => $text]],
@@ -895,6 +929,22 @@ function normalizeZaiResponse(?array $raw, string $fallbackModel): array
         ],
         'model' => $raw['model'] ?? $fallbackModel,
     ];
+}
+
+/**
+ * Compute the USD cost of one interaction from its token counts and the
+ * requested tier's pricing in model_config.json. Uses the tier's currently
+ * configured pricing, so a request auto-healed to an older Anthropic
+ * fallback snapshot is priced at the tier's current rate, not that
+ * snapshot's original (possibly different) historical rate.
+ */
+function calculateCostUsd(array $config, string $tier, int $inputTokens, int $outputTokens): ?float
+{
+    $pricing = $config['tiers'][$tier]['pricing'] ?? null;
+    if (!$pricing) return null;
+    $cost = ($inputTokens / 1000000) * ($pricing['input_per_mtok'] ?? 0)
+          + ($outputTokens / 1000000) * ($pricing['output_per_mtok'] ?? 0);
+    return round($cost, 6);
 }
 
 /**

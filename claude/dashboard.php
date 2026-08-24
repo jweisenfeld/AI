@@ -244,6 +244,7 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
         .bar-fill.sonnet { background: var(--accent); }
         .bar-fill.opus { background: var(--danger); }
         .bar-fill.glm { background: var(--accent2); }
+        .bar-fill.kimi { background: var(--blue); }
         .bar-fill.default { background: var(--blue); }
 
         /* Cost estimate */
@@ -424,13 +425,27 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
             'claude-opus-4-5':           { input: 5.00,  output: 25.00 },
             'claude-opus-4-1-20250805':  { input: 15.00, output: 75.00 },
             'claude-opus-4-20250514':    { input: 15.00, output: 75.00 },
-            // Z.AI (GLM tier), per-1M-token pricing from z.ai/model-api.
-            'glm-5.3':                   { input: 1.40,  output: 4.40 },
+            // Z.AI (GLM tier) — blended rate from the actual purchased balance
+            // ($19.90 / 20M tokens), not Z.AI's published list price.
+            'glm-5.3':                   { input: 0.995, output: 0.995 },
+            // Moonshot (Kimi tier) — standard/cache-miss rate from platform.kimi.ai/docs/pricing/chat-k3.
+            'kimi-k3':                   { input: 3.00,  output: 15.00 },
         };
 
+        // Fallback estimator for log rows written before api-proxy.php started
+        // storing cost_usd directly (see renderModelChart below, which prefers
+        // the logged cost_usd and only falls back to this for older rows).
         function estimateCost(model, inputTokens, outputTokens) {
             const rates = COSTS[model] || { input: 3.00, output: 15.00 };
             return (inputTokens / 1e6) * rates.input + (outputTokens / 1e6) * rates.output;
+        }
+
+        // Cost for one log entry: prefer the cost api-proxy.php stored at request
+        // time (tokens x $/token, from model_config.json); fall back to the COSTS
+        // table above for older rows written before cost_usd was tracked.
+        function entryCost(e) {
+            if (typeof e.cost_usd === 'number') return e.cost_usd;
+            return estimateCost(e.model, e.input_tokens || 0, e.output_tokens || 0);
         }
 
         // ============ RENDER ALL ============
@@ -458,7 +473,7 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
                 const ot = e.output_tokens || 0;
                 totalInput += it;
                 totalOutput += ot;
-                totalCost += estimateCost(e.model, it, ot);
+                totalCost += entryCost(e);
             }
             const days = new Set(allEntries.map(e => e.timestamp?.substring(0, 10)));
             const avgPerDay = (totalRequests / Math.max(days.size, 1)).toFixed(0);
@@ -476,7 +491,7 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
                 const sid = e.student_id || 'unknown';
                 if (!byStudent[sid]) byStudent[sid] = { cost: 0, tokens: 0, requests: 0 };
                 const it = e.input_tokens || 0, ot = e.output_tokens || 0;
-                byStudent[sid].cost += estimateCost(e.model, it, ot);
+                byStudent[sid].cost += entryCost(e);
                 byStudent[sid].tokens += it + ot;
                 byStudent[sid].requests += 1;
             }
@@ -501,7 +516,7 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
                 const it = e.input_tokens || 0, ot = e.output_tokens || 0;
                 s.input += it;
                 s.output += ot;
-                s.cost += estimateCost(e.model, it, ot);
+                s.cost += entryCost(e);
                 s.maxMsg = Math.max(s.maxMsg, e.message_count || 0);
                 s.models.add(e.model_tier || e.model || '?');
                 if (e.timestamp > s.lastActive) s.lastActive = e.timestamp;
@@ -538,7 +553,7 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
                 if (e.student_id && e.student_id !== 'unknown') byDay[day].students.add(e.student_id);
                 const it = e.input_tokens || 0, ot = e.output_tokens || 0;
                 byDay[day].tokens += it + ot;
-                byDay[day].cost += estimateCost(e.model, it, ot);
+                byDay[day].cost += entryCost(e);
             }
 
             const maxReq = Math.max(...Object.values(byDay).map(d => d.requests));
@@ -600,7 +615,7 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
                 byModel[m].requests++;
                 const it = e.input_tokens || 0, ot = e.output_tokens || 0;
                 byModel[m].tokens += it + ot;
-                const cost = estimateCost(m, it, ot);
+                const cost = entryCost(e);
                 byModel[m].cost += cost;
                 totalCost += cost;
             }
@@ -609,7 +624,7 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
             document.getElementById('model-chart').innerHTML = Object.entries(byModel)
                 .sort((a, b) => b[1].cost - a[1].cost)
                 .map(([model, d]) => {
-                    const tier = model.includes('haiku') ? 'haiku' : model.includes('opus') ? 'opus' : model.includes('glm') ? 'glm' : 'sonnet';
+                    const tier = model.includes('haiku') ? 'haiku' : model.includes('opus') ? 'opus' : model.includes('glm') ? 'glm' : model.includes('kimi') ? 'kimi' : 'sonnet';
                     return `<div class="bar-row">
                         <div class="bar-label" style="min-width:200px; font-size:0.8rem">${model}</div>
                         <div class="bar-track">
@@ -665,7 +680,7 @@ $lastUpdated = $entryCount > 0 ? ($entries[$entryCount - 1]['timestamp'] ?? 'unk
                 const it = e.input_tokens || 0, ot = e.output_tokens || 0;
                 byStudent[sid].tokens += it + ot;
                 byStudent[sid].maxMsg = Math.max(byStudent[sid].maxMsg, e.message_count || 0);
-                byStudent[sid].cost += estimateCost(e.model, it, ot);
+                byStudent[sid].cost += entryCost(e);
                 if (e.model_tier === 'opus' || (e.model || '').includes('opus')) byStudent[sid].opusCount++;
             }
 

@@ -42,13 +42,23 @@
       }
     },
     "glm": {
-      "_comment": "Non-Anthropic model served by Z.AI (Zhipu), via an OpenAI-compatible endpoint. Replaces the old Fable tier as the default — see api-proxy.php callZaiApi().",
+      "_comment": "Non-Anthropic model served by Z.AI (Zhipu), via an OpenAI-compatible endpoint. Replaces the old Fable tier as the default — see api-proxy.php callOpenAiCompatibleApi(). Pricing is the blended rate from the actual purchased balance ($19.90 / 20M tokens = $0.995/MTok), NOT Z.AI's published list price (input $1.40 / output $4.40 per MTok) — confirm with John whether usage is actually metered separately before trusting cost totals long-term.",
       "provider": "zai",
       "primary": "glm-5.3",
       "fallbacks": [],
       "pricing": {
-        "input_per_mtok": 1.40,
-        "output_per_mtok": 4.40
+        "input_per_mtok": 0.995,
+        "output_per_mtok": 0.995
+      }
+    },
+    "kimi": {
+      "_comment": "Non-Anthropic model served by Moonshot AI, via an OpenAI-compatible endpoint (kimi-k3 has native vision support, but this proxy doesn't translate to OpenAI's image_url format yet, so images are rejected for this tier same as glm). Pricing is Moonshot's standard/cache-miss rate ($3.00 in / $15.00 out per MTok) — their $0.30/MTok cache-hit discount isn't modeled since this proxy sends no cache hints.",
+      "provider": "moonshot",
+      "primary": "kimi-k3",
+      "fallbacks": [],
+      "pricing": {
+        "input_per_mtok": 3.00,
+        "output_per_mtok": 15.00
       }
     }
   }

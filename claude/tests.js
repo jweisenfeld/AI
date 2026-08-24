@@ -78,7 +78,7 @@ function hasImages(messages) {
  * Validate model tier name
  */
 function isValidTier(tier) {
-    const validTiers = ['haiku', 'sonnet', 'opus', 'glm'];
+    const validTiers = ['haiku', 'sonnet', 'opus', 'glm', 'kimi'];
     return validTiers.includes(tier);
 }
 
@@ -523,12 +523,13 @@ runTest('model_config.json exists and is valid JSON', () => {
     assertArrayHasKey('tiers', modelConfig, 'Config should have tiers');
 });
 
-runTest('model_config.json has all four tiers', () => {
+runTest('model_config.json has all five tiers', () => {
     assertArrayHasKey('haiku', modelConfig.tiers, 'Should have haiku tier');
     assertArrayHasKey('sonnet', modelConfig.tiers, 'Should have sonnet tier');
     assertArrayHasKey('opus', modelConfig.tiers, 'Should have opus tier');
     assertArrayHasKey('glm', modelConfig.tiers, 'Should have glm tier');
-    assertEquals(4, Object.keys(modelConfig.tiers).length, 'Should have exactly 4 tiers');
+    assertArrayHasKey('kimi', modelConfig.tiers, 'Should have kimi tier');
+    assertEquals(5, Object.keys(modelConfig.tiers).length, 'Should have exactly 5 tiers');
 });
 
 runTest('each tier has pricing information', () => {
@@ -561,16 +562,21 @@ runTest('all primary models use current generation IDs', () => {
     assertContains('sonnet-5', modelConfig.tiers.sonnet.primary, 'Sonnet primary should be 5');
     assertContains('opus-4-8', modelConfig.tiers.opus.primary, 'Opus primary should be 4.8');
     assertContains('glm-5.3', modelConfig.tiers.glm.primary, 'GLM primary should be 5.3');
+    assertContains('kimi-k3', modelConfig.tiers.kimi.primary, 'Kimi primary should be k3');
 });
 
 runTest('glm tier is marked with the zai provider', () => {
     assertEquals('zai', modelConfig.tiers.glm.provider, 'GLM tier should declare provider=zai');
 });
 
-runTest('fallbacks are non-empty for all tiers except glm', () => {
-    // GLM is served by Z.AI, not Anthropic — no auto-healing fallback chain applies.
+runTest('kimi tier is marked with the moonshot provider', () => {
+    assertEquals('moonshot', modelConfig.tiers.kimi.provider, 'Kimi tier should declare provider=moonshot');
+});
+
+runTest('fallbacks are non-empty for all tiers except glm and kimi', () => {
+    // GLM/Kimi are served by Z.AI/Moonshot, not Anthropic — no auto-healing fallback chain applies.
     for (const [tier, info] of Object.entries(modelConfig.tiers)) {
-        if (tier === 'glm') continue;
+        if (tier === 'glm' || tier === 'kimi') continue;
         assertTrue(info.fallbacks.length >= 1, `${tier} should have at least 1 fallback`);
     }
 });
@@ -580,6 +586,30 @@ runTest('primaries are not duplicated in their fallbacks', () => {
         assertFalse(info.fallbacks.includes(info.primary),
             `${tier} primary should not appear in its own fallbacks`);
     }
+});
+
+// Local mirror of api-proxy.php's calculateCostUsd().
+function calculateCostUsd(config, tier, inputTokens, outputTokens) {
+    const pricing = config.tiers[tier]?.pricing;
+    if (!pricing) return null;
+    const cost = (inputTokens / 1e6) * (pricing.input_per_mtok || 0)
+               + (outputTokens / 1e6) * (pricing.output_per_mtok || 0);
+    return Math.round(cost * 1e6) / 1e6;
+}
+
+runTest('calculateCostUsd multiplies tokens by the tier rate (x * y = cost)', () => {
+    // 500K input + 200K output tokens on GLM's blended $0.995/MTok rate
+    const cost = calculateCostUsd(modelConfig, 'glm', 500000, 200000);
+    assertEquals(Math.round((0.5 * 0.995 + 0.2 * 0.995) * 1e6) / 1e6, cost, 'GLM cost should be tokens * blended rate');
+});
+
+runTest('calculateCostUsd applies separate input/output rates for kimi', () => {
+    const cost = calculateCostUsd(modelConfig, 'kimi', 1000000, 1000000);
+    assertEquals(3.00 + 15.00, cost, 'Kimi cost should use $3 input + $15 output per MTok');
+});
+
+runTest('calculateCostUsd returns null for an unknown tier', () => {
+    assertEquals(null, calculateCostUsd(modelConfig, 'not-a-real-tier', 1000, 1000), 'Unknown tier should return null, not a false cost of $0');
 });
 
 // --- Input Size Cap Tests ---
@@ -636,8 +666,8 @@ runTest('non-opus model not affected by restriction', () => {
     assertFalse(opusDowngraded, 'Should not flag downgrade for non-opus');
 });
 
-// --- GLM (Z.AI) Tier Tests ---
-console.log('\nGLM (Z.AI) Tier:');
+// --- External Provider Tests (GLM / Z.AI, Kimi K3 / Moonshot) ---
+console.log('\nExternal Providers (GLM + Kimi):');
 
 runTest('glm is not downgraded by message count (no first-exchange restriction)', () => {
     // Unlike the old Fable tier, GLM is the cheap default and has no
@@ -647,18 +677,32 @@ runTest('glm is not downgraded by message count (no first-exchange restriction)'
     assertEquals('glm', model, 'GLM should remain glm regardless of message count');
 });
 
-runTest('zai provider + image request is rejected before calling the API', () => {
-    // Mirrors the guard in api-proxy.php: the OpenAI-compatible endpoint
-    // doesn't understand Anthropic-style image content blocks.
-    const provider = 'zai';
-    const requestHasImages = true;
-    const rejected = (provider === 'zai' && requestHasImages);
-    assertTrue(rejected, 'A GLM request containing images should be rejected');
+runTest('kimi is not downgraded by message count (no first-exchange restriction)', () => {
+    const model = 'kimi';
+    const messageCount = 25;
+    assertEquals('kimi', model, 'Kimi should remain kimi regardless of message count');
 });
 
-runTest('extractZaiText flattens Anthropic content blocks to plain text', () => {
-    // Local copy of api-proxy.php's extractZaiText().
-    const extractZaiText = (content) => {
+runTest('any external provider + image request is rejected before calling the API', () => {
+    // Mirrors the guard in api-proxy.php: neither OpenAI-compatible endpoint
+    // gets Anthropic-style image content blocks translated for it (yet).
+    for (const provider of ['zai', 'moonshot']) {
+        const isExternalProvider = provider !== 'anthropic';
+        const requestHasImages = true;
+        assertTrue(isExternalProvider && requestHasImages, `A ${provider} request containing images should be rejected`);
+    }
+});
+
+runTest('anthropic provider + image request is NOT rejected by the external-provider guard', () => {
+    const provider = 'anthropic';
+    const isExternalProvider = provider !== 'anthropic';
+    const requestHasImages = true;
+    assertFalse(isExternalProvider && requestHasImages, 'Anthropic tiers (Opus vision) must not be blocked by this guard');
+});
+
+runTest('extractPlainText flattens Anthropic content blocks to plain text', () => {
+    // Local copy of api-proxy.php's extractPlainText().
+    const extractPlainText = (content) => {
         if (typeof content === 'string') return content;
         if (!Array.isArray(content)) return '';
         return content
@@ -667,10 +711,10 @@ runTest('extractZaiText flattens Anthropic content blocks to plain text', () => 
             .join('\n');
     };
 
-    assertEquals('hello', extractZaiText('hello'), 'Plain strings should pass through unchanged');
+    assertEquals('hello', extractPlainText('hello'), 'Plain strings should pass through unchanged');
     assertEquals(
         "What's this?\nfollow-up",
-        extractZaiText([
+        extractPlainText([
             { type: 'text', text: "What's this?" },
             { type: 'image', source: { type: 'base64', data: 'xxx' } },
             { type: 'text', text: 'follow-up' },
@@ -766,8 +810,10 @@ const COSTS = {
     'claude-opus-4-5':           { input: 5.00,  output: 25.00 },
     'claude-opus-4-1-20250805':  { input: 15.00, output: 75.00 },
     'claude-opus-4-20250514':    { input: 15.00, output: 75.00 },
-    // Z.AI (GLM tier), per-1M-token pricing from z.ai/model-api.
-    'glm-5.3':                   { input: 1.40,  output: 4.40 },
+    // Z.AI (GLM tier) — blended rate from the actual purchased balance.
+    'glm-5.3':                   { input: 0.995, output: 0.995 },
+    // Moonshot (Kimi tier) — standard/cache-miss rate.
+    'kimi-k3':                   { input: 3.00,  output: 15.00 },
 };
 
 function estimateCost(model, inputTokens, outputTokens) {

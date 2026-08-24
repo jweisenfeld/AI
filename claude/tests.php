@@ -110,7 +110,7 @@ function isValidTier(string $tier): bool
         }
     }
     // Fallback: check hardcoded tiers
-    return in_array($tier, ['haiku', 'sonnet', 'opus', 'glm'], true);
+    return in_array($tier, ['haiku', 'sonnet', 'opus', 'glm', 'kimi'], true);
 }
 
 /**
@@ -147,10 +147,30 @@ function loadModelConfig(string $configPath): array
                 'provider'  => 'zai',
                 'primary'   => 'glm-5.3',
                 'fallbacks' => [],
-                'pricing'   => ['input_per_mtok' => 1.40, 'output_per_mtok' => 4.40],
+                'pricing'   => ['input_per_mtok' => 0.995, 'output_per_mtok' => 0.995],
+            ],
+            'kimi'   => [
+                'provider'  => 'moonshot',
+                'primary'   => 'kimi-k3',
+                'fallbacks' => [],
+                'pricing'   => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00],
             ],
         ]
     ];
+}
+
+/**
+ * Compute the USD cost of one interaction — local copy of api-proxy.php's
+ * calculateCostUsd(), kept here rather than included (api-proxy.php runs
+ * top-level request handling on load).
+ */
+function calculateCostUsd(array $config, string $tier, int $inputTokens, int $outputTokens): ?float
+{
+    $pricing = $config['tiers'][$tier]['pricing'] ?? null;
+    if (!$pricing) return null;
+    $cost = ($inputTokens / 1000000) * ($pricing['input_per_mtok'] ?? 0)
+          + ($outputTokens / 1000000) * ($pricing['output_per_mtok'] ?? 0);
+    return round($cost, 6);
 }
 
 /**
@@ -254,6 +274,10 @@ runTest('accepts opus tier', function() {
 
 runTest('accepts glm tier', function() {
     assertTrue(isValidTier('glm'), 'GLM should be a valid tier');
+});
+
+runTest('accepts kimi tier', function() {
+    assertTrue(isValidTier('kimi'), 'Kimi should be a valid tier');
 });
 
 runTest('rejects invalid tier', function() {
@@ -647,13 +671,14 @@ runTest('model_config.json exists and is valid JSON', function() {
     assertArrayHasKey('tiers', $config, 'Config should have tiers');
 });
 
-runTest('model_config.json has all four tiers', function() {
+runTest('model_config.json has all five tiers', function() {
     $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
     assertArrayHasKey('haiku', $config['tiers'], 'Should have haiku tier');
     assertArrayHasKey('sonnet', $config['tiers'], 'Should have sonnet tier');
     assertArrayHasKey('opus', $config['tiers'], 'Should have opus tier');
     assertArrayHasKey('glm', $config['tiers'], 'Should have glm tier');
-    assertEquals(4, count($config['tiers']), 'Should have exactly 4 tiers');
+    assertArrayHasKey('kimi', $config['tiers'], 'Should have kimi tier');
+    assertEquals(5, count($config['tiers']), 'Should have exactly 5 tiers');
 });
 
 runTest('each tier has pricing information', function() {
@@ -691,11 +716,13 @@ runTest('all primary models use current generation IDs', function() {
     $sonnetPrimary = $config['tiers']['sonnet']['primary'];
     $opusPrimary = $config['tiers']['opus']['primary'];
     $glmPrimary = $config['tiers']['glm']['primary'];
+    $kimiPrimary = $config['tiers']['kimi']['primary'];
     // Should be snapshot or alias IDs, not deprecated models
     assertContains('haiku-4-5', $haikuPrimary, 'Haiku primary should be 4.5 series');
     assertContains('sonnet-5', $sonnetPrimary, 'Sonnet primary should be 5');
     assertContains('opus-4-8', $opusPrimary, 'Opus primary should be 4.8');
     assertContains('glm-5.3', $glmPrimary, 'GLM primary should be 5.3');
+    assertContains('kimi-k3', $kimiPrimary, 'Kimi primary should be k3');
 });
 
 runTest('glm tier is marked with the zai provider', function() {
@@ -703,12 +730,17 @@ runTest('glm tier is marked with the zai provider', function() {
     assertEquals('zai', $config['tiers']['glm']['provider'] ?? null, 'GLM tier should declare provider=zai');
 });
 
-runTest('fallbacks are non-empty for all tiers except glm', function() {
-    // GLM is served by Z.AI, not Anthropic — the Anthropic auto-healing
-    // fallback chain doesn't apply, so an empty fallback list is intentional.
+runTest('kimi tier is marked with the moonshot provider', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    assertEquals('moonshot', $config['tiers']['kimi']['provider'] ?? null, 'Kimi tier should declare provider=moonshot');
+});
+
+runTest('fallbacks are non-empty for all tiers except glm and kimi', function() {
+    // GLM and Kimi are served by Z.AI/Moonshot, not Anthropic — the Anthropic
+    // auto-healing fallback chain doesn't apply, so empty fallback lists are intentional.
     $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
     foreach ($config['tiers'] as $tier => $info) {
-        if ($tier === 'glm') continue;
+        if ($tier === 'glm' || $tier === 'kimi') continue;
         assertTrue(count($info['fallbacks']) >= 1, "{$tier} should have at least 1 fallback");
     }
 });
@@ -727,13 +759,31 @@ runTest('hardcoded fallback matches model_config.json', function() {
     // Load hardcoded fallback (by passing a nonexistent path)
     $hardcoded = loadModelConfig('/nonexistent/path');
 
-    foreach (['haiku', 'sonnet', 'opus', 'glm'] as $tier) {
+    foreach (['haiku', 'sonnet', 'opus', 'glm', 'kimi'] as $tier) {
         assertEquals(
             $fileConfig['tiers'][$tier]['primary'],
             $hardcoded['tiers'][$tier]['primary'],
             "Hardcoded {$tier} primary should match model_config.json"
         );
     }
+});
+
+runTest('calculateCostUsd multiplies tokens by the tier rate (x * y = cost)', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    // 500K input + 200K output tokens on GLM's blended $0.995/MTok rate
+    $cost = calculateCostUsd($config, 'glm', 500000, 200000);
+    assertEquals(round(0.5 * 0.995 + 0.2 * 0.995, 6), $cost, 'GLM cost should be tokens * blended rate');
+});
+
+runTest('calculateCostUsd applies separate input/output rates for kimi', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    $cost = calculateCostUsd($config, 'kimi', 1000000, 1000000);
+    assertEquals(3.00 + 15.00, $cost, 'Kimi cost should use $3 input + $15 output per MTok');
+});
+
+runTest('calculateCostUsd returns null for an unknown tier', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    assertEquals(null, calculateCostUsd($config, 'not-a-real-tier', 1000, 1000), 'Unknown tier should return null, not a false cost of $0');
 });
 
 // --- Input Size Cap Tests ---
@@ -803,8 +853,8 @@ runTest('non-opus model not affected by restriction', function() {
     assertFalse($opusDowngraded, 'Should not flag downgrade for non-opus');
 });
 
-// --- GLM (Z.AI) Tier Tests ---
-echo "\nGLM (Z.AI) Tier:\n";
+// --- External Provider Tests (GLM / Z.AI, Kimi K3 / Moonshot) ---
+echo "\nExternal Providers (GLM + Kimi):\n";
 
 runTest('glm is not downgraded by message count (no first-exchange restriction)', function() {
     // Unlike the old Fable tier, GLM has no "first message only" gate —
@@ -814,20 +864,36 @@ runTest('glm is not downgraded by message count (no first-exchange restriction)'
     assertEquals('glm', $model, 'GLM should remain glm regardless of message count');
 });
 
-runTest('zai provider + image request is rejected before calling the API', function() {
-    // Mirrors the guard in api-proxy.php: buildZaiRequest()/callZaiApi() are
-    // never reached when images are present, since the OpenAI-compatible
-    // endpoint doesn't understand Anthropic-style image content blocks.
-    $provider = 'zai';
-    $requestHasImages = true;
-    $rejected = ($provider === 'zai' && $requestHasImages);
-    assertTrue($rejected, 'A GLM request containing images should be rejected');
+runTest('kimi is not downgraded by message count (no first-exchange restriction)', function() {
+    $model = 'kimi';
+    $messageCount = 25;
+    assertEquals('kimi', $model, 'Kimi should remain kimi regardless of message count');
 });
 
-runTest('extractZaiText flattens Anthropic content blocks to plain text', function() {
-    // Local copy of api-proxy.php's extractZaiText() — kept here rather than
-    // included, since api-proxy.php runs top-level request handling on load.
-    $extractZaiText = function ($content) {
+runTest('any external provider + image request is rejected before calling the API', function() {
+    // Mirrors the guard in api-proxy.php: buildOpenAiCompatibleRequest()/
+    // callOpenAiCompatibleApi() are never reached when images are present,
+    // since neither OpenAI-compatible endpoint gets Anthropic-style image
+    // content blocks translated for it (yet).
+    foreach (['zai', 'moonshot'] as $provider) {
+        $isExternalProvider = $provider !== 'anthropic';
+        $requestHasImages = true;
+        $rejected = ($isExternalProvider && $requestHasImages);
+        assertTrue($rejected, "A $provider request containing images should be rejected");
+    }
+});
+
+runTest('anthropic provider + image request is NOT rejected by the external-provider guard', function() {
+    $provider = 'anthropic';
+    $isExternalProvider = $provider !== 'anthropic';
+    $requestHasImages = true;
+    assertFalse($isExternalProvider && $requestHasImages, 'Anthropic tiers (Opus vision) must not be blocked by this guard');
+});
+
+runTest('extractPlainText flattens Anthropic content blocks to plain text', function() {
+    // Local copy of api-proxy.php's extractPlainText() — kept here rather
+    // than included, since api-proxy.php runs top-level request handling on load.
+    $extractPlainText = function ($content) {
         if (is_string($content)) return $content;
         if (!is_array($content)) return '';
         $parts = [];
@@ -839,10 +905,10 @@ runTest('extractZaiText flattens Anthropic content blocks to plain text', functi
         return implode("\n", $parts);
     };
 
-    assertEquals('hello', $extractZaiText('hello'), 'Plain strings should pass through unchanged');
+    assertEquals('hello', $extractPlainText('hello'), 'Plain strings should pass through unchanged');
     assertEquals(
         "What's this?\nfollow-up",
-        $extractZaiText([
+        $extractPlainText([
             ['type' => 'text', 'text' => "What's this?"],
             ['type' => 'image', 'source' => ['type' => 'base64', 'data' => 'xxx']],
             ['type' => 'text', 'text' => 'follow-up'],

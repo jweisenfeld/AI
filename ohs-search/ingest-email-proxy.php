@@ -311,8 +311,8 @@ function detect_school_year(string $date_str): ?string
     $m = (int) date('n', $ts);
 
     if (($y === 2024 && $m >= 9) || ($y === 2025 && $m <= 6)) return '2024-25';
-    if (($y === 2025 && $m >= 7) || $y >= 2026)               return '2025-26';
+    if (($y === 2025 && $m >= 7) || ($y === 2026 && $m <= 6)) return '2025-26';
 
     // Generic fallback for future years
-    return $m >= 7 ? "$y-" . ($y + 1) : ($y - 1) . "-$y";
+    return $m >= 7 ? "$y-" . substr((string)($y + 1), -2) : ($y - 1) . "-" . substr((string)$y, -2);
 }

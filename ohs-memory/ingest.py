@@ -158,7 +158,7 @@ def detect_school_year(dt: datetime | None) -> str | None:
     y, m = dt.year, dt.month
     if (y == 2024 and m >= 9) or (y == 2025 and m <= 6):
         return "2024-25"
-    if (y == 2025 and m >= 7) or y == 2026:
+    if (y == 2025 and m >= 7) or (y == 2026 and m <= 6):
         return "2025-26"
     # Generic fallback for future years
     return f"{y}-{str(y + 1)[-2:]}" if m >= 7 else f"{y - 1}-{str(y)[-2:]}"

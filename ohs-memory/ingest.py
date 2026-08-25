@@ -29,6 +29,7 @@ headers (sender display name and sent date). You can override with explicit flag
 import argparse
 import base64
 import hashlib
+import json
 import os
 import re
 import sys
@@ -631,6 +632,138 @@ def _get_file_author(path: Path) -> str | None:
     return None
 
 
+def _parse_pdf_date(raw: str | None) -> datetime | None:
+    """Parse a PDF metadata date string like D:20260730120000+00'00' into a datetime."""
+    if not raw:
+        return None
+    m = re.match(r"D:(\d{4})(\d{2})(\d{2})(\d{2})?(\d{2})?(\d{2})?", raw)
+    if not m:
+        return None
+    y, mo, d, h, mi, s = (int(g) if g else 0 for g in m.groups())
+    try:
+        return datetime(y, mo, d, h, mi, s, tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _get_file_dates(path: Path) -> tuple[datetime | None, datetime | None]:
+    """
+    Read (created, modified) from embedded Office/PDF document metadata --
+    the document's OWN authored dates, not the filesystem mtime.
+
+    This matters for files synced from SharePoint/OneDrive: the local sync
+    client can reset filesystem mtime on every re-sync, move, or re-download,
+    so mtime does not reliably reflect when the document was actually written.
+    docProps/core.xml (Word/PowerPoint/Excel) and PDF metadata carry the real
+    authored timestamp regardless of how the local copy got here.
+    """
+    suffix = path.suffix.lower()
+    try:
+        if suffix == ".docx":
+            from docx import Document
+            props = Document(str(path)).core_properties
+            return props.created, props.modified
+        if suffix == ".pptx":
+            from pptx import Presentation
+            props = Presentation(str(path)).core_properties
+            return props.created, props.modified
+        if suffix == ".xlsx":
+            import openpyxl
+            wb = openpyxl.load_workbook(str(path), read_only=True)
+            created, modified = wb.properties.created, wb.properties.modified
+            wb.close()
+            return created, modified
+        if suffix == ".pdf":
+            import pdfplumber
+            with pdfplumber.open(str(path)) as pdf:
+                meta = pdf.metadata or {}
+                return (
+                    _parse_pdf_date(meta.get("CreationDate")),
+                    _parse_pdf_date(meta.get("ModDate")),
+                )
+    except Exception:
+        pass
+    return None, None
+
+
+_VALID_DOC_TYPES = ("lesson_plan", "meeting_notes", "policy", "email", "other")
+
+
+def suggest_metadata_llm(text: str, filename: str, log_path: Path | None = None,
+                          debug: bool = False) -> dict:
+    """
+    Ask Claude Haiku to suggest subject/doc_type/unit from a text excerpt.
+
+    Used only to fill gaps that filename/path keyword matching couldn't --
+    e.g. a Yearbook committee file with no "yearbook" anywhere in the
+    SharePoint path. Never overrides an explicit --subject/--type flag or a
+    confident keyword match; callers only use the fields that were missing.
+    Returns {} on any failure (network, parse, missing key) -- this is a
+    nice-to-have, never allowed to block ingestion.
+
+    Falls back to guessing from the filename alone when there's no body text
+    (e.g. an image-only poster/flyer .docx extracts to 0 tokens) -- these are
+    exactly the files that would otherwise fall through to the slow full
+    interactive prompt, and a filename like "Skills USA Poster.docx" is
+    usually informative enough for a decent guess.
+    """
+    excerpt = text.strip()[:3000]
+    excerpt_for_prompt = excerpt or "(no extractable body text -- image-only or empty document; guess from filename alone)"
+
+    prompt = f"""Suggest filing metadata for this school document so it can be
+categorized correctly in Orion High School's organizational archive.
+
+Filename: {filename}
+
+Excerpt:
+{excerpt_for_prompt}
+
+Reply with ONLY a JSON object, no other text:
+{{
+  "subject": "<broad area, e.g. Physics, Economics, All-Staff, Yearbook, Athletics, Counseling, or another short department/committee name>",
+  "doc_type": "<one of: lesson_plan, meeting_notes, policy, email, other>",
+  "unit": "<short 2-6 word topic label for this specific document>"
+}}"""
+
+    try:
+        response = get_anthropic().messages.create(
+            model=EXTRACTION_MODEL,
+            max_tokens=200,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = response.content[0].text.strip()
+        cleaned = re.sub(r"^```(?:json)?|```$", "", raw, flags=re.MULTILINE).strip()
+        data = json.loads(cleaned)
+    except Exception as e:
+        if debug:
+            print(f"  [llm-debug] {filename}: FAILED — {e}")
+            _log_event(log_path, {
+                "event": "llm_suggest", "file": filename, "ok": False, "error": str(e),
+                "excerpt": excerpt_for_prompt,
+            })
+        return {}
+
+    doc_type = data.get("doc_type")
+    if doc_type not in _VALID_DOC_TYPES:
+        doc_type = None
+
+    result = {
+        "subject":  (data.get("subject") or "").strip() or None,
+        "doc_type": doc_type,
+        "unit":     (data.get("unit") or "").strip() or None,
+    }
+
+    if debug:
+        print(f"  [llm-debug] {filename}: subject={result['subject']!r}  "
+              f"doc_type={result['doc_type']!r}  unit={result['unit']!r}")
+        _log_event(log_path, {
+            "event": "llm_suggest", "file": filename, "ok": True,
+            "excerpt": excerpt_for_prompt, "raw_response": raw, "suggested": result,
+        })
+
+    return result
+
+
 def auto_infer_metadata(path: Path) -> dict:
     """
     Infer document metadata from path, filename, file mtime, and embedded metadata.
@@ -658,14 +791,20 @@ def auto_infer_metadata(path: Path) -> dict:
             inferred["subject"] = kw.title().replace(" ", "-") if "-" not in kw else kw.title()
             break
 
-    # school_year: derive from file modification time
-    try:
-        mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
-        year = detect_school_year(mtime)
+    # school_year: prefer the document's own authored date (docProps/PDF
+    # metadata) over filesystem mtime -- see _get_file_dates() docstring for
+    # why mtime is untrustworthy on a SharePoint/OneDrive-synced folder.
+    created, modified = _get_file_dates(path)
+    doc_dt = modified or created
+    if doc_dt is None:
+        try:
+            doc_dt = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+        except Exception:
+            doc_dt = None
+    if doc_dt is not None:
+        year = detect_school_year(doc_dt)
         if year:
             inferred["school_year"] = year
-    except Exception:
-        pass
 
     # teacher: read from embedded file metadata (Office core properties / PDF metadata)
     author = _get_file_author(path)
@@ -741,9 +880,25 @@ def hash_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def _log_event(log_path: Path | None, event: dict) -> None:
+    """
+    Append one JSON line to the ingestion log — one line per file per run,
+    regardless of outcome (done/update/skip/fail). Meant to be loaded later
+    with pandas/jq to audit metadata quality across a whole batch (e.g. "how
+    many docs came out with subject=None", "which school_year values got
+    LLM-suggested vs keyword-matched vs left blank").
+    """
+    if log_path is None:
+        return
+    event = {"ts": datetime.now(timezone.utc).isoformat(), **event}
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(event, default=str) + "\n")
+
+
 def ingest_file(path: Path, metadata: dict | None = None,
                 conn=None, db_url: str | None = None,
-                update: bool = False) -> str | None:
+                update: bool = False, log_path: Path | None = None,
+                debug_llm: bool = False) -> str | None:
     """
     Full ingestion pipeline for a single file.
     Returns document UUID on success, None if skipped (already ingested).
@@ -755,6 +910,9 @@ def ingest_file(path: Path, metadata: dict | None = None,
     update=True: if the same file path is already in the DB with a different hash
     (i.e. the file was edited since last ingest), re-ingest it.  The new record is
     committed FIRST; the old record is deleted only after the new one is safe.
+
+    log_path, if given, gets one JSON line per file (done/update/skip/fail)
+    with the full resolved metadata -- see _log_event().
     """
     own_conn = conn is None
     if own_conn:
@@ -767,6 +925,10 @@ def ingest_file(path: Path, metadata: dict | None = None,
         cur.execute("SELECT id FROM documents WHERE source_hash = %s", (file_hash,))
         if existing := cur.fetchone():
             print(f"  [skip] {path.name} (id: {existing[0]})")
+            _log_event(log_path, {
+                "event": "skip", "file": path.name, "path": str(path.resolve()),
+                "id": str(existing[0]),
+            })
             return None
 
         # 1b. Path check — in update mode, find any existing record at this path
@@ -787,12 +949,28 @@ def ingest_file(path: Path, metadata: dict | None = None,
         print(f"  Extracted {token_count:,} tokens")
 
         # 3. Resolve metadata
-        #    Priority: CLI flags > auto_meta (from .msg headers) > file-based inference
+        #    Priority: CLI flags > auto_meta (from .msg headers) > keyword-based
+        #    inference > LLM suggestion (lowest priority, fills remaining gaps only)
         inferred = auto_infer_metadata(path)
         # auto_meta (from .msg) is authoritative for emails; merge into inferred
         for key, val in auto_meta.items():
             if val:
                 inferred[key] = val
+
+        # If subject or doc_type is still unknown after path/filename keyword
+        # matching -- e.g. a Yearbook or Athletics file with no matching keyword
+        # anywhere in its SharePoint path -- ask Claude Haiku to suggest one from
+        # the extracted text. Skipped entirely if the CLI already specified it.
+        needs_subject  = not (metadata or {}).get("subject")  and not inferred.get("subject")
+        needs_doc_type = not (metadata or {}).get("doc_type") and not inferred.get("doc_type")
+        if needs_subject or needs_doc_type:
+            suggestion = suggest_metadata_llm(raw_text, path.name, log_path=log_path, debug=debug_llm)
+            if needs_subject and suggestion.get("subject"):
+                inferred["subject"] = suggestion["subject"]
+            if needs_doc_type and suggestion.get("doc_type"):
+                inferred["doc_type"] = suggestion["doc_type"]
+            if not inferred.get("unit") and suggestion.get("unit"):
+                inferred["unit"] = suggestion["unit"]
 
         if metadata is None:
             # Interactive mode — prompt only for fields we couldn't determine
@@ -824,11 +1002,13 @@ def ingest_file(path: Path, metadata: dict | None = None,
 
         # 5. Chunk → embed → store (small + large)
         enc = get_tokenizer()
+        chunk_counts = {}
         for label, max_tok, overlap in [
             ("small", SMALL_CHUNK_TOKENS,  SMALL_CHUNK_OVERLAP),
             ("large", LARGE_CHUNK_TOKENS,  LARGE_CHUNK_OVERLAP),
         ]:
             chunks = chunk_text(raw_text, max_tok, overlap)
+            chunk_counts[label] = len(chunks)
             if not chunks:
                 continue
             print(f"  Embedding {len(chunks)} {label} chunks...")
@@ -860,11 +1040,22 @@ def ingest_file(path: Path, metadata: dict | None = None,
         tc = resolved.get("teacher") or "?"
         action = "UPDATE" if old_doc_id else "DONE"
         print(f"\n  [{action}] {path.name}  [{yr} / {tc}]  (id: {doc_id})\n")
+        _log_event(log_path, {
+            "event": action.lower(), "file": path.name, "path": str(path.resolve()),
+            "id": str(doc_id), "old_id": str(old_doc_id) if old_doc_id else None,
+            "subject": resolved.get("subject"), "school_year": resolved.get("school_year"),
+            "teacher": resolved.get("teacher"), "doc_type": resolved.get("doc_type"),
+            "unit": resolved.get("unit"), "token_count": token_count,
+            "small_chunks": chunk_counts.get("small", 0), "large_chunks": chunk_counts.get("large", 0),
+        })
         return str(doc_id)
 
     except Exception as e:
         conn.rollback()
         print(f"\n  [FAIL] {path.name} — {e}\n")
+        _log_event(log_path, {
+            "event": "fail", "file": path.name, "path": str(path.resolve()), "error": str(e),
+        })
         raise
     finally:
         cur.close()
@@ -910,8 +1101,14 @@ Examples:
                              "different hash). New version is committed before old is deleted.")
     parser.add_argument("--limit",  type=int, default=0,
                         help="Only process first N files (0 = no limit). Useful for test runs.")
-    parser.add_argument("--log",    default="ingest_errors.log",
-                        help="File to append failure details to (default: ingest_errors.log)")
+    parser.add_argument("--log",    default="ingest_log.jsonl",
+                        help="JSONL file — one line per file (done/update/skip/fail) with full "
+                             "resolved metadata, for auditing a batch run afterward "
+                             "(default: ingest_log.jsonl)")
+    parser.add_argument("--debug-llm", action="store_true",
+                        help="Print and log the excerpt sent to Claude and the subject/doc_type/"
+                             "unit it suggests, for every file where that suggestion step runs -- "
+                             "spot-check the guesses instead of trusting them blindly.")
     args = parser.parse_args()
 
     cli_metadata = None
@@ -926,12 +1123,14 @@ Examples:
         }
 
     target = Path(args.path)
+    log_path = Path(args.log)
 
     if target.is_file():
         if target.suffix.lower() not in SUPPORTED:
             print(f"Unsupported type: {target.suffix}  (supported: {', '.join(sorted(SUPPORTED))})")
             sys.exit(1)
-        ingest_file(target, metadata=cli_metadata, update=args.update)
+        ingest_file(target, metadata=cli_metadata, update=args.update, log_path=log_path,
+                    debug_llm=args.debug_llm)
         return
 
     if not target.is_dir():
@@ -958,7 +1157,6 @@ Examples:
     print(f"DB connection open. Starting batch...\n")
 
     ok = skip = fail = 0
-    log_path = Path(args.log)
 
     try:
         for f in tqdm(files, desc="Ingesting", unit="file"):
@@ -976,15 +1174,16 @@ Examples:
                     except ValueError:
                         pass
 
-                result = ingest_file(f, metadata=file_meta, conn=conn, update=args.update)
+                result = ingest_file(f, metadata=file_meta, conn=conn, update=args.update,
+                                      log_path=log_path, debug_llm=args.debug_llm)
                 if result:
                     ok += 1
                 else:
                     skip += 1
-            except Exception as e:
+            except Exception:
+                # ingest_file() already wrote a "fail" event to log_path and
+                # printed the error — this except just keeps the batch going.
                 fail += 1
-                with open(log_path, "a", encoding="utf-8") as log:
-                    log.write(f"{datetime.now().isoformat()}  FAIL  {f}  —  {e}\n")
     finally:
         conn.close()
 
@@ -992,7 +1191,8 @@ Examples:
     print(f"Batch complete:")
     print(f"  Ingested : {ok}")
     print(f"  Skipped  : {skip}  (already in DB)")
-    print(f"  Failed   : {fail}  (see {log_path})")
+    print(f"  Failed   : {fail}")
+    print(f"  Full log : {log_path}")
     print(f"{'='*60}")
 
 

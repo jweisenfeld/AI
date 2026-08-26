@@ -165,6 +165,16 @@ function h($s) { return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); }
   .empty { padding: 40px; text-align:center; color: var(--muted); }
   .tablewrap { overflow-x: auto; }
   .note { max-width: 260px; white-space: pre-wrap; }
+
+  #reportLink {
+    position: fixed; right: 16px; bottom: 16px; z-index: 40;
+    display:flex; align-items:center; gap: 6px;
+    background: rgba(28,37,48,.92); color: #fff; text-decoration:none;
+    font-size: 13.5px; font-weight: 600; padding: 10px 16px; border-radius: 999px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+    transition: transform .08s ease, box-shadow .08s ease;
+  }
+  #reportLink:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,0.28); }
 </style>
 </head>
 <body>
@@ -238,5 +248,7 @@ function h($s) { return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); }
   <?php endif; ?>
   </div>
 </div>
+
+<a id="reportLink" href="index.html">📝 Report</a>
 </body>
 </html>

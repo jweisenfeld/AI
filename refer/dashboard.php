@@ -1,5 +1,6 @@
 <?php
 // Refer V1 — read-only viewer for referral-log.csv. No editing, no deleting.
+date_default_timezone_set('America/Los_Angeles'); // PSD1 is Pacific time; don't trust the server's php.ini default.
 session_start();
 
 $ACCESS_CODE = '1901';

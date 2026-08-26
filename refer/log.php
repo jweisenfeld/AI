@@ -1,5 +1,6 @@
 <?php
 // Refer V1 — appends one click to a flat log file. Student is optional.
+date_default_timezone_set('America/Los_Angeles'); // PSD1 is Pacific time; don't trust the server's php.ini default.
 header('Content-Type: application/json');
 
 $logFile = __DIR__ . '/referral-log.csv';

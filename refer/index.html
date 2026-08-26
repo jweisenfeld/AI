@@ -24,7 +24,7 @@
     color: var(--ink);
     font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   }
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 180px; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
 
   header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 18px; gap: 12px; flex-wrap: wrap; }
   header h1 { font-size: 22px; margin: 0; }
@@ -104,15 +104,16 @@
   #nameOverlay.hidden { display:none; }
 
   #noteBar {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
-    background: rgba(255,255,255,.96);
+    position: sticky; top: 10px; z-index: 30;
+    background: rgba(255,255,255,.97);
     backdrop-filter: blur(6px);
-    border-top: 1px solid #e1e5ea;
-    box-shadow: 0 -6px 18px rgba(0,0,0,0.08);
-    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    border: 1px solid #e1e5ea;
+    border-radius: 14px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.10);
+    padding: 14px 18px;
+    margin-bottom: 22px;
   }
-  #noteBar .inner { max-width: 1100px; margin: 0 auto; }
-  #noteBar .noteRow { display:flex; align-items:center; gap: 10px; margin-top: 8px; }
+  #noteBar .noteRow { display:flex; align-items:center; gap: 10px; margin-top: 10px; }
   #noteBar label.noteLabel { font-size: 13px; color: var(--muted); white-space: nowrap; display:none; }
   @media (min-width: 560px) { #noteBar label.noteLabel { display:inline; } }
   #noteInput {
@@ -129,7 +130,7 @@
   .gapsRow input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--minor); cursor: pointer; }
 
   #toast {
-    position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%) translateY(10px);
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(10px);
     max-width: 90vw; padding: 12px 20px; border-radius: 10px; font-size: 14.5px;
     background: #1e5e1e; color: #fff; box-shadow: 0 10px 24px rgba(0,0,0,0.2);
     opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease;
@@ -159,6 +160,19 @@
     <div id="teacherBox"></div>
   </header>
 
+  <div id="noteBar">
+    <div class="gapsRow" id="gapsRow">
+      <label class="gapLabel"><input type="checkbox" value="Respect gap"> Respect gap</label>
+      <label class="gapLabel"><input type="checkbox" value="Responsibility gap"> Responsibility gap</label>
+      <label class="gapLabel"><input type="checkbox" value="Inclusion gap"> Inclusion gap</label>
+      <label class="gapLabel"><input type="checkbox" value="Teamwork gap"> Teamwork gap</label>
+    </div>
+    <div class="noteRow">
+      <label class="noteLabel" for="noteInput">Quick note (optional):</label>
+      <input id="noteInput" type="text" placeholder="No student names — just context, e.g. 'repeated phone use during quiz' — attaches to your next tap" autocomplete="off">
+    </div>
+  </div>
+
   <div class="sections">
     <section>
       <div class="section-head minor">
@@ -179,21 +193,6 @@
 </div>
 
 <div id="toast"></div>
-
-<div id="noteBar">
-  <div class="inner">
-    <div class="gapsRow" id="gapsRow">
-      <label class="gapLabel"><input type="checkbox" value="Respect gap"> Respect gap</label>
-      <label class="gapLabel"><input type="checkbox" value="Responsibility gap"> Responsibility gap</label>
-      <label class="gapLabel"><input type="checkbox" value="Inclusion gap"> Inclusion gap</label>
-      <label class="gapLabel"><input type="checkbox" value="Teamwork gap"> Teamwork gap</label>
-    </div>
-    <div class="noteRow">
-      <label class="noteLabel" for="noteInput">Quick note (optional):</label>
-      <input id="noteInput" type="text" placeholder="No student names — just context, e.g. 'repeated phone use during quiz' — attaches to your next tap" autocomplete="off">
-    </div>
-  </div>
-</div>
 
 <script>
 (function () {

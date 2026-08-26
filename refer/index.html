@@ -8,8 +8,10 @@
   :root{
     --minor: #2f7dd1;
     --minor-dark: #235f9e;
+    --minor-tint: #eaf2fb;
     --major: #d1372f;
     --major-dark: #a5271f;
+    --major-tint: #fbeceb;
     --bg: #f4f6f8;
     --ink: #1c2530;
     --muted: #667085;
@@ -17,84 +19,76 @@
   }
   * { box-sizing: border-box; }
   html, body {
-    margin: 0; padding: 0; height: 100%;
+    margin: 0; padding: 0; min-height: 100%;
     background: var(--bg);
     color: var(--ink);
     font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   }
-  .wrap { max-width: 1000px; margin: 0 auto; padding: 20px 16px 60px; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 140px; }
 
-  header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 18px; }
+  header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 18px; gap: 12px; flex-wrap: wrap; }
   header h1 { font-size: 22px; margin: 0; }
   header h1 span { color: var(--muted); font-weight: 400; font-size: 15px; display:block; margin-top:2px;}
-  #teacherBox { text-align:right; font-size: 14px; color: var(--muted); }
+  #teacherBox { text-align:right; font-size: 14px; color: var(--muted); white-space: nowrap; }
   #teacherBox b { color: var(--ink); }
   #teacherBox a { color: var(--minor); text-decoration:none; cursor:pointer; }
   #teacherBox a:hover { text-decoration: underline; }
 
-  .buttons {
+  .sections {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    margin-top: 10px;
+    gap: 24px;
+    align-items: start;
   }
-  @media (max-width: 640px) {
-    .buttons { grid-template-columns: 1fr; }
+  @media (max-width: 780px) {
+    .sections { grid-template-columns: 1fr; }
   }
 
-  .refbtn {
+  .section-head {
     border: none;
-    border-radius: 18px;
-    padding: 34px 26px;
-    text-align: left;
-    cursor: pointer;
+    border-radius: 14px;
+    padding: 18px 22px;
     color: #fff;
     box-shadow: 0 6px 18px rgba(0,0,0,0.12);
-    transition: transform .08s ease, box-shadow .08s ease;
+    margin-bottom: 14px;
   }
-  .refbtn:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,0.16); }
-  .refbtn:active { transform: translateY(0); }
+  .section-head.minor { background: linear-gradient(135deg, var(--minor), var(--minor-dark)); }
+  .section-head.major { background: linear-gradient(135deg, var(--major), var(--major-dark)); }
+  .section-head .label { font-size: 26px; font-weight: 800; letter-spacing: .5px; }
+  .section-head .sub { margin-top: 6px; font-size: 14px; line-height: 1.4; opacity: .95; }
 
-  .refbtn.minor { background: linear-gradient(135deg, var(--minor), var(--minor-dark)); }
-  .refbtn.major { background: linear-gradient(135deg, var(--major), var(--major-dark)); }
-
-  .refbtn .label { font-size: 34px; font-weight: 800; letter-spacing: .5px; }
-  .refbtn .sub { margin-top: 10px; font-size: 15px; line-height: 1.45; opacity: .95; }
-
-  .panel {
-    display: none;
-    margin-top: 22px;
-    background: var(--card);
-    border-radius: 16px;
-    padding: 24px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.10);
+  .cat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
   }
-  .panel.open { display: block; }
-  .panel h2 { margin: 0 0 4px; font-size: 19px; }
-  .panel .pill { display:inline-block; padding: 3px 12px; border-radius: 999px; font-size: 13px; font-weight:700; color:#fff; margin-bottom: 14px;}
-  .pill.minor { background: var(--minor); }
-  .pill.major { background: var(--major); }
-  .panel textarea {
-    width: 100%; min-height: 90px; padding: 12px; font-size: 15px;
-    border: 1px solid #d7dce1; border-radius: 10px; font-family: inherit; resize: vertical;
-  }
-  .panel .hint { color: var(--muted); font-size: 13px; margin-top: 6px; }
-  .panel .actions { margin-top: 16px; display:flex; gap: 10px; }
-  .panel button { font-size: 15px; padding: 11px 20px; border-radius: 10px; border: none; cursor: pointer; }
-  .btn-submit { background: var(--ink); color: #fff; font-weight: 700; }
-  .btn-submit:disabled { opacity: .5; cursor: default; }
-  .btn-cancel { background: #e9ecef; color: var(--ink); }
 
-  #toast {
-    display:none; margin-top: 20px; padding: 16px 20px; border-radius: 12px;
-    background: #eafbea; border: 1px solid #b6e6b6; color: #1e5e1e; font-size: 15px;
+  .cat-btn {
+    border-radius: 12px;
+    padding: 16px 14px;
+    font-size: 14.5px;
+    font-weight: 600;
+    line-height: 1.3;
+    text-align: left;
+    cursor: pointer;
+    background: #fff;
+    color: var(--ink);
+    transition: transform .08s ease, box-shadow .08s ease, background .15s ease;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
   }
-  #toast.show { display:block; }
-  #toast b { font-weight: 700; }
+  .cat-btn.minor { border: 2px solid var(--minor); }
+  .cat-btn.major { border: 2px solid var(--major); }
+  .cat-btn.minor:hover { background: var(--minor-tint); }
+  .cat-btn.major:hover { background: var(--major-tint); }
+  .cat-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(0,0,0,0.12); }
+  .cat-btn:active { transform: translateY(0); }
+  .cat-btn:disabled { opacity: .5; cursor: default; transform:none; }
+  .cat-btn.logged.minor { background: var(--minor); color: #fff; }
+  .cat-btn.logged.major { background: var(--major); color: #fff; }
 
   #nameOverlay {
     position: fixed; inset: 0; background: rgba(20,24,30,.55);
-    display:flex; align-items:center; justify-content:center; padding: 20px; z-index: 50;
+    display:flex; align-items:center; justify-content:center; padding: 20px; z-index: 60;
   }
   #nameOverlay .box {
     background: #fff; border-radius: 16px; padding: 28px; max-width: 360px; width: 100%;
@@ -108,6 +102,34 @@
   }
   #nameOverlay button { width: 100%; padding: 12px; font-size: 15px; font-weight: 700; border: none; border-radius: 10px; background: var(--minor); color:#fff; cursor:pointer; }
   #nameOverlay.hidden { display:none; }
+
+  #noteBar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    background: rgba(255,255,255,.96);
+    backdrop-filter: blur(6px);
+    border-top: 1px solid #e1e5ea;
+    box-shadow: 0 -6px 18px rgba(0,0,0,0.08);
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  }
+  #noteBar .inner { max-width: 1100px; margin: 0 auto; display:flex; align-items:center; gap: 10px; }
+  #noteBar label { font-size: 13px; color: var(--muted); white-space: nowrap; display:none; }
+  @media (min-width: 560px) { #noteBar label { display:inline; } }
+  #noteInput {
+    flex: 1; padding: 12px 14px; font-size: 15px; border: 1px solid #d7dce1;
+    border-radius: 10px; font-family: inherit;
+  }
+  #noteInput:focus { outline: 2px solid var(--minor); outline-offset: 1px; }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%) translateY(10px);
+    max-width: 90vw; padding: 12px 20px; border-radius: 10px; font-size: 14.5px;
+    background: #1e5e1e; color: #fff; box-shadow: 0 10px 24px rgba(0,0,0,0.2);
+    opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease;
+    z-index: 50;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.error { background: #a5271f; }
+  #toast b { font-weight: 700; }
 </style>
 </head>
 <body>
@@ -129,33 +151,74 @@
     <div id="teacherBox"></div>
   </header>
 
-  <div class="buttons">
-    <button class="refbtn minor" data-type="Minor">
-      <div class="label">MINOR</div>
-      <div class="sub">Disruption, dress code, tardiness, minor defiance — things you're handling yourself but want on record.</div>
-    </button>
-    <button class="refbtn major" data-type="Major">
-      <div class="label">MAJOR</div>
-      <div class="sub">Safety concern, fighting, weapons, harassment, or anything needing immediate admin attention.</div>
-    </button>
-  </div>
+  <div class="sections">
+    <section>
+      <div class="section-head minor">
+        <div class="label">MINOR</div>
+        <div class="sub">Handling it yourself, but want it on record.</div>
+      </div>
+      <div class="cat-grid" id="minorGrid"></div>
+    </section>
 
-  <div class="panel" id="panel">
-    <span class="pill" id="pill"></span>
-    <h2>Add a quick note (optional)</h2>
-    <textarea id="note" placeholder="No student names — just context, e.g. 'repeated phone use during quiz'"></textarea>
-    <div class="hint" id="stamp"></div>
-    <div class="actions">
-      <button class="btn-submit" id="submitBtn">Log it</button>
-      <button class="btn-cancel" id="cancelBtn">Cancel</button>
-    </div>
+    <section>
+      <div class="section-head major">
+        <div class="label">MAJOR</div>
+        <div class="sub">Needs immediate admin attention.</div>
+      </div>
+      <div class="cat-grid" id="majorGrid"></div>
+    </section>
   </div>
+</div>
 
-  <div id="toast"></div>
+<div id="toast"></div>
+
+<div id="noteBar">
+  <div class="inner">
+    <label for="noteInput">Quick note (optional):</label>
+    <input id="noteInput" type="text" placeholder="No student names — just context, e.g. 'repeated phone use during quiz' — attaches to your next tap" autocomplete="off">
+  </div>
 </div>
 
 <script>
 (function () {
+  const MINOR_CATEGORIES = [
+    'Defiance/Failure to Cooperate',
+    'Disruption',
+    'Dress Code Violation',
+    'Electronics/Technology Misuse',
+    'Inappropriate Language (Minor)',
+    'Inappropriate Location',
+    'Physical Contact/Aggression',
+    'Property Misuse',
+    'Theft (Minor)'
+  ];
+
+  const MAJOR_CATEGORIES = [
+    'Academic Dishonesty/Plagiarism',
+    'Alcohol',
+    'Destruction of Property/Vandalism',
+    'Discriminatory Harassment',
+    'Disruptive Conduct',
+    'Failure to Cooperate',
+    'Fighting Without Major Injury',
+    'Gang Affiliation/Display',
+    'Harassment, Intimidation & Bullying (HIB)',
+    'Illicit Drug (not Cannabis)',
+    'Inappropriate Language',
+    'Inappropriate Location/Skip Class',
+    'Marijuana',
+    'Multiple Minor Accumulated Incidents',
+    'Possession of a Weapon',
+    'Sexual Harassment',
+    'Sexually Inappropriate Conduct',
+    'Technology Violation',
+    'Theft or Possession of Stolen Property',
+    'Threat to Other',
+    'Tobacco',
+    'Violence Without Major Injury',
+    'Violence With Major Injury'
+  ];
+
   function getCookie(name) {
     const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
     return m ? decodeURIComponent(m.pop()) : '';
@@ -168,12 +231,9 @@
 
   const overlay = document.getElementById('nameOverlay');
   const teacherBox = document.getElementById('teacherBox');
-  const panel = document.getElementById('panel');
-  const pill = document.getElementById('pill');
-  const note = document.getElementById('note');
-  const stamp = document.getElementById('stamp');
+  const noteInput = document.getElementById('noteInput');
   const toast = document.getElementById('toast');
-  let pendingType = null;
+  let toastTimer = null;
 
   function renderTeacherBox() {
     const name = getCookie('refer_teacher');
@@ -202,36 +262,36 @@
   }
   renderTeacherBox();
 
-  document.querySelectorAll('.refbtn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      pendingType = btn.dataset.type;
-      pill.textContent = pendingType.toUpperCase();
-      pill.className = 'pill ' + pendingType.toLowerCase();
-      note.value = '';
-      toast.className = '';
-      stamp.textContent = 'Will be logged as: ' + new Date().toLocaleString();
-      panel.classList.add('open');
-      panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      note.focus();
+  function buildGrid(container, categories, type) {
+    categories.forEach(cat => {
+      const btn = document.createElement('button');
+      btn.className = 'cat-btn ' + type.toLowerCase();
+      btn.textContent = cat;
+      btn.addEventListener('click', () => logReferral(type, cat, btn));
+      container.appendChild(btn);
     });
-  });
+  }
+  buildGrid(document.getElementById('minorGrid'), MINOR_CATEGORIES, 'Minor');
+  buildGrid(document.getElementById('majorGrid'), MAJOR_CATEGORIES, 'Major');
 
-  document.getElementById('cancelBtn').addEventListener('click', () => {
-    panel.classList.remove('open');
-    pendingType = null;
-  });
+  function showToast(message, isError) {
+    clearTimeout(toastTimer);
+    toast.innerHTML = message;
+    toast.className = 'show' + (isError ? ' error' : '');
+    toastTimer = setTimeout(() => { toast.className = ''; }, 3200);
+  }
 
-  document.getElementById('submitBtn').addEventListener('click', async () => {
-    if (!pendingType) return;
+  async function logReferral(type, category, btn) {
+    const allButtons = document.querySelectorAll('.cat-btn');
+    allButtons.forEach(b => b.disabled = true);
+
     const teacher = getCookie('refer_teacher') || 'Unknown';
-    const submitBtn = document.getElementById('submitBtn');
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Logging…';
-
+    const note = noteInput.value.trim();
     const payload = {
-      type: pendingType,
+      type: type,
+      category: category,
       teacher: teacher,
-      note: note.value.trim(),
+      note: note,
       client_time: new Date().toISOString()
     };
 
@@ -242,21 +302,16 @@
         body: JSON.stringify(payload)
       });
       const data = await res.json();
-      toast.innerHTML = '<b>Logged.</b> ' + pendingType + ' referral by ' + teacher + ' at ' + (data.timestamp || payload.client_time) + '.';
-      toast.className = 'show';
+      showToast('<b>Logged.</b> ' + type + ' &middot; ' + category + ' &middot; ' + teacher + ' at ' + (data.timestamp || payload.client_time) + '.', false);
+      btn.classList.add('logged');
+      setTimeout(() => btn.classList.remove('logged'), 1200);
+      noteInput.value = '';
     } catch (err) {
-      toast.innerHTML = '<b>Could not reach the server.</b> Nothing was logged — try again.';
-      toast.style.background = '#fdecea';
-      toast.style.borderColor = '#f3c2bd';
-      toast.style.color = '#7a241f';
-      toast.className = 'show';
+      showToast('<b>Could not reach the server.</b> Nothing was logged — try again.', true);
     }
 
-    panel.classList.remove('open');
-    pendingType = null;
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Log it';
-  });
+    allButtons.forEach(b => b.disabled = false);
+  }
 })();
 </script>
 </body>

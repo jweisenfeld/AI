@@ -14,6 +14,7 @@ if ($type !== 'Major' && $type !== 'Minor') {
     exit;
 }
 
+$category    = isset($data['category']) ? trim($data['category']) : '';
 $teacher     = isset($data['teacher']) ? trim($data['teacher']) : 'Unknown';
 $note        = isset($data['note']) ? trim($data['note']) : '';
 $clientTime  = isset($data['client_time']) ? trim($data['client_time']) : '';
@@ -31,12 +32,13 @@ if ($fh === false) {
 
 if (flock($fh, LOCK_EX)) {
     if ($isNewFile) {
-        fputcsv($fh, ['timestamp', 'teacher', 'type', 'note', 'client_time', 'ip']);
+        fputcsv($fh, ['timestamp', 'teacher', 'type', 'category', 'note', 'client_time', 'ip']);
     }
     fputcsv($fh, [
         $timestamp,
         $teacher,
         $type,
+        $category,
         $note,
         $clientTime,
         $_SERVER['REMOTE_ADDR'] ?? ''

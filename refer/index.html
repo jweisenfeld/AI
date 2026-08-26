@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Refer — Behavior Referral</title>
+<style>
+  :root{
+    --minor: #2f7dd1;
+    --minor-dark: #235f9e;
+    --major: #d1372f;
+    --major-dark: #a5271f;
+    --bg: #f4f6f8;
+    --ink: #1c2530;
+    --muted: #667085;
+    --card: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 20px 16px 60px; }
+
+  header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 18px; }
+  header h1 { font-size: 22px; margin: 0; }
+  header h1 span { color: var(--muted); font-weight: 400; font-size: 15px; display:block; margin-top:2px;}
+  #teacherBox { text-align:right; font-size: 14px; color: var(--muted); }
+  #teacherBox b { color: var(--ink); }
+  #teacherBox a { color: var(--minor); text-decoration:none; cursor:pointer; }
+  #teacherBox a:hover { text-decoration: underline; }
+
+  .buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 10px;
+  }
+  @media (max-width: 640px) {
+    .buttons { grid-template-columns: 1fr; }
+  }
+
+  .refbtn {
+    border: none;
+    border-radius: 18px;
+    padding: 34px 26px;
+    text-align: left;
+    cursor: pointer;
+    color: #fff;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+    transition: transform .08s ease, box-shadow .08s ease;
+  }
+  .refbtn:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,0.16); }
+  .refbtn:active { transform: translateY(0); }
+
+  .refbtn.minor { background: linear-gradient(135deg, var(--minor), var(--minor-dark)); }
+  .refbtn.major { background: linear-gradient(135deg, var(--major), var(--major-dark)); }
+
+  .refbtn .label { font-size: 34px; font-weight: 800; letter-spacing: .5px; }
+  .refbtn .sub { margin-top: 10px; font-size: 15px; line-height: 1.45; opacity: .95; }
+
+  .panel {
+    display: none;
+    margin-top: 22px;
+    background: var(--card);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.10);
+  }
+  .panel.open { display: block; }
+  .panel h2 { margin: 0 0 4px; font-size: 19px; }
+  .panel .pill { display:inline-block; padding: 3px 12px; border-radius: 999px; font-size: 13px; font-weight:700; color:#fff; margin-bottom: 14px;}
+  .pill.minor { background: var(--minor); }
+  .pill.major { background: var(--major); }
+  .panel textarea {
+    width: 100%; min-height: 90px; padding: 12px; font-size: 15px;
+    border: 1px solid #d7dce1; border-radius: 10px; font-family: inherit; resize: vertical;
+  }
+  .panel .hint { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .panel .actions { margin-top: 16px; display:flex; gap: 10px; }
+  .panel button { font-size: 15px; padding: 11px 20px; border-radius: 10px; border: none; cursor: pointer; }
+  .btn-submit { background: var(--ink); color: #fff; font-weight: 700; }
+  .btn-submit:disabled { opacity: .5; cursor: default; }
+  .btn-cancel { background: #e9ecef; color: var(--ink); }
+
+  #toast {
+    display:none; margin-top: 20px; padding: 16px 20px; border-radius: 12px;
+    background: #eafbea; border: 1px solid #b6e6b6; color: #1e5e1e; font-size: 15px;
+  }
+  #toast.show { display:block; }
+  #toast b { font-weight: 700; }
+
+  #nameOverlay {
+    position: fixed; inset: 0; background: rgba(20,24,30,.55);
+    display:flex; align-items:center; justify-content:center; padding: 20px; z-index: 50;
+  }
+  #nameOverlay .box {
+    background: #fff; border-radius: 16px; padding: 28px; max-width: 360px; width: 100%;
+    box-shadow: 0 20px 50px rgba(0,0,0,.3);
+  }
+  #nameOverlay h2 { margin: 0 0 6px; font-size: 19px; }
+  #nameOverlay p { color: var(--muted); font-size: 14px; margin: 0 0 16px; }
+  #nameOverlay input {
+    width: 100%; padding: 11px 12px; font-size: 16px; border: 1px solid #d7dce1;
+    border-radius: 10px; margin-bottom: 14px;
+  }
+  #nameOverlay button { width: 100%; padding: 12px; font-size: 15px; font-weight: 700; border: none; border-radius: 10px; background: var(--minor); color:#fff; cursor:pointer; }
+  #nameOverlay.hidden { display:none; }
+</style>
+</head>
+<body>
+
+<div id="nameOverlay">
+  <div class="box">
+    <h2>Quick setup</h2>
+    <p>What's your name? This is remembered on this browser so you don't have to type it each time.</p>
+    <input id="nameInput" type="text" placeholder="e.g. Weisenfeld" autocomplete="off">
+    <button id="nameSave">Save &amp; continue</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <header>
+    <h1>Refer
+      <span>One tap. No student data. Just a timestamped flag for follow-up.</span>
+    </h1>
+    <div id="teacherBox"></div>
+  </header>
+
+  <div class="buttons">
+    <button class="refbtn minor" data-type="Minor">
+      <div class="label">MINOR</div>
+      <div class="sub">Disruption, dress code, tardiness, minor defiance — things you're handling yourself but want on record.</div>
+    </button>
+    <button class="refbtn major" data-type="Major">
+      <div class="label">MAJOR</div>
+      <div class="sub">Safety concern, fighting, weapons, harassment, or anything needing immediate admin attention.</div>
+    </button>
+  </div>
+
+  <div class="panel" id="panel">
+    <span class="pill" id="pill"></span>
+    <h2>Add a quick note (optional)</h2>
+    <textarea id="note" placeholder="No student names — just context, e.g. 'repeated phone use during quiz'"></textarea>
+    <div class="hint" id="stamp"></div>
+    <div class="actions">
+      <button class="btn-submit" id="submitBtn">Log it</button>
+      <button class="btn-cancel" id="cancelBtn">Cancel</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script>
+(function () {
+  function getCookie(name) {
+    const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return m ? decodeURIComponent(m.pop()) : '';
+  }
+  function setCookie(name, value) {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + 1);
+    document.cookie = name + '=' + encodeURIComponent(value) + '; expires=' + d.toUTCString() + '; path=/; SameSite=Lax';
+  }
+
+  const overlay = document.getElementById('nameOverlay');
+  const teacherBox = document.getElementById('teacherBox');
+  const panel = document.getElementById('panel');
+  const pill = document.getElementById('pill');
+  const note = document.getElementById('note');
+  const stamp = document.getElementById('stamp');
+  const toast = document.getElementById('toast');
+  let pendingType = null;
+
+  function renderTeacherBox() {
+    const name = getCookie('refer_teacher');
+    teacherBox.innerHTML = name
+      ? '<b>' + name + '</b> &middot; <a id="changeName">not you?</a>'
+      : '';
+    const changeLink = document.getElementById('changeName');
+    if (changeLink) changeLink.addEventListener('click', () => overlay.classList.remove('hidden'));
+  }
+
+  document.getElementById('nameSave').addEventListener('click', () => {
+    const val = document.getElementById('nameInput').value.trim();
+    if (!val) return;
+    setCookie('refer_teacher', val);
+    overlay.classList.add('hidden');
+    renderTeacherBox();
+  });
+  document.getElementById('nameInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('nameSave').click();
+  });
+
+  if (!getCookie('refer_teacher')) {
+    overlay.classList.remove('hidden');
+  } else {
+    overlay.classList.add('hidden');
+  }
+  renderTeacherBox();
+
+  document.querySelectorAll('.refbtn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      pendingType = btn.dataset.type;
+      pill.textContent = pendingType.toUpperCase();
+      pill.className = 'pill ' + pendingType.toLowerCase();
+      note.value = '';
+      toast.className = '';
+      stamp.textContent = 'Will be logged as: ' + new Date().toLocaleString();
+      panel.classList.add('open');
+      panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      note.focus();
+    });
+  });
+
+  document.getElementById('cancelBtn').addEventListener('click', () => {
+    panel.classList.remove('open');
+    pendingType = null;
+  });
+
+  document.getElementById('submitBtn').addEventListener('click', async () => {
+    if (!pendingType) return;
+    const teacher = getCookie('refer_teacher') || 'Unknown';
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Logging…';
+
+    const payload = {
+      type: pendingType,
+      teacher: teacher,
+      note: note.value.trim(),
+      client_time: new Date().toISOString()
+    };
+
+    try {
+      const res = await fetch('log.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      toast.innerHTML = '<b>Logged.</b> ' + pendingType + ' referral by ' + teacher + ' at ' + (data.timestamp || payload.client_time) + '.';
+      toast.className = 'show';
+    } catch (err) {
+      toast.innerHTML = '<b>Could not reach the server.</b> Nothing was logged — try again.';
+      toast.style.background = '#fdecea';
+      toast.style.borderColor = '#f3c2bd';
+      toast.style.color = '#7a241f';
+      toast.className = 'show';
+    }
+
+    panel.classList.remove('open');
+    pendingType = null;
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Log it';
+  });
+})();
+</script>
+</body>
+</html>

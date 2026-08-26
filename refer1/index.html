@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Refer — Behavior Referral</title>
+<style>
+  :root{
+    --minor: #2f7dd1;
+    --minor-dark: #235f9e;
+    --minor-tint: #eaf2fb;
+    --major: #e2620f;
+    --major-dark: #b84a0a;
+    --major-tint: #fdf0e6;
+    --bg: #f4f6f8;
+    --ink: #1c2530;
+    --muted: #667085;
+    --card: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100%;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
+
+  header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 18px; gap: 12px; flex-wrap: wrap; }
+  header h1 { font-size: 22px; margin: 0; }
+  header h1 span { color: var(--muted); font-weight: 400; font-size: 15px; display:block; margin-top:2px;}
+  #teacherBox { text-align:right; font-size: 14px; color: var(--muted); white-space: nowrap; }
+  #teacherBox b { color: var(--ink); }
+  #teacherBox a { color: var(--minor); text-decoration:none; cursor:pointer; }
+  #teacherBox a:hover { text-decoration: underline; }
+
+  .sections {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  @media (max-width: 780px) {
+    .sections { grid-template-columns: 1fr; }
+  }
+
+  .section-head {
+    border: none;
+    border-radius: 14px;
+    padding: 18px 22px;
+    color: #fff;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+    margin-bottom: 14px;
+  }
+  .section-head.minor { background: linear-gradient(135deg, var(--minor), var(--minor-dark)); }
+  .section-head.major { background: linear-gradient(135deg, var(--major), var(--major-dark)); }
+  .section-head .label { font-size: 26px; font-weight: 800; letter-spacing: .5px; }
+  .section-head .sub { margin-top: 6px; font-size: 14px; line-height: 1.4; opacity: .95; }
+
+  .cat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
+
+  .cat-btn {
+    border-radius: 12px;
+    padding: 16px 14px;
+    font-size: 14.5px;
+    font-weight: 600;
+    line-height: 1.3;
+    text-align: left;
+    cursor: pointer;
+    background: #fff;
+    color: var(--ink);
+    transition: transform .08s ease, box-shadow .08s ease, background .15s ease;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  }
+  .cat-btn.minor { border: 2px solid var(--minor); }
+  .cat-btn.major { border: 2px solid var(--major); }
+  .cat-btn.minor:hover { background: var(--minor-tint); }
+  .cat-btn.major:hover { background: var(--major-tint); }
+  .cat-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(0,0,0,0.12); }
+  .cat-btn:active { transform: translateY(0); }
+  .cat-btn:disabled { opacity: .5; cursor: default; transform:none; }
+  .cat-btn.logged.minor { background: var(--minor); color: #fff; }
+  .cat-btn.logged.major { background: var(--major); color: #fff; }
+
+  #nameOverlay {
+    position: fixed; inset: 0; background: rgba(20,24,30,.55);
+    display:flex; align-items:center; justify-content:center; padding: 20px; z-index: 60;
+  }
+  #nameOverlay .box {
+    background: #fff; border-radius: 16px; padding: 28px; max-width: 360px; width: 100%;
+    box-shadow: 0 20px 50px rgba(0,0,0,.3);
+  }
+  #nameOverlay h2 { margin: 0 0 6px; font-size: 19px; }
+  #nameOverlay p { color: var(--muted); font-size: 14px; margin: 0 0 16px; }
+  #nameOverlay input {
+    width: 100%; padding: 11px 12px; font-size: 16px; border: 1px solid #d7dce1;
+    border-radius: 10px; margin-bottom: 14px;
+  }
+  #nameOverlay button { width: 100%; padding: 12px; font-size: 15px; font-weight: 700; border: none; border-radius: 10px; background: var(--minor); color:#fff; cursor:pointer; }
+  #nameOverlay.hidden { display:none; }
+
+  #noteBar {
+    position: sticky; top: 10px; z-index: 30;
+    background: rgba(255,255,255,.97);
+    backdrop-filter: blur(6px);
+    border: 1px solid #e1e5ea;
+    border-radius: 14px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.10);
+    padding: 14px 18px;
+    margin-bottom: 22px;
+  }
+  #noteBar .noteRow { display:flex; align-items:center; gap: 10px; margin-top: 10px; }
+  #noteBar label.noteLabel { font-size: 13px; color: var(--muted); white-space: nowrap; display:none; }
+  @media (min-width: 560px) { #noteBar label.noteLabel { display:inline; } }
+  #noteInput {
+    flex: 1; padding: 12px 14px; font-size: 15px; border: 1px solid #d7dce1;
+    border-radius: 10px; font-family: inherit;
+  }
+  #noteInput:focus { outline: 2px solid var(--minor); outline-offset: 1px; }
+
+  .gapsRow { display:flex; flex-wrap: wrap; gap: 6px 16px; }
+  .gapsRow .gapLabel {
+    display:flex; align-items:center; gap: 6px; font-size: 13.5px; color: var(--ink);
+    cursor: pointer; user-select: none;
+  }
+  .gapsRow input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--minor); cursor: pointer; }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(10px);
+    max-width: 90vw; padding: 12px 20px; border-radius: 10px; font-size: 14.5px;
+    background: #1e5e1e; color: #fff; box-shadow: 0 10px 24px rgba(0,0,0,0.2);
+    opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease;
+    z-index: 50;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.error { background: #a5271f; }
+  #toast b { font-weight: 700; }
+</style>
+</head>
+<body>
+
+<div id="nameOverlay">
+  <div class="box">
+    <h2>Quick setup</h2>
+    <p>What's your name? This is remembered on this browser so you don't have to type it each time.</p>
+    <input id="nameInput" type="text" placeholder="e.g. Weisenfeld" autocomplete="off">
+    <button id="nameSave">Save &amp; continue</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <header>
+    <h1>Refer
+      <span>One tap. No student data. Just a timestamped flag for follow-up.</span>
+    </h1>
+    <div id="teacherBox"></div>
+  </header>
+
+  <div id="noteBar">
+    <div class="gapsRow" id="gapsRow">
+      <label class="gapLabel"><input type="checkbox" value="Respect gap"> Respect gap</label>
+      <label class="gapLabel"><input type="checkbox" value="Responsibility gap"> Responsibility gap</label>
+      <label class="gapLabel"><input type="checkbox" value="Inclusion gap"> Inclusion gap</label>
+      <label class="gapLabel"><input type="checkbox" value="Teamwork gap"> Teamwork gap</label>
+    </div>
+    <div class="noteRow">
+      <label class="noteLabel" for="noteInput">Quick note (optional):</label>
+      <input id="noteInput" type="text" placeholder="No student names — just context, e.g. 'repeated phone use during quiz' — attaches to your next tap" autocomplete="off">
+    </div>
+  </div>
+
+  <div class="sections">
+    <section>
+      <div class="section-head minor">
+        <div class="label">MINOR</div>
+        <div class="sub">Handling it yourself, but want it on record.</div>
+      </div>
+      <div class="cat-grid" id="minorGrid"></div>
+    </section>
+
+    <section>
+      <div class="section-head major">
+        <div class="label">MAJOR</div>
+        <div class="sub">Needs immediate admin attention.</div>
+      </div>
+      <div class="cat-grid" id="majorGrid"></div>
+    </section>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function () {
+  const MINOR_CATEGORIES = [
+    'Defiance/Failure to Cooperate',
+    'Disruption',
+    'Dress Code Violation',
+    'Electronics/Technology Misuse',
+    'Inappropriate Language (Minor)',
+    'Inappropriate Location',
+    'Physical Contact/Aggression',
+    'Property Misuse',
+    'Theft (Minor)'
+  ];
+
+  const MAJOR_CATEGORIES = [
+    'Academic Dishonesty/Plagiarism',
+    'Alcohol',
+    'Destruction of Property/Vandalism',
+    'Discriminatory Harassment',
+    'Disruptive Conduct',
+    'Failure to Cooperate',
+    'Fighting Without Major Injury',
+    'Gang Affiliation/Display',
+    'Harassment, Intimidation & Bullying (HIB)',
+    'Illicit Drug (not Cannabis)',
+    'Inappropriate Language',
+    'Inappropriate Location/Skip Class',
+    'Marijuana',
+    'Multiple Minor Accumulated Incidents',
+    'Possession of a Weapon',
+    'Sexual Harassment',
+    'Sexually Inappropriate Conduct',
+    'Technology Violation',
+    'Theft or Possession of Stolen Property',
+    'Threat to Other',
+    'Tobacco',
+    'Violence Without Major Injury',
+    'Violence With Major Injury'
+  ];
+
+  function getCookie(name) {
+    const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return m ? decodeURIComponent(m.pop()) : '';
+  }
+  function setCookie(name, value) {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + 1);
+    document.cookie = name + '=' + encodeURIComponent(value) + '; expires=' + d.toUTCString() + '; path=/; SameSite=Lax';
+  }
+
+  const overlay = document.getElementById('nameOverlay');
+  const teacherBox = document.getElementById('teacherBox');
+  const noteInput = document.getElementById('noteInput');
+  const gapCheckboxes = document.querySelectorAll('#gapsRow input[type="checkbox"]');
+  const toast = document.getElementById('toast');
+  let toastTimer = null;
+
+  function renderTeacherBox() {
+    const name = getCookie('refer_teacher');
+    teacherBox.innerHTML = name
+      ? '<b>' + name + '</b> &middot; <a id="changeName">not you?</a>'
+      : '';
+    const changeLink = document.getElementById('changeName');
+    if (changeLink) changeLink.addEventListener('click', () => overlay.classList.remove('hidden'));
+  }
+
+  document.getElementById('nameSave').addEventListener('click', () => {
+    const val = document.getElementById('nameInput').value.trim();
+    if (!val) return;
+    setCookie('refer_teacher', val);
+    overlay.classList.add('hidden');
+    renderTeacherBox();
+  });
+  document.getElementById('nameInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('nameSave').click();
+  });
+
+  if (!getCookie('refer_teacher')) {
+    overlay.classList.remove('hidden');
+  } else {
+    overlay.classList.add('hidden');
+  }
+  renderTeacherBox();
+
+  function buildGrid(container, categories, type) {
+    categories.forEach(cat => {
+      const btn = document.createElement('button');
+      btn.className = 'cat-btn ' + type.toLowerCase();
+      btn.textContent = cat;
+      btn.addEventListener('click', () => logReferral(type, cat, btn));
+      container.appendChild(btn);
+    });
+  }
+  buildGrid(document.getElementById('minorGrid'), MINOR_CATEGORIES, 'Minor');
+  buildGrid(document.getElementById('majorGrid'), MAJOR_CATEGORIES, 'Major');
+
+  function showToast(message, isError) {
+    clearTimeout(toastTimer);
+    toast.innerHTML = message;
+    toast.className = 'show' + (isError ? ' error' : '');
+    toastTimer = setTimeout(() => { toast.className = ''; }, 3200);
+  }
+
+  async function logReferral(type, category, btn) {
+    const allButtons = document.querySelectorAll('.cat-btn');
+    allButtons.forEach(b => b.disabled = true);
+
+    const teacher = getCookie('refer_teacher') || 'Unknown';
+    const note = noteInput.value.trim();
+    const gaps = Array.from(gapCheckboxes).filter(c => c.checked).map(c => c.value);
+    const payload = {
+      type: type,
+      category: category,
+      teacher: teacher,
+      note: note,
+      gaps: gaps.join('; '),
+      client_time: new Date().toISOString()
+    };
+
+    try {
+      const res = await fetch('log.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      showToast('<b>Logged.</b> ' + type + ' &middot; ' + category + ' &middot; ' + teacher + ' at ' + (data.timestamp || payload.client_time) + '.', false);
+      btn.classList.add('logged');
+      setTimeout(() => btn.classList.remove('logged'), 1200);
+      noteInput.value = '';
+      gapCheckboxes.forEach(c => c.checked = false);
+    } catch (err) {
+      showToast('<b>Could not reach the server.</b> Nothing was logged — try again.', true);
+    }
+
+    allButtons.forEach(b => b.disabled = false);
+  }
+})();
+</script>
+</body>
+</html>

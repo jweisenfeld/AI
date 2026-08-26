@@ -129,6 +129,36 @@
   }
   .gapsRow input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--minor); cursor: pointer; }
 
+  .studentRow { margin-top: 10px; position: relative; }
+  .studentSearchWrap { display:flex; align-items:center; gap: 10px; position: relative; }
+  #studentInput {
+    flex: 1; padding: 12px 14px; font-size: 15px; border: 1px solid #d7dce1;
+    border-radius: 10px; font-family: inherit;
+  }
+  #studentInput:focus { outline: 2px solid var(--minor); outline-offset: 1px; }
+
+  #studentSuggestions {
+    display:none; position: absolute; left: 0; right: 0; top: calc(100% + 6px);
+    background: #fff; border: 1px solid #d7dce1; border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.14); max-height: 280px; overflow-y: auto; z-index: 35;
+  }
+  #studentSuggestions.show { display:block; }
+  .sugItem { padding: 10px 14px; font-size: 13.5px; cursor: pointer; border-bottom: 1px solid #f0f1f3; line-height: 1.5; }
+  .sugItem:last-child { border-bottom: none; }
+  .sugItem:hover, .sugItem.active { background: var(--minor-tint); }
+  .sugItem .sugSep { color: var(--muted); margin: 0 4px; }
+  .sugEmpty { padding: 12px 14px; font-size: 13.5px; color: var(--muted); }
+  mark { background: #fff176; color: inherit; padding: 0 1px; border-radius: 2px; }
+
+  .studentChip {
+    display:flex; align-items:center; gap: 10px; background: var(--minor-tint);
+    border: 1px solid var(--minor); border-radius: 10px; padding: 10px 14px; font-size: 14px;
+  }
+  .studentChip button {
+    border:none; background: transparent; color: var(--minor-dark); font-size: 18px; line-height:1;
+    cursor:pointer; padding: 0 2px; font-weight: 700;
+  }
+
   #toast {
     position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(10px);
     max-width: 90vw; padding: 12px 20px; border-radius: 10px; font-size: 14.5px;
@@ -155,7 +185,7 @@
 <div class="wrap">
   <header>
     <h1>Refer
-      <span>One tap. No student data. Just a timestamped flag for follow-up.</span>
+      <span>One tap. Student name is optional. Timestamped for follow-up.</span>
     </h1>
     <div id="teacherBox"></div>
   </header>
@@ -167,9 +197,22 @@
       <label class="gapLabel"><input type="checkbox" value="Inclusion gap"> Inclusion gap</label>
       <label class="gapLabel"><input type="checkbox" value="Teamwork gap"> Teamwork gap</label>
     </div>
+
+    <div class="studentRow" id="studentRow">
+      <div class="studentSearchWrap" id="studentSearchWrap">
+        <label class="noteLabel" for="studentInput">Student (optional):</label>
+        <input id="studentInput" type="text" placeholder="Start typing a name, email, or ID…" autocomplete="off">
+        <div id="studentSuggestions"></div>
+      </div>
+      <div class="studentChip" id="studentChip" style="display:none;">
+        Selected: <span id="studentChipText"></span>
+        <button type="button" id="studentClear" title="Clear student">&times;</button>
+      </div>
+    </div>
+
     <div class="noteRow">
       <label class="noteLabel" for="noteInput">Quick note (optional):</label>
-      <input id="noteInput" type="text" placeholder="No student names — just context, e.g. 'repeated phone use during quiz' — attaches to your next tap" autocomplete="off">
+      <input id="noteInput" type="text" placeholder="Context, e.g. 'repeated phone use during quiz' — attaches to your next tap" autocomplete="off">
     </div>
   </div>
 
@@ -251,6 +294,92 @@
   const toast = document.getElementById('toast');
   let toastTimer = null;
 
+  const studentInput = document.getElementById('studentInput');
+  const studentSuggestions = document.getElementById('studentSuggestions');
+  const studentChip = document.getElementById('studentChip');
+  const studentChipText = document.getElementById('studentChipText');
+  const studentClear = document.getElementById('studentClear');
+  let selectedStudent = null;
+  let studentSearchTimer = null;
+  let studentSearchSeq = 0;
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function highlight(text, query) {
+    text = String(text || '');
+    if (!query) return escapeHtml(text);
+    const idx = text.toLowerCase().indexOf(query.toLowerCase());
+    if (idx === -1) return escapeHtml(text);
+    return escapeHtml(text.slice(0, idx)) + '<mark>' + escapeHtml(text.slice(idx, idx + query.length)) + '</mark>' + escapeHtml(text.slice(idx + query.length));
+  }
+
+  function selectStudent(s) {
+    selectedStudent = s;
+    studentInput.value = '';
+    studentSuggestions.classList.remove('show');
+    studentChipText.textContent = s.firstName + ' ' + s.lastName + ' (ID ' + s.studentId + ')';
+    studentChip.style.display = 'flex';
+    studentInput.style.display = 'none';
+  }
+  function clearStudent() {
+    selectedStudent = null;
+    studentChip.style.display = 'none';
+    studentInput.style.display = '';
+    studentInput.value = '';
+    studentInput.focus();
+  }
+  studentClear.addEventListener('click', clearStudent);
+
+  studentInput.addEventListener('input', () => {
+    const q = studentInput.value.trim();
+    clearTimeout(studentSearchTimer);
+    if (q.length < 2) {
+      studentSuggestions.classList.remove('show');
+      studentSuggestions.innerHTML = '';
+      return;
+    }
+    studentSearchTimer = setTimeout(() => runStudentSearch(q), 200);
+  });
+
+  async function runStudentSearch(q) {
+    const seq = ++studentSearchSeq;
+    try {
+      const res = await fetch('students.php?q=' + encodeURIComponent(q));
+      const list = await res.json();
+      if (seq !== studentSearchSeq) return; // a newer keystroke already fired
+      renderSuggestions(list, q);
+    } catch (err) {
+      // silent — autosuggest is a convenience, not required to submit
+    }
+  }
+
+  function renderSuggestions(list, q) {
+    if (!list.length) {
+      studentSuggestions.innerHTML = '<div class="sugEmpty">No matches</div>';
+      studentSuggestions.classList.add('show');
+      return;
+    }
+    studentSuggestions.innerHTML = list.map((s, i) =>
+      '<div class="sugItem" data-idx="' + i + '">' +
+        highlight(s.lastName, q) + ', ' + highlight(s.firstName, q) +
+        '<span class="sugSep">&middot;</span>' + highlight(s.email, q) +
+        '<span class="sugSep">&middot;</span>ID ' + highlight(s.studentId, q) +
+        '<span class="sugSep">&middot;</span>Grade ' + highlight(s.grade, q) +
+      '</div>'
+    ).join('');
+    studentSuggestions.classList.add('show');
+    studentSuggestions.querySelectorAll('.sugItem').forEach((el, i) => {
+      el.addEventListener('click', () => selectStudent(list[i]));
+    });
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!document.getElementById('studentRow').contains(e.target)) {
+      studentSuggestions.classList.remove('show');
+    }
+  });
+
   function renderTeacherBox() {
     const name = getCookie('refer_teacher');
     teacherBox.innerHTML = name
@@ -304,12 +433,16 @@
     const teacher = getCookie('refer_teacher') || 'Unknown';
     const note = noteInput.value.trim();
     const gaps = Array.from(gapCheckboxes).filter(c => c.checked).map(c => c.value);
+    const student = selectedStudent
+      ? selectedStudent.firstName + ' ' + selectedStudent.lastName + ' (ID ' + selectedStudent.studentId + ')'
+      : '';
     const payload = {
       type: type,
       category: category,
       teacher: teacher,
       note: note,
       gaps: gaps.join('; '),
+      student: student,
       client_time: new Date().toISOString()
     };
 
@@ -325,6 +458,7 @@
       setTimeout(() => btn.classList.remove('logged'), 1200);
       noteInput.value = '';
       gapCheckboxes.forEach(c => c.checked = false);
+      clearStudent();
     } catch (err) {
       showToast('<b>Could not reach the server.</b> Nothing was logged — try again.', true);
     }

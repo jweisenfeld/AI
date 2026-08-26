@@ -1,5 +1,5 @@
 <?php
-// Refer V1 — appends one click to a flat log file. No student data collected.
+// Refer V1 — appends one click to a flat log file. Student is optional.
 header('Content-Type: application/json');
 
 $logFile = __DIR__ . '/referral-log.csv';
@@ -18,6 +18,7 @@ $category    = isset($data['category']) ? trim($data['category']) : '';
 $teacher     = isset($data['teacher']) ? trim($data['teacher']) : 'Unknown';
 $note        = isset($data['note']) ? trim($data['note']) : '';
 $gaps        = isset($data['gaps']) ? trim($data['gaps']) : '';
+$student     = isset($data['student']) ? trim($data['student']) : '';
 $clientTime  = isset($data['client_time']) ? trim($data['client_time']) : '';
 
 // Server clock is the source of truth for the timestamp.
@@ -33,7 +34,7 @@ if ($fh === false) {
 
 if (flock($fh, LOCK_EX)) {
     if ($isNewFile) {
-        fputcsv($fh, ['timestamp', 'teacher', 'type', 'category', 'gaps', 'note', 'client_time', 'ip']);
+        fputcsv($fh, ['timestamp', 'teacher', 'type', 'category', 'gaps', 'note', 'client_time', 'ip', 'student'], ',', '"', '\\');
     }
     fputcsv($fh, [
         $timestamp,
@@ -43,8 +44,9 @@ if (flock($fh, LOCK_EX)) {
         $gaps,
         $note,
         $clientTime,
-        $_SERVER['REMOTE_ADDR'] ?? ''
-    ]);
+        $_SERVER['REMOTE_ADDR'] ?? '',
+        $student
+    ], ',', '"', '\\');
     flock($fh, LOCK_UN);
 }
 fclose($fh);

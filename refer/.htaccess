@@ -1,0 +1,6 @@
+# Raw data files — served only through the password-gated PHP scripts,
+# never directly. Works on both old (2.2) and cPanel (2.4 + mod_access_compat) Apache.
+<FilesMatch "^(Students_List\.csv|referral-log\.csv)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>

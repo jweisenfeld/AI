@@ -52,12 +52,23 @@ if (empty($_SESSION['refer_dash_ok'])) {
 
 $logFile = __DIR__ . '/referral-log.csv';
 
+// referral-log.csv is blocked from direct web access (.htaccess), so the
+// only way to download it is through this same password-gated request.
+if (isset($_GET['download']) && $_GET['download'] === 'csv') {
+    if (file_exists($logFile)) {
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="referral-log.csv"');
+        readfile($logFile);
+    }
+    exit;
+}
+
 $rows = [];
 if (file_exists($logFile)) {
     $fh = fopen($logFile, 'r');
-    $header = fgetcsv($fh);
+    $header = fgetcsv($fh, 0, ',', '"', '\\');
     $headerCount = count($header);
-    while (($r = fgetcsv($fh)) !== false) {
+    while (($r = fgetcsv($fh, 0, ',', '"', '\\')) !== false) {
         // Older rows may have fewer/more columns than the current header
         // if the CSV schema grew after the file was first created. Pad or
         // trim rather than let array_combine() throw on a count mismatch.
@@ -90,7 +101,7 @@ $filtered = array_filter($rows, function ($r) use ($typeFilter, $teacherFilter, 
     if ($typeFilter !== '' && $r['type'] !== $typeFilter) return false;
     if ($teacherFilter !== '' && $r['teacher'] !== $teacherFilter) return false;
     if ($search !== '') {
-        $hay = strtolower(($r['category'] ?? '') . ' ' . ($r['note'] ?? '') . ' ' . ($r['gaps'] ?? ''));
+        $hay = strtolower(($r['category'] ?? '') . ' ' . ($r['note'] ?? '') . ' ' . ($r['gaps'] ?? '') . ' ' . ($r['student'] ?? ''));
         if (strpos($hay, strtolower($search)) === false) return false;
     }
     return true;
@@ -159,7 +170,7 @@ function h($s) { return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); }
 <body>
 <div class="wrap">
   <h1>Refer — Dashboard</h1>
-  <p class="sub"><?= $totalCount ?> total referrals logged. Raw file: <a href="referral-log.csv">referral-log.csv</a> &middot; <a href="?logout=1">Sign out</a></p>
+  <p class="sub"><?= $totalCount ?> total referrals logged. <a href="?download=csv">Download CSV</a> &middot; <a href="?logout=1">Sign out</a></p>
 
   <div class="stats">
     <div class="stat"><div class="num"><?= $totalCount ?></div><div class="lbl">Total</div></div>
@@ -203,6 +214,7 @@ function h($s) { return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); }
         <tr>
           <th>Timestamp</th>
           <th>Teacher</th>
+          <th>Student</th>
           <th>Type</th>
           <th>Category</th>
           <th>Gaps</th>
@@ -214,6 +226,7 @@ function h($s) { return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); }
         <tr>
           <td><?= h($r['timestamp'] ?? '') ?></td>
           <td><?= h($r['teacher'] ?? '') ?></td>
+          <td><?= h($r['student'] ?? '') ?></td>
           <td><span class="pill <?= strtolower($r['type'] ?? '') ?>"><?= h($r['type'] ?? '') ?></span></td>
           <td><?= h($r['category'] ?? '') ?></td>
           <td><?= h($r['gaps'] ?? '') ?></td>

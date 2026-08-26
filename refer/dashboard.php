@@ -1,13 +1,71 @@
 <?php
 // Refer V1 — read-only viewer for referral-log.csv. No editing, no deleting.
+session_start();
+
+$ACCESS_CODE = '1901';
+
+if (isset($_GET['logout'])) {
+    unset($_SESSION['refer_dash_ok']);
+}
+
+if (isset($_POST['code'])) {
+    if (trim($_POST['code']) === $ACCESS_CODE) {
+        $_SESSION['refer_dash_ok'] = true;
+    } else {
+        $loginError = 'Wrong code — try again.';
+    }
+}
+
+if (empty($_SESSION['refer_dash_ok'])) {
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Refer — Dashboard</title>
+    <style>
+      body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; background:#f4f6f8; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+      .box { background:#fff; border-radius:16px; padding:32px; max-width:320px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,.12); text-align:center; }
+      .box h1 { font-size:19px; margin:0 0 6px; }
+      .box p { color:#667085; font-size:14px; margin:0 0 18px; }
+      .box input { width:100%; padding:12px; font-size:22px; letter-spacing:8px; text-align:center; border:1px solid #d7dce1; border-radius:10px; margin-bottom:14px; }
+      .box button { width:100%; padding:12px; font-size:15px; font-weight:700; border:none; border-radius:10px; background:#2f7dd1; color:#fff; cursor:pointer; }
+      .err { color:#a5271f; font-size:13px; margin:-8px 0 14px; }
+    </style>
+    </head>
+    <body>
+      <div class="box">
+        <h1>Refer Dashboard</h1>
+        <p>Enter the access code to view referrals.</p>
+        <?php if (!empty($loginError)): ?><div class="err"><?= htmlspecialchars($loginError) ?></div><?php endif; ?>
+        <form method="post">
+          <input type="password" name="code" inputmode="numeric" maxlength="4" autofocus autocomplete="off">
+          <button type="submit">Enter</button>
+        </form>
+      </div>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
 $logFile = __DIR__ . '/referral-log.csv';
 
 $rows = [];
 if (file_exists($logFile)) {
     $fh = fopen($logFile, 'r');
     $header = fgetcsv($fh);
+    $headerCount = count($header);
     while (($r = fgetcsv($fh)) !== false) {
-        if (count($r) < count($header)) continue;
+        // Older rows may have fewer/more columns than the current header
+        // if the CSV schema grew after the file was first created. Pad or
+        // trim rather than let array_combine() throw on a count mismatch.
+        if (count($r) < $headerCount) {
+            $r = array_pad($r, $headerCount, '');
+        } elseif (count($r) > $headerCount) {
+            $r = array_slice($r, 0, $headerCount);
+        }
         $rows[] = array_combine($header, $r);
     }
     fclose($fh);
@@ -39,10 +97,12 @@ $filtered = array_filter($rows, function ($r) use ($typeFilter, $teacherFilter, 
 });
 
 $totalCount = count($rows);
-$minorCount = count(array_filter($rows, fn($r) => $r['type'] === 'Minor'));
-$majorCount = count(array_filter($rows, fn($r) => $r['type'] === 'Major'));
+$minorCount = count(array_filter($rows, function ($r) { return $r['type'] === 'Minor'; }));
+$majorCount = count(array_filter($rows, function ($r) { return $r['type'] === 'Major'; }));
 $today = date('Y-m-d');
-$todayCount = count(array_filter($rows, fn($r) => strpos($r['timestamp'] ?? '', $today) === 0));
+$todayCount = count(array_filter($rows, function ($r) use ($today) {
+    return strpos($r['timestamp'] ?? '', $today) === 0;
+}));
 
 function h($s) { return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); }
 ?>
@@ -99,7 +159,7 @@ function h($s) { return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); }
 <body>
 <div class="wrap">
   <h1>Refer — Dashboard</h1>
-  <p class="sub"><?= $totalCount ?> total referrals logged. Raw file: <a href="referral-log.csv">referral-log.csv</a></p>
+  <p class="sub"><?= $totalCount ?> total referrals logged. Raw file: <a href="referral-log.csv">referral-log.csv</a> &middot; <a href="?logout=1">Sign out</a></p>
 
   <div class="stats">
     <div class="stat"><div class="num"><?= $totalCount ?></div><div class="lbl">Total</div></div>

@@ -9,9 +9,9 @@
     --minor: #2f7dd1;
     --minor-dark: #235f9e;
     --minor-tint: #eaf2fb;
-    --major: #d1372f;
-    --major-dark: #a5271f;
-    --major-tint: #fbeceb;
+    --major: #e2620f;
+    --major-dark: #b84a0a;
+    --major-tint: #fdf0e6;
     --bg: #f4f6f8;
     --ink: #1c2530;
     --muted: #667085;
@@ -24,7 +24,7 @@
     color: var(--ink);
     font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   }
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 140px; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 180px; }
 
   header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 18px; gap: 12px; flex-wrap: wrap; }
   header h1 { font-size: 22px; margin: 0; }
@@ -111,14 +111,22 @@
     box-shadow: 0 -6px 18px rgba(0,0,0,0.08);
     padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
   }
-  #noteBar .inner { max-width: 1100px; margin: 0 auto; display:flex; align-items:center; gap: 10px; }
-  #noteBar label { font-size: 13px; color: var(--muted); white-space: nowrap; display:none; }
-  @media (min-width: 560px) { #noteBar label { display:inline; } }
+  #noteBar .inner { max-width: 1100px; margin: 0 auto; }
+  #noteBar .noteRow { display:flex; align-items:center; gap: 10px; margin-top: 8px; }
+  #noteBar label.noteLabel { font-size: 13px; color: var(--muted); white-space: nowrap; display:none; }
+  @media (min-width: 560px) { #noteBar label.noteLabel { display:inline; } }
   #noteInput {
     flex: 1; padding: 12px 14px; font-size: 15px; border: 1px solid #d7dce1;
     border-radius: 10px; font-family: inherit;
   }
   #noteInput:focus { outline: 2px solid var(--minor); outline-offset: 1px; }
+
+  .gapsRow { display:flex; flex-wrap: wrap; gap: 6px 16px; }
+  .gapsRow .gapLabel {
+    display:flex; align-items:center; gap: 6px; font-size: 13.5px; color: var(--ink);
+    cursor: pointer; user-select: none;
+  }
+  .gapsRow input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--minor); cursor: pointer; }
 
   #toast {
     position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%) translateY(10px);
@@ -174,8 +182,16 @@
 
 <div id="noteBar">
   <div class="inner">
-    <label for="noteInput">Quick note (optional):</label>
-    <input id="noteInput" type="text" placeholder="No student names — just context, e.g. 'repeated phone use during quiz' — attaches to your next tap" autocomplete="off">
+    <div class="gapsRow" id="gapsRow">
+      <label class="gapLabel"><input type="checkbox" value="Respect gap"> Respect gap</label>
+      <label class="gapLabel"><input type="checkbox" value="Responsibility gap"> Responsibility gap</label>
+      <label class="gapLabel"><input type="checkbox" value="Inclusion gap"> Inclusion gap</label>
+      <label class="gapLabel"><input type="checkbox" value="Teamwork gap"> Teamwork gap</label>
+    </div>
+    <div class="noteRow">
+      <label class="noteLabel" for="noteInput">Quick note (optional):</label>
+      <input id="noteInput" type="text" placeholder="No student names — just context, e.g. 'repeated phone use during quiz' — attaches to your next tap" autocomplete="off">
+    </div>
   </div>
 </div>
 
@@ -232,6 +248,7 @@
   const overlay = document.getElementById('nameOverlay');
   const teacherBox = document.getElementById('teacherBox');
   const noteInput = document.getElementById('noteInput');
+  const gapCheckboxes = document.querySelectorAll('#gapsRow input[type="checkbox"]');
   const toast = document.getElementById('toast');
   let toastTimer = null;
 
@@ -287,11 +304,13 @@
 
     const teacher = getCookie('refer_teacher') || 'Unknown';
     const note = noteInput.value.trim();
+    const gaps = Array.from(gapCheckboxes).filter(c => c.checked).map(c => c.value);
     const payload = {
       type: type,
       category: category,
       teacher: teacher,
       note: note,
+      gaps: gaps.join('; '),
       client_time: new Date().toISOString()
     };
 
@@ -306,6 +325,7 @@
       btn.classList.add('logged');
       setTimeout(() => btn.classList.remove('logged'), 1200);
       noteInput.value = '';
+      gapCheckboxes.forEach(c => c.checked = false);
     } catch (err) {
       showToast('<b>Could not reach the server.</b> Nothing was logged — try again.', true);
     }

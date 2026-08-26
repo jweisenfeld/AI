@@ -17,6 +17,7 @@ if ($type !== 'Major' && $type !== 'Minor') {
 $category    = isset($data['category']) ? trim($data['category']) : '';
 $teacher     = isset($data['teacher']) ? trim($data['teacher']) : 'Unknown';
 $note        = isset($data['note']) ? trim($data['note']) : '';
+$gaps        = isset($data['gaps']) ? trim($data['gaps']) : '';
 $clientTime  = isset($data['client_time']) ? trim($data['client_time']) : '';
 
 // Server clock is the source of truth for the timestamp.
@@ -32,13 +33,14 @@ if ($fh === false) {
 
 if (flock($fh, LOCK_EX)) {
     if ($isNewFile) {
-        fputcsv($fh, ['timestamp', 'teacher', 'type', 'category', 'note', 'client_time', 'ip']);
+        fputcsv($fh, ['timestamp', 'teacher', 'type', 'category', 'gaps', 'note', 'client_time', 'ip']);
     }
     fputcsv($fh, [
         $timestamp,
         $teacher,
         $type,
         $category,
+        $gaps,
         $note,
         $clientTime,
         $_SERVER['REMOTE_ADDR'] ?? ''

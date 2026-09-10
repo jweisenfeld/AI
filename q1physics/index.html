@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Q1 co-enrollment map — 9th grade, Orion High School</title>
+<style>
+:root{--bg:#F5F7F8;--ink:#17212B;--mute:#63707E;--rule:#D9DFE4;--o0:#0E7C7B;--o1:#3A57C9;--o2:#C98A0C}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;color:var(--ink);font:15px/1.5 "Avenir Next","Avenir","Segoe UI Variable Text","Segoe UI","Helvetica Neue",Helvetica,Arial,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+main{max-width:1180px;margin:0 auto;padding:44px 28px 64px}
+h1{font-size:clamp(24px,3.2vw,34px);line-height:1.15;font-weight:650;letter-spacing:-0.015em;margin:0 0 10px;max-width:30ch}
+.lede{color:var(--mute);max-width:70ch;margin:0 0 6px}
+.legend{display:flex;gap:18px 26px;flex-wrap:wrap;margin:20px 0 6px;font-size:14px;color:var(--mute)}
+.legend span{display:inline-flex;align-items:center;gap:8px}
+.legend i{width:22px;height:10px;border-radius:2px;display:inline-block}
+.legend .none{background:repeating-linear-gradient(45deg,#E3E8EC 0 3px,#B9C2CB 3px 5px);border:1px dashed #8E99A4}
+figure{margin:0;background:#fff;border:1px solid var(--rule);border-radius:6px;padding:14px 18px 8px}
+figure svg{width:100%;height:auto;display:block}
+.colhead{font-size:13px;font-weight:650;fill:var(--mute)}
+.lab{font-size:13.5px;fill:var(--ink);paint-order:stroke;stroke:#fff;stroke-width:5px;stroke-linejoin:round}
+.lab.who{font-weight:650}
+.lab .sub,.lab.sub{fill:var(--mute);font-weight:400}
+.lab .num{fill:var(--ink);font-weight:650}
+.rib{opacity:.55;transition:opacity .15s ease}
+.rib:hover{opacity:.9}
+svg.f-o0 .rib:not(.o0),svg.f-o1 .rib:not(.o1),svg.f-o2 .rib:not(.o2){opacity:.07}
+svg.f-o0 .rib.o0,svg.f-o1 .rib.o1,svg.f-o2 .rib.o2{opacity:.85}
+.node[data-o]{cursor:pointer}
+.node[data-o] rect{outline:none}
+.node[data-o]:focus-visible rect{stroke:var(--ink);stroke-width:2}
+figcaption{font-size:13px;color:var(--mute);padding:10px 2px 6px;max-width:90ch}
+h2{font-size:20px;font-weight:650;letter-spacing:-0.01em;margin:44px 0 6px}
+.h2sub{color:var(--mute);margin:0 0 18px;max-width:70ch}
+.partners{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:0 36px}
+.partner{display:grid;grid-template-columns:78px 1fr;gap:14px;padding:18px 0;border-top:1px solid var(--rule)}
+.pnum{font-size:34px;font-weight:650;line-height:1;letter-spacing:-0.02em}
+.pnum span{display:block;font-size:12px;color:var(--mute);font-weight:400;letter-spacing:0;margin-top:4px}
+.pname{font-weight:650}
+.pcourse{color:var(--mute);font-size:13.5px}
+.partner p{margin:6px 0 0;font-size:14px;max-width:52ch}
+.gridwrap{overflow-x:auto;background:#fff;border:1px solid var(--rule);border-radius:6px;padding:10px 12px}
+.grid{border-collapse:separate;border-spacing:3px;font-size:13.5px;width:100%}
+.grid th{font-weight:500;text-align:left;color:var(--ink);vertical-align:bottom}
+.grid thead th span{display:inline-block;writing-mode:vertical-rl;transform:rotate(180deg);padding:6px 0 2px;color:var(--mute)}
+.grid thead th.me span{color:var(--ink);font-weight:650}
+.grid tbody th{white-space:nowrap;padding-right:10px;line-height:1.2;min-width:170px}
+.grid .tn{display:block;font-weight:600}
+.grid .tc{display:block;font-size:11.5px;color:var(--mute);font-weight:400;max-width:230px;white-space:normal}
+.grid td{text-align:center;min-width:44px;height:38px;border-radius:3px;background:#F1F4F6;color:var(--mute)}
+.grid td.diag{background:transparent}
+.grid tr.me th .tn{color:var(--o0)}
+.grid tr.me td.v,.grid td.me{box-shadow:inset 0 0 0 1.5px var(--o0)}
+.notes{font-size:14px;color:var(--ink);max-width:78ch}
+.notes li{margin:6px 0}
+.notes ul{padding-left:20px;margin:8px 0 0}
+.small{font-size:12.5px;color:var(--mute);margin-top:30px;max-width:80ch}
+@media (prefers-reduced-motion:reduce){.rib{transition:none}}
+@media (max-width:640px){main{padding:28px 14px 48px}.partner{grid-template-columns:64px 1fr}.pnum{font-size:28px}}
+</style></head><body><main>
+<h1>Where your freshmen sit for math and English this quarter</h1>
+<p class="lede">All 64 students in your three Q1 sections, traced from your room to their math class and then to their English class. Ribbon width is the number of students; color is which of your sections they come from. Hover or tap a ribbon for the exact path; click one of your sections to isolate it.</p>
+<div class="legend"><span><i style="background:var(--o0)"></i>Physics 1, period 1</span><span><i style="background:var(--o1)"></i>Physics 1, period 5</span><span><i style="background:var(--o2)"></i>Gaming &amp; Design, period 4</span><span><i class="none"></i>No class in that subject this quarter</span></div>
+<figure>
+<svg viewBox="0 0 1180 660" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="ttl" font-family="inherit">
+<title id="ttl">Where Mr. Weisenfeld's Q1 students sit for math and English</title>
+<defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#E3E8EC"/><line x1="0" y1="0" x2="0" y2="6" stroke="#B9C2CB" stroke-width="2"/></pattern></defs>
+<text class="colhead" x="238" y="30" text-anchor="end">Your sections</text>
+<text class="colhead" x="600.0" y="30" text-anchor="middle">Their math class</text>
+<text class="colhead" x="948" y="30" text-anchor="start">Their English class</text>
+<path class="rib o0" fill="#0E7C7B" d="M238.0,58.0 C415.0,58.0 415.0,86.5 592.0,86.5 L592.0,101.0 C415.0,101.0 415.0,72.5 238.0,72.5 Z"><title>Weisenfeld, Physics 1 (P1) → Conway, Geometry 1 (P5) → No English class this quarter: 2 students</title></path>
+<path class="rib o0" fill="#0E7C7B" d="M238.0,72.5 C415.0,72.5 415.0,252.0 592.0,252.0 L592.0,281.0 C415.0,281.0 415.0,101.4 238.0,101.4 Z"><title>Weisenfeld, Physics 1 (P1) → Eaton, Algebra 1 (P2) → No English class this quarter: 4 students</title></path>
+<path class="rib o0" fill="#0E7C7B" d="M238.0,101.4 C415.0,101.4 415.0,345.7 592.0,345.7 L592.0,418.1 C415.0,418.1 415.0,173.8 238.0,173.8 Z"><title>Weisenfeld, Physics 1 (P1) → Eaton, Algebra 1 (P5) → No English class this quarter: 10 students</title></path>
+<path class="rib o0" fill="#0E7C7B" d="M238.0,173.8 C415.0,173.8 415.0,453.8 592.0,453.8 L592.0,468.3 C415.0,468.3 415.0,188.3 238.0,188.3 Z"><title>Weisenfeld, Physics 1 (P1) → No math class this quarter → Standridge, English 9 (P4): 2 students</title></path>
+<path class="rib o0" fill="#0E7C7B" d="M238.0,188.3 C415.0,188.3 415.0,468.3 592.0,468.3 L592.0,504.5 C415.0,504.5 415.0,224.5 238.0,224.5 Z"><title>Weisenfeld, Physics 1 (P1) → No math class this quarter → Standridge, English 9 (P5): 5 students</title></path>
+<path class="rib o0" fill="#0E7C7B" d="M238.0,224.5 C415.0,224.5 415.0,504.5 592.0,504.5 L592.0,533.4 C415.0,533.4 415.0,253.5 238.0,253.5 Z"><title>Weisenfeld, Physics 1 (P1) → No math class this quarter → No English class this quarter: 4 students</title></path>
+<path class="rib o1" fill="#3A57C9" d="M238.0,288.5 C415.0,288.5 415.0,58.0 592.0,58.0 L592.0,65.2 C415.0,65.2 415.0,295.7 238.0,295.7 Z"><title>Weisenfeld, Physics 1 (P5) → Conway, Geometry 1 (P1) → No English class this quarter: 1 student</title></path>
+<path class="rib o1" fill="#3A57C9" d="M238.0,295.7 C415.0,295.7 415.0,136.7 592.0,136.7 L592.0,143.9 C415.0,143.9 415.0,302.9 238.0,302.9 Z"><title>Weisenfeld, Physics 1 (P5) → Eaton, Algebra 1 (P1) → LeDuc, Inclusion English 9 (P4): 1 student</title></path>
+<path class="rib o1" fill="#3A57C9" d="M238.0,302.9 C415.0,302.9 415.0,143.9 592.0,143.9 L592.0,187.4 C415.0,187.4 415.0,346.4 238.0,346.4 Z"><title>Weisenfeld, Physics 1 (P5) → Eaton, Algebra 1 (P1) → No English class this quarter: 6 students</title></path>
+<path class="rib o1" fill="#3A57C9" d="M238.0,346.4 C415.0,346.4 415.0,281.0 592.0,281.0 L592.0,302.7 C415.0,302.7 415.0,368.1 238.0,368.1 Z"><title>Weisenfeld, Physics 1 (P5) → Eaton, Algebra 1 (P2) → No English class this quarter: 3 students</title></path>
+<path class="rib o1" fill="#3A57C9" d="M238.0,368.1 C415.0,368.1 415.0,533.4 592.0,533.4 L592.0,562.4 C415.0,562.4 415.0,397.1 238.0,397.1 Z"><title>Weisenfeld, Physics 1 (P5) → No math class this quarter → Standridge, English 9 (P4): 4 students</title></path>
+<path class="rib o1" fill="#3A57C9" d="M238.0,397.1 C415.0,397.1 415.0,562.4 592.0,562.4 L592.0,613.0 C415.0,613.0 415.0,447.7 238.0,447.7 Z"><title>Weisenfeld, Physics 1 (P5) → No math class this quarter → No English class this quarter: 7 students</title></path>
+<path class="rib o2" fill="#C98A0C" d="M238.0,482.7 C415.0,482.7 415.0,65.2 592.0,65.2 L592.0,72.5 C415.0,72.5 415.0,490.0 238.0,490.0 Z"><title>Weisenfeld, Gaming &amp; Design (P4) → Conway, Geometry 1 (P1) → Standridge, English 9 (P5): 1 student</title></path>
+<path class="rib o2" fill="#C98A0C" d="M238.0,490.0 C415.0,490.0 415.0,101.0 592.0,101.0 L592.0,122.7 C415.0,122.7 415.0,511.7 238.0,511.7 Z"><title>Weisenfeld, Gaming &amp; Design (P4) → Conway, Geometry 1 (P5) → No English class this quarter: 3 students</title></path>
+<path class="rib o2" fill="#C98A0C" d="M238.0,511.7 C415.0,511.7 415.0,187.4 592.0,187.4 L592.0,238.0 C415.0,238.0 415.0,562.4 238.0,562.4 Z"><title>Weisenfeld, Gaming &amp; Design (P4) → Eaton, Algebra 1 (P1) → Standridge, English 9 (P5): 7 students</title></path>
+<path class="rib o2" fill="#C98A0C" d="M238.0,562.4 C415.0,562.4 415.0,302.7 592.0,302.7 L592.0,309.9 C415.0,309.9 415.0,569.6 238.0,569.6 Z"><title>Weisenfeld, Gaming &amp; Design (P4) → Eaton, Algebra 1 (P2) → Standridge, English 9 (P5): 1 student</title></path>
+<path class="rib o2" fill="#C98A0C" d="M238.0,569.6 C415.0,569.6 415.0,309.9 592.0,309.9 L592.0,331.7 C415.0,331.7 415.0,591.3 238.0,591.3 Z"><title>Weisenfeld, Gaming &amp; Design (P4) → Eaton, Algebra 1 (P2) → No English class this quarter: 3 students</title></path>
+<path class="rib o2" fill="#C98A0C" d="M238.0,591.3 C415.0,591.3 415.0,418.1 592.0,418.1 L592.0,439.8 C415.0,439.8 415.0,613.0 238.0,613.0 Z"><title>Weisenfeld, Gaming &amp; Design (P4) → Eaton, Algebra 1 (P5) → No English class this quarter: 3 students</title></path>
+<path class="rib o2" fill="#C98A0C" d="M238.0,613.0 C415.0,613.0 415.0,613.0 592.0,613.0 L592.0,634.8 C415.0,634.8 415.0,634.8 238.0,634.8 Z"><title>Weisenfeld, Gaming &amp; Design (P4) → No math class this quarter → Standridge, English 9 (P5): 3 students</title></path>
+<path class="rib o2" fill="#C98A0C" d="M238.0,634.8 C415.0,634.8 415.0,634.8 592.0,634.8 L592.0,642.0 C415.0,642.0 415.0,642.0 238.0,642.0 Z"><title>Weisenfeld, Gaming &amp; Design (P4) → No math class this quarter → No English class this quarter: 1 student</title></path>
+<path class="rib o2" fill="#C98A0C" d="M608.0,58.0 C778.0,58.0 778.0,155.3 948.0,155.3 L948.0,162.6 C778.0,162.6 778.0,65.2 608.0,65.2 Z"><title>Weisenfeld, Gaming &amp; Design (P4) → Conway, Geometry 1 (P1) → Standridge, English 9 (P5): 1 student</title></path>
+<path class="rib o1" fill="#3A57C9" d="M608.0,65.2 C778.0,65.2 778.0,301.7 948.0,301.7 L948.0,309.0 C778.0,309.0 778.0,72.5 608.0,72.5 Z"><title>Weisenfeld, Physics 1 (P5) → Conway, Geometry 1 (P1) → No English class this quarter: 1 student</title></path>
+<path class="rib o0" fill="#0E7C7B" d="M608.0,86.5 C778.0,86.5 778.0,309.0 948.0,309.0 L948.0,323.5 C778.0,323.5 778.0,101.0 608.0,101.0 Z"><title>Weisenfeld, Physics 1 (P1) → Conway, Geometry 1 (P5) → No English class this quarter: 2 students</title></path>
+<path class="rib o2" fill="#C98A0C" d="M608.0,101.0 C778.0,101.0 778.0,323.5 948.0,323.5 L948.0,345.2 C778.0,345.2 778.0,122.7 608.0,122.7 Z"><title>Weisenfeld, Gaming &amp; Design (P4) → Conway, Geometry 1 (P5) → No English class this quarter: 3 students</title></path>
+<path class="rib o1" fill="#3A57C9" d="M608.0,136.7 C778.0,136.7 778.0,58.0 948.0,58.0 L948.0,65.2 C778.0,65.2 778.0,143.9 608.0,143.9 Z"><title>Weisenfeld, Physics 1 (P5) → Eaton, Algebra 1 (P1) → LeDuc, Inclusion English 9 (P4): 1 student</title></path>
+<path class="rib o2" fill="#C98A0C" d="M608.0,143.9 C778.0,143.9 778.0,162.6 948.0,162.6 L948.0,213.3 C778.0,213.3 778.0,194.6 608.0,194.6 Z"><title>Weisenfeld, Gaming &amp; Design (P4) → Eaton, Algebra 1 (P1) → Standridge, English 9 (P5): 7 students</title></path>
+<path class="rib o1" fill="#3A57C9" d="M608.0,194.6 C778.0,194.6 778.0,345.2 948.0,345.2 L948.0,388.6 C778.0,388.6 778.0,238.0 608.0,238.0 Z"><title>Weisenfeld, Physics 1 (P5) → Eaton, Algebra 1 (P1) → No English class this quarter: 6 students</title></path>
+<path class="rib o2" fill="#C98A0C" d="M608.0,252.0 C778.0,252.0 778.0,213.3 948.0,213.3 L948.0,220.5 C778.0,220.5 778.0,259.3 608.0,259.3 Z"><title>Weisenfeld, Gaming &amp; Design (P4) → Eaton, Algebra 1 (P2) → Standridge, English 9 (P5): 1 student</title></path>
+<path class="rib o0" fill="#0E7C7B" d="M608.0,259.3 C778.0,259.3 778.0,388.6 948.0,388.6 L948.0,417.6 C778.0,417.6 778.0,288.2 608.0,288.2 Z"><title>Weisenfeld, Physics 1 (P1) → Eaton, Algebra 1 (P2) → No English class this quarter: 4 students</title></path>
+<path class="rib o1" fill="#3A57C9" d="M608.0,288.2 C778.0,288.2 778.0,417.6 948.0,417.6 L948.0,439.3 C778.0,439.3 778.0,309.9 608.0,309.9 Z"><title>Weisenfeld, Physics 1 (P5) → Eaton, Algebra 1 (P2) → No English class this quarter: 3 students</title></path>
+<path class="rib o2" fill="#C98A0C" d="M608.0,309.9 C778.0,309.9 778.0,439.3 948.0,439.3 L948.0,461.0 C778.0,461.0 778.0,331.7 608.0,331.7 Z"><title>Weisenfeld, Gaming &amp; Design (P4) → Eaton, Algebra 1 (P2) → No English class this quarter: 3 students</title></path>
+<path class="rib o0" fill="#0E7C7B" d="M608.0,345.7 C778.0,345.7 778.0,461.0 948.0,461.0 L948.0,533.4 C778.0,533.4 778.0,418.1 608.0,418.1 Z"><title>Weisenfeld, Physics 1 (P1) → Eaton, Algebra 1 (P5) → No English class this quarter: 10 students</title></path>
+<path class="rib o2" fill="#C98A0C" d="M608.0,418.1 C778.0,418.1 778.0,533.4 948.0,533.4 L948.0,555.1 C778.0,555.1 778.0,439.8 608.0,439.8 Z"><title>Weisenfeld, Gaming &amp; Design (P4) → Eaton, Algebra 1 (P5) → No English class this quarter: 3 students</title></path>
+<path class="rib o0" fill="#0E7C7B" d="M608.0,453.8 C778.0,453.8 778.0,88.6 948.0,88.6 L948.0,103.1 C778.0,103.1 778.0,468.3 608.0,468.3 Z"><title>Weisenfeld, Physics 1 (P1) → No math class this quarter → Standridge, English 9 (P4): 2 students</title></path>
+<path class="rib o1" fill="#3A57C9" d="M608.0,468.3 C778.0,468.3 778.0,103.1 948.0,103.1 L948.0,132.0 C778.0,132.0 778.0,497.2 608.0,497.2 Z"><title>Weisenfeld, Physics 1 (P5) → No math class this quarter → Standridge, English 9 (P4): 4 students</title></path>
+<path class="rib o0" fill="#0E7C7B" d="M608.0,497.2 C778.0,497.2 778.0,220.5 948.0,220.5 L948.0,256.7 C778.0,256.7 778.0,533.4 608.0,533.4 Z"><title>Weisenfeld, Physics 1 (P1) → No math class this quarter → Standridge, English 9 (P5): 5 students</title></path>
+<path class="rib o2" fill="#C98A0C" d="M608.0,533.4 C778.0,533.4 778.0,256.7 948.0,256.7 L948.0,278.4 C778.0,278.4 778.0,555.1 608.0,555.1 Z"><title>Weisenfeld, Gaming &amp; Design (P4) → No math class this quarter → Standridge, English 9 (P5): 3 students</title></path>
+<path class="rib o0" fill="#0E7C7B" d="M608.0,555.1 C778.0,555.1 778.0,555.1 948.0,555.1 L948.0,584.1 C778.0,584.1 778.0,584.1 608.0,584.1 Z"><title>Weisenfeld, Physics 1 (P1) → No math class this quarter → No English class this quarter: 4 students</title></path>
+<path class="rib o1" fill="#3A57C9" d="M608.0,584.1 C778.0,584.1 778.0,584.1 948.0,584.1 L948.0,634.8 C778.0,634.8 778.0,634.8 608.0,634.8 Z"><title>Weisenfeld, Physics 1 (P5) → No math class this quarter → No English class this quarter: 7 students</title></path>
+<path class="rib o2" fill="#C98A0C" d="M608.0,634.8 C778.0,634.8 778.0,634.8 948.0,634.8 L948.0,642.0 C778.0,642.0 778.0,642.0 608.0,642.0 Z"><title>Weisenfeld, Gaming &amp; Design (P4) → No math class this quarter → No English class this quarter: 1 student</title></path>
+<g class="node" data-o="o0"><rect x="222" y="58.0" width="16" height="195.5" rx="2" fill="#0E7C7B"/><text class="lab who" x="210" y="151.7" text-anchor="end">You<tspan class="sub">, Physics 1</tspan></text><text class="lab sub" x="210" y="167.7" text-anchor="end">Period 1 · <tspan class="num">27</tspan> students</text></g>
+<g class="node" data-o="o1"><rect x="222" y="288.5" width="16" height="159.3" rx="2" fill="#3A57C9"/><text class="lab who" x="210" y="364.1" text-anchor="end">You<tspan class="sub">, Physics 1</tspan></text><text class="lab sub" x="210" y="380.1" text-anchor="end">Period 5 · <tspan class="num">22</tspan> students</text></g>
+<g class="node" data-o="o2"><rect x="222" y="482.7" width="16" height="159.3" rx="2" fill="#C98A0C"/><text class="lab who" x="210" y="558.4" text-anchor="end">You<tspan class="sub">, Gaming &amp; Design</tspan></text><text class="lab sub" x="210" y="574.4" text-anchor="end">Period 4 · <tspan class="num">22</tspan> students</text></g>
+<g class="node"><rect x="592" y="58.0" width="16" height="14.5" rx="2" fill="#2A3644"/><text class="lab who" x="618" y="61.2" text-anchor="start">Conway<tspan class="sub">, Geometry 1</tspan></text><text class="lab sub" x="618" y="77.2" text-anchor="start">Period 1 · <tspan class="num">2</tspan> students</text></g>
+<g class="node"><rect x="592" y="86.5" width="16" height="36.2" rx="2" fill="#2A3644"/><text class="lab who" x="618" y="100.6" text-anchor="start">Conway<tspan class="sub">, Geometry 1</tspan></text><text class="lab sub" x="618" y="116.6" text-anchor="start">Period 5 · <tspan class="num">5</tspan> students</text></g>
+<g class="node"><rect x="592" y="136.7" width="16" height="101.4" rx="2" fill="#2A3644"/><text class="lab who" x="618" y="183.4" text-anchor="start">Eaton<tspan class="sub">, Algebra 1</tspan></text><text class="lab sub" x="618" y="199.4" text-anchor="start">Period 1 · <tspan class="num">14</tspan> students</text></g>
+<g class="node"><rect x="592" y="252.0" width="16" height="79.6" rx="2" fill="#2A3644"/><text class="lab who" x="618" y="287.8" text-anchor="start">Eaton<tspan class="sub">, Algebra 1</tspan></text><text class="lab sub" x="618" y="303.8" text-anchor="start">Period 2 · <tspan class="num">11</tspan> students</text></g>
+<g class="node"><rect x="592" y="345.7" width="16" height="94.1" rx="2" fill="#2A3644"/><text class="lab who" x="618" y="388.7" text-anchor="start">Eaton<tspan class="sub">, Algebra 1</tspan></text><text class="lab sub" x="618" y="404.7" text-anchor="start">Period 5 · <tspan class="num">13</tspan> students</text></g>
+<g class="node"><rect x="592" y="453.8" width="16" height="188.2" rx="2" fill="url(#hatch)" stroke="#8E99A4" stroke-dasharray="3 3" stroke-width="1"/><text class="lab" x="618" y="543.9" text-anchor="start">No math class</text><text class="lab sub" x="618" y="559.9" text-anchor="start">this quarter · <tspan class="num">26</tspan></text></g>
+<g class="node"><rect x="948" y="58.0" width="16" height="7.2" rx="2" fill="#2A3644"/><text class="lab who" x="974" y="57.6" text-anchor="start">LeDuc<tspan class="sub">, Inclusion English 9</tspan></text><text class="lab sub" x="974" y="73.6" text-anchor="start">Period 4 · <tspan class="num">1</tspan> student</text></g>
+<g class="node"><rect x="948" y="88.6" width="16" height="43.4" rx="2" fill="#2A3644"/><text class="lab who" x="974" y="106.3" text-anchor="start">Standridge<tspan class="sub">, English 9</tspan></text><text class="lab sub" x="974" y="122.3" text-anchor="start">Period 4 · <tspan class="num">6</tspan> students</text></g>
+<g class="node"><rect x="948" y="155.3" width="16" height="123.1" rx="2" fill="#2A3644"/><text class="lab who" x="974" y="212.9" text-anchor="start">Standridge<tspan class="sub">, English 9</tspan></text><text class="lab sub" x="974" y="228.9" text-anchor="start">Period 5 · <tspan class="num">17</tspan> students</text></g>
+<g class="node"><rect x="948" y="301.7" width="16" height="340.3" rx="2" fill="url(#hatch)" stroke="#8E99A4" stroke-dasharray="3 3" stroke-width="1"/><text class="lab" x="974" y="467.9" text-anchor="start">No English class</text><text class="lab sub" x="974" y="483.9" text-anchor="start">this quarter · <tspan class="num">47</tspan></text></g>
+</svg>
+<figcaption>Orion High School, 9th grade, Quarter 1 2026–27, from the PowerSchool schedule matrix pulled September 9. 71 seats across your three sections; 7 students are in two of your sections and appear twice. Podcasting (an English-department elective) is not counted as an English class here.</figcaption>
+</figure>
+
+<h2>Who to sit down with</h2>
+<p class="h2sub">Ranked by how many of your 64 students each teacher also has this quarter.</p>
+<div class="partners"><div class="partner"><div class="pnum">33<span>of 64</span></div><div><div class="pname">Travis Eaton</div><div class="pcourse">Algebra 1 — periods 1, 2, 5</div><p>Your biggest overlap by far. 10 of your 27 period-1 Physics students are in his period-5 Algebra 1 the same afternoon; 7 of your period-5 Physics students and 7 of your Gaming &amp; Design students start the day in his period-1 Algebra.</p></div></div><div class="partner"><div class="pnum">30<span>of 64</span></div><div><div class="pname">Miranda Standridge</div><div class="pcourse">English 9 — periods 4, 5 · Podcasting — period 2</div><p>12 of your 22 Gaming &amp; Design students walk straight from your period 4 into her period-5 English 9 — the tightest hand-off in your day. 23 of your students are in her English 9 and 9 are in her Podcasting elective (2 in both).</p></div></div><div class="partner"><div class="pnum">6<span>of 64</span></div><div><div class="pname">Katie Conway</div><div class="pcourse">Geometry 1 — periods 1, 5 · Algebra 3</div><p>Your accelerated-math students: 3 Gaming &amp; Design and 2 period-1 Physics students sit in her period-5 Geometry. Small group, but they can carry more algebra in your labs.</p></div></div><div class="partner"><div class="pnum">1<span>of 64</span></div><div><div class="pname">Sarah LeDuc</div><div class="pcourse">Inclusion English 9 — period 4 · SPED case management</div><p>One shared student this quarter (period-5 Physics). Worth a five-minute check-in on accommodations, but not a pacing partner in Q1.</p></div></div></div>
+
+<h2>The whole 9th-grade team</h2>
+<p class="h2sub">Students shared between each pair of teachers in Q1 academic sections. Darker means more shared students; your row and column are outlined. Eaton and Standridge are each the only teacher of their core course, so every math or English tie-in in the grade runs through them.</p>
+<div class="gridwrap"><table class="grid"><thead><tr><th></th><th class=""><span>Eaton</span></th><th class=""><span>Arambul</span></th><th class=""><span>Fraser</span></th><th class=""><span>Standridge</span></th><th class=""><span>Riley</span></th><th class="me"><span>Weisenfeld</span></th><th class=""><span>Cochran</span></th><th class=""><span>LeDuc</span></th><th class=""><span>Conway</span></th></tr></thead><tbody><tr class=""><th><span class="tn">Eaton</span><span class="tc">Algebra 1 · 83</span></th><td class="diag"></td><td class="v" style="background:rgba(42,54,68,0.74);color:#fff">44</td><td class="v" style="background:rgba(42,54,68,0.80);color:#fff">48</td><td class="v" style="background:rgba(42,54,68,0.66);color:#fff">39</td><td class="v" style="background:rgba(42,54,68,0.68);color:#fff">40</td><td class="v me" style="background:rgba(42,54,68,0.57);color:#fff">33</td><td class="v" style="background:rgba(42,54,68,0.56);color:#fff">32</td><td class="v" style="background:rgba(42,54,68,0.27);color:#17212B">13</td><td class="v">–</td></tr><tr class=""><th><span class="tn">Arambul</span><span class="tc">Health Sci Careers 1 · 70</span></th><td class="v" style="background:rgba(42,54,68,0.74);color:#fff">44</td><td class="diag"></td><td class="v" style="background:rgba(42,54,68,0.26);color:#17212B">12</td><td class="v" style="background:rgba(42,54,68,0.55);color:#fff">31</td><td class="v" style="background:rgba(42,54,68,0.64);color:#fff">37</td><td class="v me" style="background:rgba(42,54,68,0.56);color:#fff">32</td><td class="v" style="background:rgba(42,54,68,0.68);color:#fff">40</td><td class="v" style="background:rgba(42,54,68,0.17);color:#17212B">6</td><td class="v" style="background:rgba(42,54,68,0.15);color:#17212B">5</td></tr><tr class=""><th><span class="tn">Fraser</span><span class="tc">Graphic Design, Intro Engineering 1 · 69</span></th><td class="v" style="background:rgba(42,54,68,0.80);color:#fff">48</td><td class="v" style="background:rgba(42,54,68,0.26);color:#17212B">12</td><td class="diag"></td><td class="v" style="background:rgba(42,54,68,0.68);color:#fff">40</td><td class="v" style="background:rgba(42,54,68,0.53);color:#fff">30</td><td class="v me" style="background:rgba(42,54,68,0.56);color:#fff">32</td><td class="v" style="background:rgba(42,54,68,0.51);color:#fff">29</td><td class="v" style="background:rgba(42,54,68,0.23);color:#17212B">10</td><td class="v" style="background:rgba(42,54,68,0.17);color:#17212B">6</td></tr><tr class=""><th><span class="tn">Standridge</span><span class="tc">English 9, Podcasting · 67</span></th><td class="v" style="background:rgba(42,54,68,0.66);color:#fff">39</td><td class="v" style="background:rgba(42,54,68,0.55);color:#fff">31</td><td class="v" style="background:rgba(42,54,68,0.68);color:#fff">40</td><td class="diag"></td><td class="v" style="background:rgba(42,54,68,0.50);color:#fff">28</td><td class="v me" style="background:rgba(42,54,68,0.53);color:#fff">30</td><td class="v" style="background:rgba(42,54,68,0.41);color:#17212B">22</td><td class="v" style="background:rgba(42,54,68,0.10);color:#17212B">1</td><td class="v" style="background:rgba(42,54,68,0.15);color:#17212B">5</td></tr><tr class=""><th><span class="tn">Riley</span><span class="tc">MS Office Specialist 1, Yearbook 1 · 65</span></th><td class="v" style="background:rgba(42,54,68,0.68);color:#fff">40</td><td class="v" style="background:rgba(42,54,68,0.64);color:#fff">37</td><td class="v" style="background:rgba(42,54,68,0.53);color:#fff">30</td><td class="v" style="background:rgba(42,54,68,0.50);color:#fff">28</td><td class="diag"></td><td class="v me" style="background:rgba(42,54,68,0.51);color:#fff">29</td><td class="v" style="background:rgba(42,54,68,0.46);color:#fff">25</td><td class="v" style="background:rgba(42,54,68,0.12);color:#17212B">3</td><td class="v" style="background:rgba(42,54,68,0.17);color:#17212B">6</td></tr><tr class="me"><th><span class="tn">Weisenfeld</span><span class="tc">Gaming &amp; Design, Physics 1 · 64</span></th><td class="v me" style="background:rgba(42,54,68,0.57);color:#fff">33</td><td class="v me" style="background:rgba(42,54,68,0.56);color:#fff">32</td><td class="v me" style="background:rgba(42,54,68,0.56);color:#fff">32</td><td class="v me" style="background:rgba(42,54,68,0.53);color:#fff">30</td><td class="v me" style="background:rgba(42,54,68,0.51);color:#fff">29</td><td class="diag"></td><td class="v me" style="background:rgba(42,54,68,0.38);color:#17212B">20</td><td class="v me" style="background:rgba(42,54,68,0.10);color:#17212B">1</td><td class="v me" style="background:rgba(42,54,68,0.17);color:#17212B">6</td></tr><tr class=""><th><span class="tn">Cochran</span><span class="tc">NW History, World Geography · 60</span></th><td class="v" style="background:rgba(42,54,68,0.56);color:#fff">32</td><td class="v" style="background:rgba(42,54,68,0.68);color:#fff">40</td><td class="v" style="background:rgba(42,54,68,0.51);color:#fff">29</td><td class="v" style="background:rgba(42,54,68,0.41);color:#17212B">22</td><td class="v" style="background:rgba(42,54,68,0.46);color:#fff">25</td><td class="v me" style="background:rgba(42,54,68,0.38);color:#17212B">20</td><td class="diag"></td><td class="v" style="background:rgba(42,54,68,0.26);color:#17212B">12</td><td class="v" style="background:rgba(42,54,68,0.14);color:#17212B">4</td></tr><tr class=""><th><span class="tn">LeDuc</span><span class="tc">Inclusion Algebra 1, Inclusion English 9 · 13</span></th><td class="v" style="background:rgba(42,54,68,0.27);color:#17212B">13</td><td class="v" style="background:rgba(42,54,68,0.17);color:#17212B">6</td><td class="v" style="background:rgba(42,54,68,0.23);color:#17212B">10</td><td class="v" style="background:rgba(42,54,68,0.10);color:#17212B">1</td><td class="v" style="background:rgba(42,54,68,0.12);color:#17212B">3</td><td class="v me" style="background:rgba(42,54,68,0.10);color:#17212B">1</td><td class="v" style="background:rgba(42,54,68,0.26);color:#17212B">12</td><td class="diag"></td><td class="v">–</td></tr><tr class=""><th><span class="tn">Conway</span><span class="tc">Algebra 3, Geometry 1 · 11</span></th><td class="v">–</td><td class="v" style="background:rgba(42,54,68,0.15);color:#17212B">5</td><td class="v" style="background:rgba(42,54,68,0.17);color:#17212B">6</td><td class="v" style="background:rgba(42,54,68,0.15);color:#17212B">5</td><td class="v" style="background:rgba(42,54,68,0.17);color:#17212B">6</td><td class="v me" style="background:rgba(42,54,68,0.17);color:#17212B">6</td><td class="v" style="background:rgba(42,54,68,0.14);color:#17212B">4</td><td class="v">–</td><td class="diag"></td></tr></tbody></table></div>
+
+<h2>Things worth a look from the counselor</h2>
+<div class="notes"><ul>
+<li>One student on the 9th-grade roster has an entirely blank matrix — no classes, lunch, advisory, or counselor assignment (homeroom listed as Cleveland).</li>
+<li>All 12 students in Inclusion English 9 (LeDuc, period 4) are also enrolled in World Geography section 1 (Cochran, period 4). PowerSchool flags every one of these cells as a section conflict, and none of the 12 are in a general English 9 section. If that is the intended support model, fine; if not, twelve schedules need fixing.</li>
+<li>Seven students are in both Algebra 1 (Eaton) and Inclusion Algebra 1 (LeDuc) in period 2 — this looks like intentional co-teaching, unlike the item above.</li>
+<li>Missing year-long assignments: 1 student without lunch, 2 without advisory, 3 without a counselor.</li>
+<li>Year of graduation reads 2030 for 122 students, but is blank/0 for 4, 2029 for 1, and 2031 for 1.</li>
+<li>Grade-wide this quarter: 94 of 128 freshmen have a math class and 68 have an English class; 12 have neither. Of your 49 Physics students, 22 have no math class and 37 have no English class in Q1.</li>
+</ul></div>
+<p class="small">Student names and IDs from the source report were used only to count overlaps and do not appear on this page. Regenerate each quarter from the new matrix report; the sections and teachers will shift.</p>
+</main>
+<script>
+(function(){
+  var svg=document.querySelector('figure svg');var pinned=null;
+  function set(o){svg.classList.remove('f-o0','f-o1','f-o2');if(o)svg.classList.add('f-'+o);}
+  svg.querySelectorAll('.node[data-o]').forEach(function(n){
+    n.setAttribute('tabindex','0');
+    n.addEventListener('mouseenter',function(){if(!pinned)set(n.dataset.o);});
+    n.addEventListener('mouseleave',function(){if(!pinned)set(null);});
+    n.addEventListener('focus',function(){if(!pinned)set(n.dataset.o);});
+    n.addEventListener('blur',function(){if(!pinned)set(null);});
+    n.addEventListener('click',function(){pinned=(pinned===n.dataset.o)?null:n.dataset.o;set(pinned);});
+    n.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();n.click();}});
+  });
+  svg.querySelectorAll('.rib').forEach(function(p){
+    var o=[].filter.call(p.classList,function(c){return /^o\d$/.test(c);})[0];
+    p.addEventListener('mouseenter',function(){if(!pinned)set(o);});
+    p.addEventListener('mouseleave',function(){if(!pinned)set(null);});
+  });
+})();
+</script>
+</body></html>

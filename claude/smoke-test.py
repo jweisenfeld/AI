@@ -50,6 +50,14 @@ try:
 except ImportError:
     sys.exit("This script needs `requests`:  pip install requests")
 
+
+# Windows consoles default to cp1252 and raise UnicodeEncodeError on arrows,
+# dashes and box characters. Never let a formatting character kill a report.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except (AttributeError, ValueError):
+    pass
+
 HERE = Path(__file__).resolve().parent
 PROXY_URL = "https://psd1.net/claude/api-proxy.php"
 CONFIG_PATH = HERE / "model_config.json"

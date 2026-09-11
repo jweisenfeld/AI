@@ -30,6 +30,14 @@ try:
 except ImportError:
     sys.exit("This script needs `requests`:  pip install requests")
 
+
+# Windows consoles default to cp1252 and raise UnicodeEncodeError on arrows,
+# dashes and box characters. Never let a formatting character kill a report.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except (AttributeError, ValueError):
+    pass
+
 DEFAULT_URL = "https://psd1.net/claude/stream-test.php"
 
 # psd1.net's ModSecurity rejects the default python-requests User-Agent (406).

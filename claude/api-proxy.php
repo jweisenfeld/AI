@@ -502,8 +502,16 @@ if ($restrictions['topic_lock'] !== '' && $restrictions['topic_lock'] !== 'unlim
         : $topicConstraint;
 }
 
-// Add optional temperature (0.0 to 1.0), rounded to 2 decimal places
-if (isset($requestData['temperature'])) {
+// Add optional temperature (0.0 to 1.0), rounded to 2 decimal places.
+//
+// Newer Anthropic models reject the parameter outright ("`temperature` is
+// deprecated for this model"), which is a per-model quirk like Kimi's
+// fixed_temperature — so it's the `omit_temperature` field in
+// model_config.json, not a branch here. Leaving it in was silently expensive:
+// the 400 tripped isModelError(), auto-healing walked down the fallback chain,
+// and students asking for Sonnet 5 quietly got Sonnet 4.6 at Sonnet 5 prices.
+$omitTemperature = !empty($config['tiers'][$requestedModel]['omit_temperature']);
+if (!$omitTemperature && isset($requestData['temperature'])) {
     $temp = round((float)$requestData['temperature'], 2);
     if ($temp >= 0.0 && $temp <= 1.0) {
         $apiRequest['temperature'] = $temp;
@@ -1124,8 +1132,18 @@ function isModelError(int $httpCode, ?array $responseData): bool
     if (!is_array($responseData)) return false;
     $errorType = $responseData['error']['type'] ?? '';
     $errorMsg  = strtolower($responseData['error']['message'] ?? '');
-    return $errorType === 'invalid_request_error'
-        && strpos($errorMsg, 'model') !== false;
+    if ($errorType !== 'invalid_request_error') return false;
+    if (strpos($errorMsg, 'model') === false) return false;
+
+    // "`temperature` is deprecated for this model" contains the word "model"
+    // but is a complaint about a PARAMETER, not about the model being wrong.
+    // Treating it as a model error made the proxy walk its fallback chain and
+    // permanently rewrite model_config.json to an older model — a real
+    // downgrade caused by a request field it could have simply dropped.
+    foreach (['temperature', 'top_p', 'top_k', 'max_tokens', 'stop_sequence'] as $param) {
+        if (strpos($errorMsg, $param) !== false) return false;
+    }
+    return true;
 }
 
 /**

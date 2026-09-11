@@ -229,20 +229,8 @@ importFunctionsFromProxy([
     'convertToOpenAiContent',
     'buildOpenAiCompatibleRequest',
     'describeConnectionFailure',
+    'isModelError',
 ]);
-
-/**
- * Check if an API error response indicates an invalid/deprecated model.
- */
-function isModelError(int $httpCode, ?array $responseData): bool
-{
-    if ($httpCode !== 400) return false;
-    if (!is_array($responseData)) return false;
-    $errorType = $responseData['error']['type'] ?? '';
-    $errorMsg  = strtolower($responseData['error']['message'] ?? '');
-    return $errorType === 'invalid_request_error'
-        && strpos($errorMsg, 'model') !== false;
-}
 
 /**
  * Validate request data structure
@@ -1189,6 +1177,25 @@ runTest('no restrictions at all yields nothing to show', function() {
 
 // --- Per-Model Quirk Config Tests ---
 echo "\nPer-Model Quirks (config-driven):\n";
+
+runTest('temperature complaints are NOT treated as model errors', function() {
+    // "`temperature` is deprecated for this model" contains "model", but healing
+    // on it silently downgraded Sonnet 5 to Sonnet 4.6 and rewrote the config.
+    $resp = ['error' => ['type' => 'invalid_request_error', 'message' => '`temperature` is deprecated for this model.']];
+    assertFalse(isModelError(400, $resp), 'A parameter complaint must not trigger fallback healing');
+});
+
+runTest('genuine model errors still trigger healing', function() {
+    $resp = ['error' => ['type' => 'invalid_request_error', 'message' => 'model: claude-opus-9 not found']];
+    assertTrue(isModelError(400, $resp), 'A real bad-model error should still heal');
+});
+
+runTest('sonnet and opus omit temperature; haiku keeps it', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    assertTrue(!empty($config['tiers']['sonnet']['omit_temperature']), 'Sonnet 5 rejects temperature');
+    assertTrue(!empty($config['tiers']['opus']['omit_temperature']), 'Opus 4.8 rejects temperature');
+    assertFalse(!empty($config['tiers']['haiku']['omit_temperature']), 'Haiku still accepts temperature');
+});
 
 runTest('kimi declares fixed_temperature (it 400s on anything but 1)', function() {
     $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);

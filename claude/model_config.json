@@ -16,6 +16,7 @@
     },
     "sonnet": {
       "primary": "claude-sonnet-5",
+      "omit_temperature": true,
       "fallbacks": [
         "claude-sonnet-4-6",
         "claude-sonnet-4-5-20250929",
@@ -29,6 +30,7 @@
     },
     "opus": {
       "primary": "claude-opus-4-8",
+      "omit_temperature": true,
       "fallbacks": [
         "claude-opus-4-7",
         "claude-opus-4-6",

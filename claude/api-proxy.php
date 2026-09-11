@@ -63,6 +63,15 @@ if (!$ANTHROPIC_API_KEY) {
     exit;
 }
 
+// How long to wait for a model to finish. Raising max_tokens to 8192 made the
+// old 120s ceiling too tight: a full program from a slow provider can take
+// longer than that, and GLM was returning "Operation timed out after 120001
+// milliseconds with 0 bytes received" on exactly the kind of request this
+// chatbot exists for. This proxy is non-streaming, so the entire answer must be
+// generated before a single byte comes back — that wait is unavoidable without
+// a streaming rewrite.
+define('API_TIMEOUT_SECONDS', 240);
+
 // Non-Anthropic ("external") providers — Z.AI (GLM), Moonshot (Kimi), and
 // DeepSeek — are all OpenAI-compatible endpoints, each keyed by its own
 // secrets file. Keys are optional at boot; only required if a student
@@ -144,7 +153,17 @@ if (isset($requestData['action']) && $requestData['action'] === 'verify_login') 
             'created_at'    => time(),
             'last_used'     => time(),
         ]), LOCK_EX);
-        echo json_encode(['success' => true, 'student_name' => $studentName, 'token' => $token, 'is_unlimited' => $isUnlimited ?? false]);
+        echo json_encode([
+            'success'       => true,
+            'student_name'  => $studentName,
+            'token'         => $token,
+            'is_unlimited'  => $isUnlimited ?? false,
+            // So the chat can show what's in force before the first message.
+            '_restrictions' => buildRestrictionStatus([
+                'free_hours' => $loginFreeHrs,
+                'topic_lock' => $loginTopicLk,
+            ]),
+        ]);
     } else {
         http_response_code(401);
         echo json_encode(['error' => 'Invalid credentials.']);
@@ -159,7 +178,11 @@ if (isset($requestData['action']) && $requestData['action'] === 'validate_sessio
     $sid   = trim($requestData['student_id'] ?? '');
     $token = $requestData['session_token'] ?? '';
     if (validateSession($sessionsDir, $token, $sid, $studentFile)) {
-        echo json_encode(['success' => true]);
+        // Returning to a saved session (page reload) rebuilds the banner too.
+        echo json_encode([
+            'success'       => true,
+            '_restrictions' => buildRestrictionStatus(getStudentRestrictions($studentFile, $sid)),
+        ]);
     } else {
         http_response_code(401);
         echo json_encode(['error' => 'Session invalid or expired.']);
@@ -517,17 +540,23 @@ if ($opusDowngraded) {
 $logEntry['provider'] = $provider;
 
 // --- Make API call ---
+// Give PHP more headroom than the cURL timeout, so a slow model produces a
+// real timeout error the student can read rather than a truncated 500.
+@set_time_limit(API_TIMEOUT_SECONDS + 60);
 $modelHealed = false;
 if ($isExternalProvider) {
     // GLM/Kimi K3/DeepSeek: OpenAI-compatible endpoints, no auto-healing (single model, no fallbacks configured).
-    $externalRequest = buildOpenAiCompatibleRequest($apiRequest, $resolvedModel, $supportsVision);
+    $fixedTemp = isset($config['tiers'][$requestedModel]['fixed_temperature'])
+        ? (float)$config['tiers'][$requestedModel]['fixed_temperature']
+        : null;
+    $externalRequest = buildOpenAiCompatibleRequest($apiRequest, $resolvedModel, $supportsVision, $fixedTemp);
     $endpoint = $EXTERNAL_PROVIDERS[$provider]['endpoint'];
     $apiKey   = $EXTERNAL_API_KEYS[$provider];
     list($httpCode, $rawResponse, $curlError) = callOpenAiCompatibleApi($endpoint, $externalRequest, $apiKey);
 
     if ($curlError) {
-        http_response_code(500);
-        echo json_encode(['error' => "Failed to connect to $provider API: " . $curlError]);
+        http_response_code(504);
+        echo json_encode(['error' => describeConnectionFailure($curlError, $provider)]);
         exit;
     }
 
@@ -541,8 +570,8 @@ if ($isExternalProvider) {
     list($httpCode, $response, $curlError) = callAnthropicApi($apiRequest, $ANTHROPIC_API_KEY);
 
     if ($curlError) {
-        http_response_code(500);
-        echo json_encode(['error' => 'Failed to connect to API: ' . $curlError]);
+        http_response_code(504);
+        echo json_encode(['error' => describeConnectionFailure($curlError, 'anthropic')]);
         exit;
     }
 
@@ -593,6 +622,14 @@ if (is_array($responseData) && isset($responseData['usage'])) {
     $logEntry['output_tokens'] = $responseData['usage']['output_tokens'] ?? 0;
     $logEntry['cost_usd'] = calculateCostUsd($config, $requestedModel, $logEntry['input_tokens'], $logEntry['output_tokens']);
 }
+// Record why a response was unusable (e.g. 'empty_response' with the token
+// budget spent on reasoning) so the dashboard shows more than a bare 502.
+if (is_array($responseData) && isset($responseData['error'])) {
+    $logEntry['error_type'] = $responseData['error']['type'] ?? 'unknown';
+    if (isset($responseData['error']['reasoning_chars'])) {
+        $logEntry['reasoning_chars'] = $responseData['error']['reasoning_chars'];
+    }
+}
 $logEntry['http_status'] = $httpCode;
 $logEntry['model'] = $resolvedModel;
 $logEntry['model_healed'] = $modelHealed;
@@ -614,6 +651,14 @@ if (is_array($responseData) && isset($responseData['content'])) {
     }
 }
 writeStudentLog($studentId, $lastUserText, $responseText, $logEntry);
+
+// Refresh the restriction banner on every reply: a topic lock lifts when a free
+// window opens and the school-hours model limit starts at 5 PM, so a banner
+// drawn once at login would go stale during a long session.
+if (is_array($responseData)) {
+    $responseData['_restrictions'] = buildRestrictionStatus($restrictions);
+    $response = json_encode($responseData);
+}
 
 // If model was downgraded, inject a note into the response
 if (isset($modelDowngraded) && $modelDowngraded && is_array($responseData)) {
@@ -853,7 +898,9 @@ function callAnthropicApi(array $apiRequest, string $apiKey): array
             'x-api-key: ' . $apiKey,
             'anthropic-version: 2023-06-01',
         ],
-        CURLOPT_TIMEOUT        => 120,
+        // 8192-token answers (a full program) can take a slow provider well past
+        // two minutes — GLM timed out at 120s once max_tokens was raised.
+        CURLOPT_TIMEOUT        => API_TIMEOUT_SECONDS,
     ]);
     $response  = curl_exec($ch);
     $httpCode  = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -871,7 +918,7 @@ function callAnthropicApi(array $apiRequest, string $apiKey): array
  * requests before reaching here). When true, content is converted to
  * OpenAI's content-block array so image_url blocks survive.
  */
-function buildOpenAiCompatibleRequest(array $apiRequest, string $model, bool $supportsVision = false): array
+function buildOpenAiCompatibleRequest(array $apiRequest, string $model, bool $supportsVision = false, ?float $fixedTemperature = null): array
 {
     $messages = [];
     if (isset($apiRequest['system'])) {
@@ -884,11 +931,17 @@ function buildOpenAiCompatibleRequest(array $apiRequest, string $model, bool $su
             'content' => $supportsVision ? convertToOpenAiContent($content) : extractPlainText($content),
         ];
     }
+    // Some models accept only one temperature and reject everything else with a
+    // hard 400 (Kimi K3: "invalid temperature: only 1 is allowed for this
+    // model"). That's a per-model quirk, so it lives as a `fixed_temperature`
+    // field in model_config.json rather than an if-block here — a new model with
+    // the same constraint is a config edit, not a code change. The student's
+    // temperature slider is simply ignored for those tiers.
     return [
         'model'       => $model,
         'messages'    => $messages,
         'max_tokens'  => $apiRequest['max_tokens'],
-        'temperature' => $apiRequest['temperature'] ?? 1.0,
+        'temperature' => $fixedTemperature ?? ($apiRequest['temperature'] ?? 1.0),
     ];
 }
 
@@ -961,7 +1014,9 @@ function callOpenAiCompatibleApi(string $endpoint, array $body, string $apiKey):
             'Content-Type: application/json',
             'Authorization: Bearer ' . $apiKey,
         ],
-        CURLOPT_TIMEOUT        => 120,
+        // 8192-token answers (a full program) can take a slow provider well past
+        // two minutes — GLM timed out at 120s once max_tokens was raised.
+        CURLOPT_TIMEOUT        => API_TIMEOUT_SECONDS,
     ]);
     $response  = curl_exec($ch);
     $httpCode  = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -987,10 +1042,9 @@ function normalizeOpenAiCompatibleResponse(?array $raw, string $fallbackModel): 
         $type = is_array($err) ? ($err['type'] ?? 'api_error') : 'api_error';
         return ['error' => ['type' => $type, 'message' => $message]];
     }
-    $text = $raw['choices'][0]['message']['content'] ?? null;
-    if ($text === null) {
-        return ['error' => ['type' => 'api_error', 'message' => 'Model API returned no response content.']];
-    }
+    $message = $raw['choices'][0]['message'] ?? [];
+    $text = $message['content'] ?? null;
+
     // Map OpenAI's finish_reason onto Anthropic's stop_reason vocabulary so the
     // frontend can tell "answer complete" from "ran out of tokens mid-code" the
     // same way for every provider.
@@ -998,12 +1052,48 @@ function normalizeOpenAiCompatibleResponse(?array $raw, string $fallbackModel): 
     $stopReason = $finish === 'length' ? 'max_tokens'
                 : ($finish === 'stop' ? 'end_turn' : $finish);
 
+    // Usage is reported even when the answer is unusable — those tokens were
+    // still billed, so every return path below carries it through to the log.
+    $usage = [
+        'input_tokens'  => $raw['usage']['prompt_tokens'] ?? 0,
+        'output_tokens' => $raw['usage']['completion_tokens'] ?? 0,
+    ];
+
+    // An empty answer is not the same as a missing one. Reasoning-style models
+    // (DeepSeek Vision does this) write their chain of thought into
+    // `reasoning_content` and only afterwards write the answer into `content`;
+    // if the token budget runs out mid-thought, `content` comes back as an
+    // empty string with finish_reason 'length'. Left alone that renders as a
+    // blank chat bubble with a full token bill and no explanation.
+    if ($text === null || trim((string)$text) === '') {
+        $reasoningChars = strlen((string)($message['reasoning_content'] ?? ''));
+        if ($stopReason === 'max_tokens') {
+            $why = 'This model used its whole response budget thinking and never got to the answer. '
+                 . 'Ask for something smaller (one class or function at a time), or switch to '
+                 . 'DeepSeek Flash, DeepSeek Pro, or Sonnet for code.';
+        } elseif ($text === null) {
+            $why = 'The model API returned no response content. Try again or switch models.';
+        } else {
+            $why = 'The model returned an empty answer. Try rephrasing, or switch models.';
+        }
+        return [
+            'error' => [
+                'type'    => 'empty_response',
+                'message' => $why,
+                // Diagnostics for claude_usage.log — tells a future reader whether
+                // the budget went into reasoning or the model simply said nothing.
+                'reasoning_chars' => $reasoningChars,
+                'finish_reason'   => $finish,
+            ],
+            'usage'       => $usage,
+            'model'       => $raw['model'] ?? $fallbackModel,
+            'stop_reason' => $stopReason,
+        ];
+    }
+
     return [
         'content' => [['type' => 'text', 'text' => $text]],
-        'usage'   => [
-            'input_tokens'  => $raw['usage']['prompt_tokens'] ?? 0,
-            'output_tokens' => $raw['usage']['completion_tokens'] ?? 0,
-        ],
+        'usage'   => $usage,
         'model' => $raw['model'] ?? $fallbackModel,
         'stop_reason' => $stopReason,
     ];
@@ -1284,6 +1374,88 @@ function formatAllowedWindows(string $allowedHours): string
         }
     }
     return implode(' and ', $parts);
+}
+
+/**
+ * Turn a raw cURL failure into something a student can act on.
+ *
+ * A timeout is by far the most common case and it is not a configuration
+ * problem: the model simply took longer than API_TIMEOUT_SECONDS to write the
+ * whole answer, which big "write me a complete program" prompts invite. Saying
+ * "check your API configuration" for that would send the reader down the wrong
+ * path entirely.
+ */
+function describeConnectionFailure(string $curlError, string $provider): array
+{
+    $isTimeout = stripos($curlError, 'timed out') !== false
+              || stripos($curlError, 'timeout') !== false;
+
+    if ($isTimeout) {
+        return [
+            'type'    => 'model_timeout',
+            'message' => 'That answer took too long and the connection timed out — usually because '
+                       . 'the request asked for a whole program at once. Ask for one piece at a time '
+                       . '(just the player class, just the collision code), or try a faster model '
+                       . 'like Haiku or DeepSeek Flash.',
+        ];
+    }
+
+    return [
+        'type'    => 'api_error',
+        'message' => "Couldn't reach the {$provider} model right now. Wait a moment and try again, "
+                   . 'or switch to a different model.',
+    ];
+}
+
+/**
+ * Describe the restrictions in force for this account RIGHT NOW, for the
+ * banner at the top of the chat.
+ *
+ * Deliberately computed server-side and refreshed on every response rather
+ * than worked out once in JavaScript: the answer is time-dependent (a topic
+ * lock lifts inside a free window; the school-hours model limit starts at
+ * 5 PM), so a banner rendered once at login goes stale mid-session. Keeping
+ * the window arithmetic here also means isWithinAllowedHours() isn't
+ * reimplemented in JS, where it would drift.
+ *
+ * Mirrors the rules applied above:
+ *   - free_hours "unlimited"        → no school-hours model limit, no topic lock
+ *   - topic_lock set, outside free  → subject constraint injected into system
+ *   - outside Mon-Fri 7AM-5PM       → every tier forced to Haiku
+ */
+function buildRestrictionStatus(array $restrictions): array
+{
+    $tz   = new DateTimeZone('America/Los_Angeles');
+    $now  = new DateTime('now', $tz);
+    $mins = (int)$now->format('G') * 60 + (int)$now->format('i');
+    $dow  = (int)$now->format('N');
+    $hour = (int)$now->format('G');
+
+    $freeHours = strtolower(trim($restrictions['free_hours'] ?? ''));
+    $topicLock = strtolower(trim($restrictions['topic_lock'] ?? ''));
+
+    $hoursUnlimited = ($freeHours === 'unlimited');
+    $inFreeWindow   = $hoursUnlimited
+        || ($freeHours !== '' && isWithinAllowedHours($freeHours, $mins));
+
+    $isSchoolHours = ($dow >= 1 && $dow <= 5 && $hour >= 7 && $hour < 17);
+
+    $topicActive = ($topicLock !== '' && $topicLock !== 'unlimited' && !$inFreeWindow);
+    $isTutor     = $topicActive && substr($topicLock, -6) === '-tutor';
+    $subject     = $isTutor ? substr($topicLock, 0, -6) : $topicLock;
+
+    return [
+        'topic_locked'   => $topicActive,
+        'topic_subject'  => $topicActive ? ucfirst($subject) : null,
+        'topic_mode'     => $topicActive ? ($isTutor ? 'tutor' : 'assistant') : null,
+        // Set even when the lock is currently lifted, so the banner can say
+        // what will come back when the free window closes.
+        'topic_pending'  => ($topicLock !== '' && $topicLock !== 'unlimited' && $inFreeWindow && !$hoursUnlimited),
+        'model_limited'  => (!$isSchoolHours && !$hoursUnlimited),
+        'in_free_window' => ($inFreeWindow && !$hoursUnlimited),
+        'free_windows'   => ($freeHours !== '' && !$hoursUnlimited) ? formatAllowedWindows($freeHours) : '',
+        'unrestricted'   => ($hoursUnlimited && $topicLock === 'unlimited'),
+    ];
 }
 
 /**

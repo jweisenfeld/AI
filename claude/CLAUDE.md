@@ -37,10 +37,62 @@ An unclosed block now renders as code and is labeled "cut off, ask continue"; `a
 also maps OpenAI `finish_reason: length` to `stop_reason: max_tokens` so the frontend can show a
 tip.
 
+**Failed requests roll back the user turn.** index.html pushes the user's message into `messages`
+before sending. If the request fails (any error, or an empty answer) no assistant reply follows
+it, and the next send would put two user turns in a row — which the Anthropic API rejects
+("roles must alternate"), bricking the conversation until Clear Chat. `rollBackUserTurn()`
+removes that turn **by identity**, and hands the student's text and attachments back to the
+composer (without clobbering anything they typed or attached since). Their message bubble stays
+on screen as a record, so the error text says the message wasn't added to the conversation.
+
+**Empty answers.** An OpenAI-compatible response can be 2xx with `content: ""` — reasoning-style
+models (DeepSeek Vision is the observed case) write chain-of-thought into `reasoning_content` and
+only then write the answer, so a budget that runs out mid-thought bills full output tokens and
+returns nothing. `normalizeOpenAiCompatibleResponse()` turns empty/whitespace content into an
+`empty_response` error that still carries `usage` (so cost logging survives) and records
+`reasoning_chars` + `finish_reason` in `claude_usage.log`. index.html has a matching backstop for
+the Anthropic path and never pushes an empty assistant turn into `messages`.
+
 index.html requests `max_tokens: 8192` (raised from 4096, which cut off full-program answers).
 8192 is the proxy's hard ceiling — `api-proxy.php` clamps with `min($requested, 8192)` and still
 defaults to 4096 when a client omits the field, which is what tests.js/tests.php assert. Only
 tokens actually generated are billed, so the higher cap costs nothing until a reply needs it.
+
+## Restriction Banner
+A banner above the chat states what the account can do *right now*: subject-only /
+Socratic-tutor mode from `topic_lock`, whether a free window is open, and whether the
+school-hours rule is forcing every tier to Haiku. `buildRestrictionStatus()` in api-proxy.php
+computes it **server-side** and returns it from `verify_login`, `validate_session`, and every
+chat reply — the state is time-dependent (a topic lock lifts inside a free window; the Haiku
+limit starts at 5 PM), so a banner drawn once at login goes stale mid-session, and computing it
+in JS would mean reimplementing `isWithinAllowedHours()` there. Amber when something is
+narrowing what the student can do, blue for a free window, hidden for unrestricted accounts.
+
+## Per-Model Quirks Live in model_config.json
+When a model has an idiosyncrasy, encode it as a **field**, not a branch. Kimi K3 rejects every
+temperature except 1 (400: "invalid temperature: only 1 is allowed for this model"), so its tier
+carries `"fixed_temperature": 1` and `buildOpenAiCompatibleRequest()` applies it generically —
+a second model with the same constraint is a config edit, not a code change. Same principle as
+`supportsVision`. Resist adding per-provider codepaths: every bug found so far (unclosed code
+fences, token-cap truncation, empty answers, unpaired user turns) was shared across providers
+and got one shared fix.
+
+## Timeouts
+`API_TIMEOUT_SECONDS` (240) caps both cURL calls; PHP gets that plus 60s via `set_time_limit()`.
+The old 120s ceiling was too tight once `max_tokens` went to 8192 — GLM timed out mid-program
+with "0 bytes received". This proxy is **non-streaming**, so the whole answer is generated before
+any byte returns; that wait is inherent without a streaming rewrite. `describeConnectionFailure()`
+reports timeouts as `model_timeout` with advice to ask for one piece at a time, rather than the
+misleading "check your API configuration".
+
+## Smoke Test
+`smoke-test.py` sends one short code prompt per tier through the **deployed** proxy and reports
+which model answered, `stop_reason`, empty answers, whether a fenced code block survived intact,
+tokens and estimated cost. Tiers are read from model_config.json, so new ones are covered
+automatically. Credentials come from `CHATBOT_USER`/`CHATBOT_PASS` or the gitignored
+`.smoke-test-credentials.json` — never committed. Requests need a browser User-Agent or
+psd1.net's ModSecurity returns 406. Run it after deploying, and remember that outside school
+hours a non-unlimited account tests Haiku eight times.
 
 ## Security
 API keys are stored server-side only — never exposed to the browser.

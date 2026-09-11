@@ -193,6 +193,45 @@ function calculateCostUsd(array $config, string $tier, int $inputTokens, int $ou
 }
 
 /**
+ * Define named functions here by lifting their source straight out of
+ * api-proxy.php, rather than keeping hand-maintained copies.
+ *
+ * api-proxy.php can't simply be included — it runs request handling on load.
+ * But for rules where a stale copy would be worse than no test at all (time
+ * windows, restriction state, response normalization), testing a duplicate
+ * proves nothing about the code that actually runs. Extraction relies on the
+ * file's formatting: a top-level `function name(` with its closing `}` in
+ * column 0.
+ */
+function importFunctionsFromProxy(array $names): void
+{
+    static $source = null;
+    if ($source === null) {
+        $source = file_get_contents(__DIR__ . '/api-proxy.php');
+    }
+    foreach ($names as $name) {
+        if (function_exists($name)) continue;
+        $pattern = '/^function\s+' . preg_quote($name, '/') . '\s*\(.*?^\}/ms';
+        if (!preg_match($pattern, $source, $m)) {
+            throw new RuntimeException("Could not extract {$name}() from api-proxy.php");
+        }
+        eval($m[0]);
+    }
+}
+
+importFunctionsFromProxy([
+    'normalizeOpenAiCompatibleResponse',
+    'parseTimeMins',
+    'isWithinAllowedHours',
+    'formatAllowedWindows',
+    'buildRestrictionStatus',
+    'extractPlainText',
+    'convertToOpenAiContent',
+    'buildOpenAiCompatibleRequest',
+    'describeConnectionFailure',
+]);
+
+/**
  * Check if an API error response indicates an invalid/deprecated model.
  */
 function isModelError(int $httpCode, ?array $responseData): bool
@@ -1022,6 +1061,172 @@ runTest('convertToOpenAiContent translates an Anthropic image block to OpenAI im
     assertEquals('text', $result[0]['type'], 'First block should stay a text block');
     assertEquals('image_url', $result[1]['type'], 'Image block should become image_url');
     assertEquals('data:image/png;base64,xxxBASE64xxx', $result[1]['image_url']['url'], 'image_url.url should be a data: URI with the correct media type');
+});
+
+// --- OpenAI-Compatible Response Normalization Tests ---
+echo "\nOpenAI-Compatible Response Normalization:\n";
+
+/** Build a minimal OpenAI-shaped chat completion for the tests below. */
+function fakeCompletion($content, string $finish = 'stop', array $extraMessage = []): array
+{
+    return [
+        'model'   => 'deepseek-v4-flash',
+        'choices' => [[
+            'message'       => array_merge(['role' => 'assistant', 'content' => $content], $extraMessage),
+            'finish_reason' => $finish,
+        ]],
+        'usage'   => ['prompt_tokens' => 83, 'completion_tokens' => 8192],
+    ];
+}
+
+runTest('normal answer passes through with end_turn', function() {
+    $r = normalizeOpenAiCompatibleResponse(fakeCompletion('Hello there'), 'fallback');
+    assertFalse(isset($r['error']), 'A normal answer should not be an error');
+    assertEquals('Hello there', $r['content'][0]['text'], 'Text should pass through unchanged');
+    assertEquals('end_turn', $r['stop_reason'], "finish_reason 'stop' should map to end_turn");
+});
+
+runTest('truncated answer maps finish_reason length to max_tokens', function() {
+    $r = normalizeOpenAiCompatibleResponse(fakeCompletion("```python\ndef f():", 'length'), 'fallback');
+    assertFalse(isset($r['error']), 'Truncated-but-present text is still a usable answer');
+    assertEquals('max_tokens', $r['stop_reason'], "finish_reason 'length' should map to max_tokens");
+});
+
+runTest('empty content with finish_reason length becomes empty_response', function() {
+    // DeepSeek Vision: whole budget spent in reasoning_content, nothing written to content.
+    $r = normalizeOpenAiCompatibleResponse(
+        fakeCompletion('', 'length', ['reasoning_content' => str_repeat('x', 4000)]),
+        'fallback'
+    );
+    assertTrue(isset($r['error']), 'Empty content should be reported as an error, not a blank bubble');
+    assertEquals('empty_response', $r['error']['type'], 'Error type should be empty_response');
+    assertEquals(4000, $r['error']['reasoning_chars'], 'Reasoning length should be recorded for the log');
+});
+
+runTest('whitespace-only content is treated as empty', function() {
+    $r = normalizeOpenAiCompatibleResponse(fakeCompletion("  \n\t "), 'fallback');
+    assertTrue(isset($r['error']), 'Whitespace-only content should not render as an answer');
+    assertEquals('empty_response', $r['error']['type'], 'Error type should be empty_response');
+});
+
+runTest('empty response still reports usage so the tokens are still billed to the log', function() {
+    $r = normalizeOpenAiCompatibleResponse(fakeCompletion('', 'length'), 'fallback');
+    assertEquals(83, $r['usage']['input_tokens'], 'Input tokens must survive the error path');
+    assertEquals(8192, $r['usage']['output_tokens'], 'Output tokens must survive the error path');
+});
+
+runTest('missing content key is still an api-level empty_response', function() {
+    $raw = ['choices' => [['message' => ['role' => 'assistant'], 'finish_reason' => 'stop']]];
+    $r = normalizeOpenAiCompatibleResponse($raw, 'fallback');
+    assertEquals('empty_response', $r['error']['type'], 'Null content should report empty_response');
+});
+
+runTest('provider error passes through untouched', function() {
+    $r = normalizeOpenAiCompatibleResponse(['error' => ['type' => 'rate_limit', 'message' => 'slow down']], 'fallback');
+    assertEquals('rate_limit', $r['error']['type'], 'Provider error type should pass through');
+});
+
+// --- Restriction Banner Tests ---
+echo "\nRestriction Status (banner):\n";
+
+// "0-24" is always inside the window, "0-0" never is — lets these assert the
+// topic-lock rules without depending on what time the suite happens to run.
+const ALWAYS_FREE = '0-24';
+const NEVER_FREE  = '0-0';
+
+runTest('topic lock with no free window is active', function() {
+    $s = buildRestrictionStatus(['free_hours' => '', 'topic_lock' => 'physics']);
+    assertTrue($s['topic_locked'], 'A topic lock with no free window applies 24/7');
+    assertEquals('Physics', $s['topic_subject'], 'Subject should be capitalized for display');
+    assertEquals('assistant', $s['topic_mode'], 'Plain subject means answer mode');
+});
+
+runTest('"-tutor" suffix selects Socratic mode', function() {
+    $s = buildRestrictionStatus(['free_hours' => NEVER_FREE, 'topic_lock' => 'physics-tutor']);
+    assertTrue($s['topic_locked'], 'Lock applies outside the free window');
+    assertEquals('Physics', $s['topic_subject'], 'The -tutor suffix should be stripped from the subject');
+    assertEquals('tutor', $s['topic_mode'], 'The -tutor suffix means Socratic mode');
+});
+
+runTest('topic lock lifts inside a free window', function() {
+    $s = buildRestrictionStatus(['free_hours' => ALWAYS_FREE, 'topic_lock' => 'physics']);
+    assertFalse($s['topic_locked'], 'Lock should lift inside the free window');
+    assertTrue($s['in_free_window'], 'Should report being in the free window');
+    assertTrue($s['topic_pending'], 'Banner should say the lock returns when the window closes');
+});
+
+runTest('unlimited account reports no restrictions', function() {
+    $s = buildRestrictionStatus(['free_hours' => 'unlimited', 'topic_lock' => 'unlimited']);
+    assertTrue($s['unrestricted'], 'Fully unlimited accounts should show no banner');
+    assertFalse($s['topic_locked'], 'Unlimited accounts are never topic locked');
+    assertFalse($s['model_limited'], 'Unlimited accounts bypass the school-hours model limit');
+});
+
+runTest('unlimited hours bypass the school-hours model limit', function() {
+    $s = buildRestrictionStatus(['free_hours' => 'unlimited', 'topic_lock' => 'physics']);
+    assertFalse($s['model_limited'], 'free_hours=unlimited bypasses the Haiku downgrade');
+    assertFalse($s['topic_locked'], 'free_hours=unlimited also lifts the topic lock');
+});
+
+runTest('model limit tracks school hours for a standard account', function() {
+    $now = new DateTime('now', new DateTimeZone('America/Los_Angeles'));
+    $dow = (int)$now->format('N');
+    $hour = (int)$now->format('G');
+    $expected = !($dow >= 1 && $dow <= 5 && $hour >= 7 && $hour < 17);
+    $s = buildRestrictionStatus(['free_hours' => '', 'topic_lock' => '']);
+    assertEquals($expected, $s['model_limited'], 'model_limited should be true exactly outside Mon-Fri 7AM-5PM Pacific');
+});
+
+runTest('free windows are formatted for humans', function() {
+    $s = buildRestrictionStatus(['free_hours' => '12-13', 'topic_lock' => 'physics']);
+    assertEquals('12 PM–1 PM', $s['free_windows'], 'Windows should be rendered in 12-hour form for the banner');
+});
+
+runTest('no restrictions at all yields nothing to show', function() {
+    $s = buildRestrictionStatus(['free_hours' => 'unlimited', 'topic_lock' => 'unlimited']);
+    assertTrue($s['unrestricted'], 'A fully unlimited account has an empty banner');
+});
+
+// --- Per-Model Quirk Config Tests ---
+echo "\nPer-Model Quirks (config-driven):\n";
+
+runTest('kimi declares fixed_temperature (it 400s on anything but 1)', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    assertEquals(1, $config['tiers']['kimi']['fixed_temperature'] ?? null,
+        'Kimi K3 must pin temperature=1 or every request fails');
+});
+
+runTest('fixed_temperature overrides the student temperature slider', function() {
+    $built = buildOpenAiCompatibleRequest(
+        ['messages' => [['role' => 'user', 'content' => 'hi']], 'max_tokens' => 8192, 'temperature' => 0.7],
+        'kimi-k3', false, 1.0
+    );
+    assertEquals(1.0, $built['temperature'], 'A pinned temperature must win over the request value');
+});
+
+runTest('tiers without fixed_temperature keep the student value', function() {
+    $built = buildOpenAiCompatibleRequest(
+        ['messages' => [['role' => 'user', 'content' => 'hi']], 'max_tokens' => 8192, 'temperature' => 0.7],
+        'glm-5.3', false, null
+    );
+    assertEquals(0.7, $built['temperature'], 'Unpinned tiers should still honour the slider');
+});
+
+// --- Connection Failure Message Tests ---
+echo "
+Connection Failure Messages:
+";
+
+runTest('cURL timeout is reported as a model_timeout, not a config problem', function() {
+    $e = describeConnectionFailure('Operation timed out after 240001 milliseconds with 0 bytes received', 'zai');
+    assertEquals('model_timeout', $e['type'], 'Timeouts should get their own type so the UI can skip the config advice');
+    assertTrue(strpos($e['message'], 'one piece at a time') !== false, 'Message should tell the student what to do instead');
+});
+
+runTest('other connection failures stay generic but still actionable', function() {
+    $e = describeConnectionFailure('Could not resolve host: api.z.ai', 'zai');
+    assertEquals('api_error', $e['type'], 'Non-timeout failures keep the generic type');
+    assertTrue(strpos($e['message'], 'zai') !== false, 'Message should name the provider that failed');
 });
 
 // --- Conversation Length Cap Tests ---

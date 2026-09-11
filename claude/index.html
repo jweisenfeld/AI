@@ -354,6 +354,31 @@
             tab-size: 4;
         }
 
+        /* Restriction banner — what this account can and can't do right now. */
+        .restriction-banner {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin: 0 0 2px 0;
+            padding: 10px 16px;
+            font-size: 0.85rem;
+            line-height: 1.45;
+            border-left: 4px solid #0284c7;
+            background: #e0f2fe;
+            color: #0c4a6e;
+        }
+
+        /* Amber when something is actively narrowing what the student can do. */
+        .restriction-banner.limited {
+            border-left-color: #d97706;
+            background: #fef3c7;
+            color: #78350f;
+        }
+
+        .restriction-banner .banner-icon { flex-shrink: 0; font-size: 1rem; line-height: 1.35; }
+        .restriction-banner strong { font-weight: 600; }
+        .restriction-banner .banner-detail { display: block; opacity: 0.85; margin-top: 2px; }
+
         /* Fenced code blocks: dark panel with a language label and a Copy button
            in a header bar, so students can lift code straight into an editor
            with its indentation intact. */
@@ -1047,7 +1072,7 @@
                             <span class="model-name">DeepSeek Pro</span>
                             <span class="model-desc">$$</span>
                         </button>
-                        <button class="model-btn" data-model="dsvision" onclick="selectModel(this)" title="DeepSeek V4 Flash Vision (experimental). Supports images!">
+                        <button class="model-btn" data-model="dsvision" onclick="selectModel(this)" title="DeepSeek V4 Flash Vision (experimental). Supports images! Best for questions about pictures — it can spend its whole budget thinking on long code requests. Use DeepSeek Flash or Pro for code.">
                             <span class="model-name">DeepSeek Vision</span>
                             <span class="model-desc">$ &#128247;</span>
                         </button>
@@ -1062,6 +1087,11 @@
                     <button class="clear-btn" onclick="clearChat()">Clear Chat</button>
                 </div>
             </div>
+
+            <!-- Account restrictions in force right now (topic lock / school-hours
+                 model limit). Server-computed and refreshed on every reply; not
+                 dismissible, because it's status rather than a tip. -->
+            <div id="restriction-banner" class="restriction-banner" hidden></div>
 
             <!-- Usage Tips (Word-style dismissible banners) -->
             <div id="tips-container"></div>
@@ -1198,6 +1228,7 @@
                         student_id: id, student_name: data.student_name, token: data.token, is_unlimited: !!data.is_unlimited
                     }));
                     applySession(id, data.student_name, data.token, data.is_unlimited);
+                    renderRestrictionBanner(data._restrictions);
                 } else {
                     err.textContent = 'Invalid credentials. Please try again.';
                 }
@@ -1221,6 +1252,8 @@
                 });
                 if (res.ok) {
                     applySession(saved.student_id, saved.student_name, saved.token, saved.is_unlimited);
+                    const restored = await res.json().catch(() => null);
+                    if (restored) renderRestrictionBanner(restored._restrictions);
                 } else {
                     localStorage.removeItem('claude_session'); // password changed or expired
                 }
@@ -1419,13 +1452,17 @@
                 ? text
                 : userContent;
 
-            // Add to conversation
-            messages.push({ role: 'user', content: messageContent });
+            // Add to conversation. Held by reference so a failed request can take
+            // it back out again — see rollBackUserTurn() below.
+            const userTurn = { role: 'user', content: messageContent };
+            messages.push(userTurn);
 
             // Render user message
             appendMessage('user', text, pendingImages.map(img => img.preview));
 
-            // Clear input
+            // Clear input. Keep a reference to the attachments first, so a failed
+            // request can hand them back instead of making the student re-upload.
+            const sentImages = pendingImages;
             input.value = '';
             pendingImages = [];
             document.getElementById('image-preview').innerHTML = '';
@@ -1484,7 +1521,7 @@
                     } else if (data.error.type === 'auth_error') {
                         clearSession();
                     }
-                    const knownTypes = ['input_too_large', 'conversation_too_long', 'rate_limit_error', 'auth_error'];
+                    const knownTypes = ['input_too_large', 'conversation_too_long', 'rate_limit_error', 'auth_error', 'empty_response', 'model_timeout'];
                     throw Object.assign(new Error(data.error.message || JSON.stringify(data.error)), { known: knownTypes.includes(data.error.type) });
                 }
 
@@ -1502,6 +1539,20 @@
                     updateTokenDisplay();
                 }
 
+                // A model can burn its whole budget and return nothing (reasoning models
+                // that never reach the answer). The proxy turns that into an error for
+                // the OpenAI-compatible tiers; this is the backstop for every tier.
+                // Don't push an empty assistant turn — some APIs reject one on the next
+                // request, which would break the rest of the conversation.
+                if (!assistantText.trim()) {
+                    rollBackUserTurn(userTurn, text, sentImages);
+                    appendMessage('assistant', 'That model returned an empty answer (it used its whole response budget without writing one). Try a smaller request, or switch models.\n\nYour message is back in the box — it was not added to the conversation.', [], data.usage, data.model);
+                    updateStatus('Empty response');
+                    isLoading = false;
+                    document.getElementById('send-btn').disabled = false;
+                    return;
+                }
+
                 // Add to conversation
                 messages.push({ role: 'assistant', content: assistantText });
 
@@ -1514,6 +1565,10 @@
                 if (data.stop_reason === 'max_tokens') {
                     showTip('truncated', 'That answer hit the length limit and stopped partway. Type <strong>continue</strong> to get the rest, or ask for one piece at a time.');
                 }
+
+                // Restrictions can change mid-session (a free window opens, 5 PM
+                // arrives), so the banner is refreshed from every reply.
+                renderRestrictionBanner(data._restrictions);
 
                 // Show server notices (e.g. model downgrade outside school hours)
                 if (data._notice) {
@@ -1539,8 +1594,11 @@
 
             } catch (error) {
                 loadingDiv.remove();
+                // The request never produced a reply, so the user turn would be left
+                // unpaired — take it back out and hand the text back to the student.
+                rollBackUserTurn(userTurn, text, sentImages);
                 const suffix = error.known ? '' : '\n\nPlease check your API configuration and try again.';
-                appendMessage('assistant', `Error: ${error.message}${suffix}`);
+                appendMessage('assistant', `Error: ${error.message}${suffix}\n\nYour message is back in the box — it was not added to the conversation.`);
                 updateStatus('Error occurred');
             }
 
@@ -1596,6 +1654,89 @@
                 </div>
             `;
             return div;
+        }
+
+        /**
+         * Show what this account is restricted to right now.
+         *
+         * `status` comes from the server (buildRestrictionStatus() in
+         * api-proxy.php) at login, on session restore, and with every reply —
+         * the state is time-dependent, so it's recomputed rather than cached.
+         * Students otherwise discover these limits by bumping into them: the
+         * assistant refuses an off-topic question, or every model quietly
+         * becomes Haiku at 5 PM.
+         */
+        function renderRestrictionBanner(status) {
+            const banner = document.getElementById('restriction-banner');
+            if (!banner) return;
+
+            if (!status || status.unrestricted) {
+                banner.hidden = true;
+                return;
+            }
+
+            const lines = [];
+            let limited = false;
+
+            if (status.topic_locked && status.topic_subject) {
+                limited = true;
+                lines.push(status.topic_mode === 'tutor'
+                    ? `<strong>${status.topic_subject} tutor mode.</strong> This chat guides you with questions instead of giving answers, and only covers ${status.topic_subject} and schoolwork.`
+                    : `<strong>${status.topic_subject} only.</strong> This chat answers ${status.topic_subject} and schoolwork questions, and will redirect anything else.`);
+                if (status.free_windows) {
+                    lines.push(`<span class="banner-detail">Open to any topic during ${status.free_windows}.</span>`);
+                }
+            } else if (status.in_free_window) {
+                lines.push(`<strong>Free period.</strong> Any topic is open right now${status.free_windows ? ` (${status.free_windows})` : ''}.`);
+                if (status.topic_pending) {
+                    lines.push('<span class="banner-detail">Your subject-only setting comes back when this window closes.</span>');
+                }
+            }
+
+            if (status.model_limited) {
+                limited = true;
+                lines.push('<span class="banner-detail">Outside school hours (Mon&ndash;Fri, 7&nbsp;AM&ndash;5&nbsp;PM Pacific), every model runs as Haiku &mdash; the model buttons above won\'t change the answer.</span>');
+            }
+
+            if (!lines.length) {
+                banner.hidden = true;
+                return;
+            }
+
+            banner.className = 'restriction-banner' + (limited ? ' limited' : '');
+            banner.innerHTML = `<span class="banner-icon">${limited ? '&#9888;' : '&#8505;'}</span><span>${lines.join(' ')}</span>`;
+            banner.hidden = false;
+        }
+
+        /**
+         * Take a user turn back out of the conversation after a failed request.
+         *
+         * A user message is added to `messages` before the request is sent. If the
+         * request then fails, no assistant reply follows it, and the next message
+         * puts two user turns in a row — which the Anthropic API rejects outright
+         * ("roles must alternate"), bricking the conversation until Clear Chat.
+         * Removing it by identity (not just popping the tail) keeps this correct
+         * no matter what else has touched the array.
+         *
+         * The student's own bubble stays on screen as a record of what they asked;
+         * their text and any attached images go back in the composer so a retry
+         * doesn't mean retyping or re-uploading. Anything they've typed or attached
+         * since is left alone.
+         */
+        function rollBackUserTurn(turn, text, images) {
+            const idx = messages.lastIndexOf(turn);
+            if (idx !== -1) messages.splice(idx, 1);
+
+            const input = document.getElementById('message-input');
+            if (input && !input.value.trim() && text) {
+                input.value = text;
+                autoResize(input);
+            }
+
+            if (images && images.length && pendingImages.length === 0) {
+                pendingImages = images;
+                renderImagePreviews();
+            }
         }
 
         function formatMessage(text) {

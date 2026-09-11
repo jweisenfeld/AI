@@ -52,9 +52,10 @@
       }
     },
     "kimi": {
-      "_comment": "Non-Anthropic model served by Moonshot AI, via an OpenAI-compatible endpoint (kimi-k3 has native vision support, but this proxy doesn't translate to OpenAI's image_url format yet, so images are rejected for this tier same as glm). Pricing is Moonshot's standard/cache-miss rate ($3.00 in / $15.00 out per MTok) — their $0.30/MTok cache-hit discount isn't modeled since this proxy sends no cache hints.",
+      "_comment": "Non-Anthropic model served by Moonshot AI, via an OpenAI-compatible endpoint (kimi-k3 has native vision support, but this proxy doesn't translate to OpenAI's image_url format yet, so images are rejected for this tier same as glm). Pricing is Moonshot's standard/cache-miss rate ($3.00 in / $15.00 out per MTok) — their $0.30/MTok cache-hit discount isn't modeled since this proxy sends no cache hints. Kimi K3 accepts ONLY temperature=1 and 400s on anything else ('invalid temperature: only 1 is allowed for this model'), so fixed_temperature pins it and the student's temperature slider is ignored for this tier.",
       "provider": "moonshot",
       "primary": "kimi-k3",
+      "fixed_temperature": 1,
       "fallbacks": [],
       "pricing": {
         "input_per_mtok": 3.00,

@@ -24,6 +24,24 @@ and automatic model updates.
 4. Response streams back to the browser
 5. Usage and per-interaction cost are logged for the dashboard
 
+## Message Rendering
+`formatMessage()` in index.html is a hand-rolled markdown renderer (no library). Fenced code
+blocks are pulled out **before** any other pass and rendered as a `.code-block` panel: a header
+bar with the language label and a **Copy** button (`copyCodeBlock()`, clipboard API with an
+execCommand fallback) over a `<pre><code>` that preserves indentation.
+
+The closing fence is **optional** by design. Replies that hit the output-token cap stop
+mid-code, and an unterminated fence used to leak the whole program into the markdown passes —
+`# comments` became `<h1>` headings, indentation collapsed, and students couldn't copy the code.
+An unclosed block now renders as code and is labeled "cut off, ask continue"; `api-proxy.php`
+also maps OpenAI `finish_reason: length` to `stop_reason: max_tokens` so the frontend can show a
+tip.
+
+index.html requests `max_tokens: 8192` (raised from 4096, which cut off full-program answers).
+8192 is the proxy's hard ceiling — `api-proxy.php` clamps with `min($requested, 8192)` and still
+defaults to 4096 when a client omits the field, which is what tests.js/tests.php assert. Only
+tokens actually generated are billed, so the higher cap costs nothing until a reply needs it.
+
 ## Security
 API keys are stored server-side only — never exposed to the browser.
 `.htaccess` restricts direct access to PHP config files.

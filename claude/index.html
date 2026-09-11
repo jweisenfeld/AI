@@ -350,6 +350,66 @@
         .message-content pre code {
             background: none;
             padding: 0;
+            white-space: pre;
+            tab-size: 4;
+        }
+
+        /* Fenced code blocks: dark panel with a language label and a Copy button
+           in a header bar, so students can lift code straight into an editor
+           with its indentation intact. */
+        .message-content .code-block {
+            margin: 12px 0;
+            border-radius: 8px;
+            overflow: hidden;
+            background: var(--code-bg);
+        }
+
+        .message-content .code-block-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.08);
+            color: #cbd5e1;
+            font-size: 0.75rem;
+            font-family: 'Fira Code', 'Consolas', monospace;
+        }
+
+        .message-content .code-lang {
+            letter-spacing: 0.5px;
+        }
+
+        .message-content .code-lang .code-cutoff {
+            color: #fcd34d;
+        }
+
+        .message-content .code-copy-btn {
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, 0.12);
+            color: #e5e7eb;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            padding: 3px 12px;
+            font-size: 0.75rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .message-content .code-copy-btn:hover {
+            background: rgba(255, 255, 255, 0.22);
+        }
+
+        .message-content .code-copy-btn.copied {
+            background: #16a34a;
+            border-color: #16a34a;
+            color: #fff;
+        }
+
+        .message-content .code-block pre {
+            margin: 0;
+            border-radius: 0;
         }
 
         .message-content p { margin: 8px 0; }
@@ -1391,7 +1451,7 @@
 
                 const requestBody = {
                     model: currentModel,
-                    max_tokens: 4096,
+                    max_tokens: 8192,  // the proxy's ceiling — long code answers were being cut off at 4096
                     messages: messages,
                     temperature: temperature,
                     student_id: studentId,
@@ -1447,6 +1507,13 @@
 
                 // Render with metadata
                 appendMessage('assistant', assistantText, [], data.usage, data.model);
+
+                // The reply hit the 8192-token output cap — still possible for very
+                // long code answers. Tell the student rather than leaving them with
+                // half a program.
+                if (data.stop_reason === 'max_tokens') {
+                    showTip('truncated', 'That answer hit the length limit and stopped partway. Type <strong>continue</strong> to get the rest, or ask for one piece at a time.');
+                }
 
                 // Show server notices (e.g. model downgrade outside school hours)
                 if (data._notice) {
@@ -1539,10 +1606,26 @@
             const rawPlaceholders = [];   // stores { html } for verbatim restoration
             const mathPlaceholders = [];  // stores rendered KaTeX html
 
-            // Pull out fenced code blocks first (highest priority)
-            text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, lang, code) => {
-                const escaped = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-                const html = `<pre><code class="language-${lang}">${escaped}</code></pre>`;
+            // Pull out fenced code blocks first (highest priority).
+            // The closing fence is optional: when a reply is cut off mid-code (it hit
+            // the max_tokens output cap, which long code answers can still do) the block
+            // still renders as code instead of spilling into the markdown passes below,
+            // where `# comments` become headings and the indentation is lost.
+            text = text.replace(/```([^\n`]*)\n?([\s\S]*?)(?:\n?```|$)/g, (match, info, code) => {
+                const lang = (info || '').trim().split(/\s+/)[0].replace(/[^\w+#.-]/g, '');
+                const cutOff = !/```\s*$/.test(match);
+                const escaped = code.replace(/\s+$/, '')
+                    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                const label = (lang || 'code') +
+                    (cutOff ? ' <span class="code-cutoff">&mdash; cut off, ask &ldquo;continue&rdquo;</span>' : '');
+                const html =
+                    '<div class="code-block">' +
+                        '<div class="code-block-header">' +
+                            `<span class="code-lang">${label}</span>` +
+                            '<button type="button" class="code-copy-btn" onclick="copyCodeBlock(this)">Copy</button>' +
+                        '</div>' +
+                        `<pre><code class="language-${lang}">${escaped}</code></pre>` +
+                    '</div>';
                 const idx = rawPlaceholders.length;
                 rawPlaceholders.push(html);
                 return `\x01RAW${idx}\x01`;
@@ -1681,6 +1764,10 @@
             f = blocks.map(block => {
                 const trimmed = block.trim();
                 if (!trimmed) return '';
+                // A block that is nothing but a placeholder is a code block or
+                // display-math block: wrapping it in <p> would nest a <div>/<pre>
+                // inside a paragraph, which browsers split apart.
+                if (/^\x01RAW\d+\x01$/.test(trimmed)) return trimmed;
                 if (blockTags.test(trimmed)) return trimmed;
                 // Wrap plain text, converting single newlines to <br>
                 return `<p>${trimmed.replace(/\n/g, '<br>')}</p>`;
@@ -1718,6 +1805,51 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        /**
+         * Copy a rendered code block's contents to the clipboard.
+         * Prefers the async clipboard API (needs https, which psd1.net has) and
+         * falls back to a hidden textarea + execCommand on locked-down browsers.
+         */
+        function copyCodeBlock(btn) {
+            const block = btn.closest('.code-block');
+            const code = block ? block.querySelector('code') : null;
+            if (!code) return;
+
+            const flash = (ok) => {
+                btn.textContent = ok ? 'Copied!' : 'Copy failed';
+                btn.classList.toggle('copied', ok);
+                setTimeout(() => {
+                    btn.textContent = 'Copy';
+                    btn.classList.remove('copied');
+                }, 1800);
+            };
+
+            const text = code.textContent;
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(
+                    () => flash(true),
+                    () => flash(legacyCopy(text))
+                );
+            } else {
+                flash(legacyCopy(text));
+            }
+        }
+
+        function legacyCopy(text) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'fixed';
+            ta.style.top = '-1000px';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            let ok = false;
+            try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+            document.body.removeChild(ta);
+            return ok;
         }
 
         function updateStatus(text) {

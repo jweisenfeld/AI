@@ -991,6 +991,13 @@ function normalizeOpenAiCompatibleResponse(?array $raw, string $fallbackModel): 
     if ($text === null) {
         return ['error' => ['type' => 'api_error', 'message' => 'Model API returned no response content.']];
     }
+    // Map OpenAI's finish_reason onto Anthropic's stop_reason vocabulary so the
+    // frontend can tell "answer complete" from "ran out of tokens mid-code" the
+    // same way for every provider.
+    $finish = $raw['choices'][0]['finish_reason'] ?? null;
+    $stopReason = $finish === 'length' ? 'max_tokens'
+                : ($finish === 'stop' ? 'end_turn' : $finish);
+
     return [
         'content' => [['type' => 'text', 'text' => $text]],
         'usage'   => [
@@ -998,6 +1005,7 @@ function normalizeOpenAiCompatibleResponse(?array $raw, string $fallbackModel): 
             'output_tokens' => $raw['usage']['completion_tokens'] ?? 0,
         ],
         'model' => $raw['model'] ?? $fallbackModel,
+        'stop_reason' => $stopReason,
     ];
 }
 

@@ -1,0 +1,99 @@
+{
+  "_comment": "Model configuration for Claude API proxy. Updated automatically by update_models.php or manually.",
+  "_updated": "2026-07-03T00:00:00Z",
+  "_source": "https://platform.claude.com/docs/en/about-claude/models",
+  "tiers": {
+    "haiku": {
+      "primary": "claude-haiku-4-5-20251001",
+      "fallbacks": [
+        "claude-haiku-4-5",
+        "claude-3-haiku-20240307"
+      ],
+      "pricing": {
+        "input_per_mtok": 1.00,
+        "output_per_mtok": 5.00
+      }
+    },
+    "sonnet": {
+      "primary": "claude-sonnet-5",
+      "omit_temperature": true,
+      "fallbacks": [
+        "claude-sonnet-4-6",
+        "claude-sonnet-4-5-20250929",
+        "claude-sonnet-4-5",
+        "claude-sonnet-4-20250514"
+      ],
+      "pricing": {
+        "input_per_mtok": 3.00,
+        "output_per_mtok": 15.00
+      }
+    },
+    "opus": {
+      "primary": "claude-opus-4-8",
+      "omit_temperature": true,
+      "fallbacks": [
+        "claude-opus-4-7",
+        "claude-opus-4-6",
+        "claude-opus-4-5-20251101",
+        "claude-opus-4-5",
+        "claude-opus-4-1-20250805"
+      ],
+      "pricing": {
+        "input_per_mtok": 5.00,
+        "output_per_mtok": 25.00
+      }
+    },
+    "glm": {
+      "_comment": "Non-Anthropic model served by Z.AI (Zhipu), via an OpenAI-compatible endpoint. Replaces the old Fable tier as the default — see api-proxy.php callOpenAiCompatibleApi(). Pricing is the blended rate from the actual purchased balance ($19.90 / 20M tokens = $0.995/MTok), NOT Z.AI's published list price (input $1.40 / output $4.40 per MTok) — confirm with John whether usage is actually metered separately before trusting cost totals long-term.",
+      "provider": "zai",
+      "primary": "glm-5.3",
+      "fallbacks": [],
+      "pricing": {
+        "input_per_mtok": 0.995,
+        "output_per_mtok": 0.995
+      }
+    },
+    "kimi": {
+      "_comment": "Non-Anthropic model served by Moonshot AI, via an OpenAI-compatible endpoint (kimi-k3 has native vision support, but this proxy doesn't translate to OpenAI's image_url format yet, so images are rejected for this tier same as glm). Pricing is Moonshot's standard/cache-miss rate ($3.00 in / $15.00 out per MTok) — their $0.30/MTok cache-hit discount isn't modeled since this proxy sends no cache hints. Kimi K3 accepts ONLY temperature=1 and 400s on anything else ('invalid temperature: only 1 is allowed for this model'), so fixed_temperature pins it and the student's temperature slider is ignored for this tier.",
+      "provider": "moonshot",
+      "primary": "kimi-k3",
+      "fixed_temperature": 1,
+      "fallbacks": [],
+      "pricing": {
+        "input_per_mtok": 3.00,
+        "output_per_mtok": 15.00
+      }
+    },
+    "dsflash": {
+      "_comment": "DeepSeek V4 Flash — cheap/fast text model, OpenAI-compatible endpoint. Pricing is the off-peak cache-miss rate from api-docs.deepseek.com/quick_start/pricing (peak hours 01:00-04:00 & 06:00-10:00 UTC fall outside school hours, so off-peak is the realistic rate).",
+      "provider": "deepseek",
+      "primary": "deepseek-v4-flash",
+      "fallbacks": [],
+      "pricing": {
+        "input_per_mtok": 0.22,
+        "output_per_mtok": 0.66
+      }
+    },
+    "dspro": {
+      "_comment": "DeepSeek V4 Pro — higher-capability text model, same endpoint/provider as dsflash. Pricing is the off-peak cache-miss rate.",
+      "provider": "deepseek",
+      "primary": "deepseek-v4-pro",
+      "fallbacks": [],
+      "pricing": {
+        "input_per_mtok": 0.66,
+        "output_per_mtok": 1.98
+      }
+    },
+    "dsvision": {
+      "_comment": "DeepSeek V4 Flash Vision (experimental) — same text pricing/capability as dsflash, but supportsVision=true lets api-proxy.php translate Anthropic-style image blocks into OpenAI's image_url format instead of rejecting them. Images are billed at the input rate, up to 384 tokens each.",
+      "provider": "deepseek",
+      "primary": "deepseek-v4-flash-vision-exp",
+      "fallbacks": [],
+      "supportsVision": true,
+      "pricing": {
+        "input_per_mtok": 0.22,
+        "output_per_mtok": 0.66
+      }
+    }
+  }
+}

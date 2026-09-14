@@ -1542,10 +1542,31 @@
                     signal: streamAbort.signal
                 });
 
-                const isStream = (response.headers.get('content-type') || '').includes('text/event-stream');
+                let isStream = (response.headers.get('content-type') || '').includes('text/event-stream');
 
                 let data;
-                if (isStream) {
+                if (!isStream) {
+                    // Safety net: if anything upstream mangles the Content-Type, a
+                    // perfectly good event stream would otherwise be handed to
+                    // JSON.parse and the student would see a broken chat. Recognise
+                    // a stream by its shape and replay it through the same reader —
+                    // all at once rather than incrementally, but correct.
+                    // Trim leading stray output before replaying: it lands on the
+                    // first line and would make that frame unrecognisable, silently
+                    // dropping the opening of the answer (an opening ``` fence).
+                    const raw = (await response.text()).replace(/^\s+/, '');
+                    if (/^(event:|data:)/.test(raw)) {
+                        isStream = true;
+                        data = await consumeAssistantStream(textAsResponse(raw), loadingDiv);
+                    } else {
+                        loadingDiv.remove();
+                        try {
+                            data = JSON.parse(raw);
+                        } catch (e) {
+                            throw new Error('The server sent a reply this page could not read.');
+                        }
+                    }
+                } else {
                     data = await consumeAssistantStream(response, loadingDiv);
                     if (data.aborted) {
                         // Student pressed Stop. Keep what arrived: it is a real
@@ -1561,9 +1582,6 @@
                         setSendingState(false);
                         return;
                     }
-                } else {
-                    data = await response.json();
-                    loadingDiv.remove();
                 }
 
                 if (data.error) {
@@ -1839,6 +1857,22 @@
                 return { text, error: failure, aborted: false };
             }
             return Object.assign({ text, aborted }, meta || {});
+        }
+
+        /**
+         * Present already-read text as a Response, so the same stream reader can
+         * consume it. Used only by the Content-Type safety net above.
+         */
+        function textAsResponse(text) {
+            const bytes = new TextEncoder().encode(text);
+            let sent = false;
+            return {
+                body: {
+                    getReader: () => ({
+                        read: async () => (sent ? { done: true } : (sent = true, { done: false, value: bytes }))
+                    })
+                }
+            };
         }
 
         /**

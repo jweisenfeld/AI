@@ -14,6 +14,20 @@
  * - Conversation length cap
  */
 
+// Buffer ALL output from here on, before a single header is set.
+//
+// The secrets files this script requires are separate PHP files; if one has so
+// much as a newline after its closing tag, that whitespace is output the moment
+// it is included — which makes PHP send the headers it has at that point and
+// silently ignore every header() call afterwards. That is invisible on the JSON
+// path (json_decode skips leading whitespace) but fatal to streaming: the
+// Content-Type stays application/json while the body is Server-Sent Events, so
+// the browser never recognises the stream.
+//
+// With a buffer open, nothing is sent until this script decides to send it, and
+// the stray whitespace can simply be discarded.
+ob_start();
+
 // Always return JSON (even on errors)
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -745,6 +759,11 @@ if ($streamStarted) {
     }
     flush();
 } else {
+    // Drop any stray buffered output so the body is exactly $response and the
+    // Content-Length below is honest.
+    while (ob_get_level() > 0) {
+        @ob_end_clean();
+    }
     http_response_code($httpCode);
     header('Content-Length: ' . strlen($response));
     header('Connection: close');
@@ -1194,10 +1213,21 @@ function beginEventStream(): void
     @ini_set('zlib.output_compression', '0');
     @ini_set('output_buffering', '0');
     @ini_set('implicit_flush', '1');
+    // Discard, never flush: anything buffered at this point is stray output
+    // (whitespace from an included file), and flushing it would commit the
+    // wrong headers before the event-stream ones below could take effect.
     while (ob_get_level() > 0) {
-        @ob_end_flush();
+        @ob_end_clean();
     }
     @ob_implicit_flush(true);
+
+    // If headers already went out, the Content-Type below is ignored and the
+    // client will not see this as a stream. Log it loudly — silent misdelivery
+    // is far worse to diagnose than a logged warning.
+    if (headers_sent($sentFile, $sentLine)) {
+        error_log("Streaming: headers already sent at {$sentFile}:{$sentLine}; "
+                . "SSE Content-Type will be ignored. Check included files for stray output.");
+    }
 
     // Anything PHP prints mid-stream lands inside an SSE frame and corrupts it,
     // so notices go to the error log only from here on.
@@ -1331,7 +1361,8 @@ function callAnthropicApiStreaming(
     ]);
     curl_exec($ch);
     if ($tail !== '') {          // final line, no trailing newline
-        $onLine(rtrim($tail, ""));
+        $onLine(rtrim($tail, "
+"));
         $tail = '';
     }
     if ($httpCode === 0) {
@@ -1433,7 +1464,8 @@ function callOpenAiCompatibleApiStreaming(string $endpoint, array $body, string 
     ]);
     curl_exec($ch);
     if ($tail !== '') {          // final line, no trailing newline
-        $onLine(rtrim($tail, ""));
+        $onLine(rtrim($tail, "
+"));
         $tail = '';
     }
     if ($httpCode === 0) {

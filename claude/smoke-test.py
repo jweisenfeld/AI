@@ -200,8 +200,32 @@ def test_tier(tier, tier_cfg, token, student_id, config, args):
     # The proxy only opens an event stream once the first text arrives, so an
     # error raised before then still comes back as ordinary JSON.
     first_token = None
-    if "text/event-stream" in (resp.headers.get("Content-Type") or ""):
-        data, first_token = read_event_stream(resp, started)
+    ctype = resp.headers.get("Content-Type") or ""
+    looks_like_sse = "text/event-stream" in ctype
+
+    if not looks_like_sse and not args.no_stream:
+        # Safety net matching index.html: a mangled Content-Type must not make a
+        # working stream look like a failure. Judge by shape, and say so.
+        # Strip leading stray output before parsing: it lands on the first line,
+        # and would otherwise make the opening frame unrecognisable and silently
+        # drop the start of the answer.
+        peek = resp.text.lstrip()
+        if peek.startswith(("event:", "data:")):
+            data, first_token = read_event_stream(peek.splitlines(), started)
+            elapsed = time.time() - started
+            result = {
+                "tier": tier, "http": resp.status_code, "seconds": elapsed,
+                "streamed": True, "model": data.get("model"),
+                "stop_reason": data.get("stop_reason"), "usage": data.get("usage"),
+                "image": use_image, "usage_estimated": data.get("usage_estimated"),
+                "ctype_wrong": ctype,
+            }
+            result["cost"] = estimate_cost(config, tier, data.get("usage"))
+            return finish_result(result, data.get("text", ""), use_image)
+
+    if looks_like_sse:
+        data, first_token = read_event_stream(
+            resp.iter_lines(chunk_size=1, decode_unicode=True), started)
         elapsed = time.time() - started
         result = {
             "tier": tier, "http": resp.status_code, "seconds": elapsed,
@@ -254,7 +278,7 @@ def test_tier(tier, tier_cfg, token, student_id, config, args):
     return finish_result(result, text, use_image)
 
 
-def read_event_stream(resp, started):
+def read_event_stream(lines, started):
     """Read the proxy's SSE reply, returning (data, seconds-to-first-token).
 
     Mirrors consumeAssistantStream() in index.html: `delta` events carry text,
@@ -266,7 +290,7 @@ def read_event_stream(resp, started):
     first_token = None
     event = "message"
 
-    for raw in resp.iter_lines(chunk_size=1, decode_unicode=True):
+    for raw in lines:
         if raw is None:
             continue
         line = raw.rstrip("\r")
@@ -374,6 +398,9 @@ def main():
         ttft = result.get("first_token")
         timing = f"{result['seconds']:.1f}s" + (f" (first token {ttft:.1f}s)" if ttft else "")
         print(f"{mark}  {timing}  {result['note']}")
+        if result.get("ctype_wrong"):
+            print(f"            {YELLOW}server sent Content-Type {result['ctype_wrong']!r} "
+                  f"instead of text/event-stream — read as a stream anyway{RESET}")
         if result.get("usage_estimated"):
             print(f"            {YELLOW}token counts are ESTIMATED "
                   f"(provider sent no usage on the stream){RESET}")

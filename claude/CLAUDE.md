@@ -9,10 +9,10 @@ and automatic model updates.
 | File | Description |
 |------|-------------|
 | `index.html` | Student-facing chat UI (~66KB) |
-| `api-proxy.php` | Server-side proxy — forwards Anthropic-tier requests to `api.anthropic.com`, GLM to Z.AI, Kimi K3 to Moonshot (both OpenAI-compatible) |
+| `api-proxy.php` | Server-side proxy — forwards Anthropic-tier requests to `api.anthropic.com`, GLM to Z.AI, Kimi K3 to Moonshot, DeepSeek to DeepSeek, Grok to xAI (all OpenAI-compatible) |
 | `dashboard.php` | Teacher analytics dashboard — usage statistics and cost per student |
 | `dashboard.html` | Dashboard frontend |
-| `model_config.json` | Model configuration with pricing tiers (Haiku / Sonnet / Opus via Anthropic, GLM via Z.AI, Kimi K3 via Moonshot) |
+| `model_config.json` | Model configuration with pricing tiers (Haiku / Sonnet / Opus via Anthropic, GLM via Z.AI, Kimi K3 via Moonshot, DeepSeek via DeepSeek, Grok 4.6 via xAI) |
 | `update_models.php` | Fetches latest model list from Anthropic API and updates config (skips non-Anthropic tiers like `glm`/`kimi`) |
 | `tests.js` / `tests.php` | Test suite for the interface |
 
@@ -20,7 +20,8 @@ and automatic model updates.
 1. Student opens `index.html` in browser
 2. Student types a message → JS sends it to `api-proxy.php`
 3. `api-proxy.php` adds the API key and forwards to `api.anthropic.com` (Haiku/Sonnet/Opus),
-   `api.z.ai` (GLM), or `api.moonshot.ai` (Kimi K3)
+   `api.z.ai` (GLM), `api.moonshot.ai` (Kimi K3), `api.deepseek.com` (DeepSeek), or
+   `api.x.ai` (Grok)
 4. Response streams back to the browser
 5. Usage and per-interaction cost are logged for the dashboard
 
@@ -153,14 +154,32 @@ API keys are stored server-side only — never exposed to the browser.
 ## Model Tiers
 `model_config.json` defines which models are available and their relative costs, one entry per tier.
 Each tier's `provider` field controls which backend api-proxy.php calls: `anthropic` (default,
-Anthropic Messages API), `zai` (Z.AI's OpenAI-compatible endpoint, GLM tier), or `moonshot`
-(Moonshot's OpenAI-compatible endpoint, Kimi tier). `zai`/`moonshot` share one generic code path
-in api-proxy.php (`$EXTERNAL_PROVIDERS`, `buildOpenAiCompatibleRequest`/`callOpenAiCompatibleApi`/
-`normalizeOpenAiCompatibleResponse`) — adding a third OpenAI-compatible provider means adding one
-entry to `$EXTERNAL_PROVIDERS` plus a secrets file, not new call/parse code.
+Anthropic Messages API), or one of the OpenAI-compatible externals — `zai` (GLM), `moonshot`
+(Kimi K3), `deepseek` (DeepSeek Flash/Pro/Vision), `xai` (Grok 4.6). Every external shares one
+generic code path in api-proxy.php (`$EXTERNAL_PROVIDERS`, `buildOpenAiCompatibleRequest`/
+`callOpenAiCompatibleApi`/`normalizeOpenAiCompatibleResponse`) — adding another OpenAI-compatible
+provider means adding one entry to `$EXTERNAL_PROVIDERS` plus a secrets file, not new call/parse
+code. Grok was added exactly that way: one `$EXTERNAL_PROVIDERS` entry, one `model_config.json`
+tier, one button, and the tier lists in the test suites. No new codepath.
+
+**xAI has two APIs; this proxy wants the older one.** docs.x.ai now leads with the Responses API
+(`POST /v1/responses`), whose request shape is `input:` rather than `messages:`. The
+OpenAI-compatible `POST /v1/chat/completions` route is still live — verified by probe, not by
+assumption: unauthenticated it answers **401** (route exists, key missing) where a made-up route
+under the same host answers **404**. `buildOpenAiCompatibleRequest()` already emits exactly what it
+wants (`model`/`messages`/`max_tokens`/`temperature`), so pointing at `chat/completions` needed no
+translation layer. If xAI ever retires it, that becomes a real porting job, not a URL edit.
 Anthropic tiers get auto-healing model fallback and `update_models.php` support; external-provider
 tiers do not (single model, no fallback list, and `update_models.php` skips them — those models
 are verified manually).
+
+Grok 4.6 is text-only here. xAI's current model table lists no vision support for the 4.x text
+models, and this proxy would need the `image_url` translation regardless — so the tier omits
+`supportsVision` and image requests on it are rejected server-side like GLM/Kimi/DeepSeek
+Flash/Pro. Its pricing (`2.00`/`6.00`) is xAI's **short-prompt** rate, which applies below 200k
+prompt tokens; at or above 200k both rates double. Nothing this chatbot sends comes near 200k, so
+the cheap rate is the honest one to model — but if long-context use ever starts, that's the
+assumption to revisit.
 
 GLM is the default model tier — it replaced the old Fable tier (removed for cost reasons) as the
 free-to-students, no-restriction default. Both GLM and Kimi K3 are text-only for now: image/vision
@@ -170,8 +189,11 @@ this proxy doesn't translate Anthropic-style image content blocks into OpenAI's 
 
 Each external provider's API key lives in its own secrets file next to `claudekey.php` (outside
 `public_html`): `.secrets/zaikey.php` returns `['ZAI_API_KEY' => '...']`, `.secrets/kimikey.php`
-returns `['KIMI_API_KEY' => '...']`. If a tier's key file is missing, that tier fails closed with
-a 500 rather than falling back silently.
+returns `['KIMI_API_KEY' => '...']`, `.secrets/deepseekkey.php` returns
+`['DEEPSEEK_API_KEY' => '...']`, `.secrets/grokkey.php` returns `['GROK_API_KEY' => '...']`.
+Keys are read at boot but only *required* when a student actually picks that tier, so a missing
+file takes down one tier, not the app. If a tier's key file is missing, that tier fails closed
+with a 500 rather than falling back silently.
 
 ## Cost Tracking
 Every logged interaction includes `cost_usd`, computed in api-proxy.php as

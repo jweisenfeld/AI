@@ -78,7 +78,7 @@ function hasImages(messages) {
  * Validate model tier name
  */
 function isValidTier(tier) {
-    const validTiers = ['haiku', 'sonnet', 'opus', 'glm', 'kimi', 'dsflash', 'dspro', 'dsvision'];
+    const validTiers = ['haiku', 'sonnet', 'opus', 'glm', 'kimi', 'dsflash', 'dspro', 'dsvision', 'grok'];
     return validTiers.includes(tier);
 }
 
@@ -523,7 +523,7 @@ runTest('model_config.json exists and is valid JSON', () => {
     assertArrayHasKey('tiers', modelConfig, 'Config should have tiers');
 });
 
-runTest('model_config.json has all eight tiers', () => {
+runTest('model_config.json has all nine tiers', () => {
     assertArrayHasKey('haiku', modelConfig.tiers, 'Should have haiku tier');
     assertArrayHasKey('sonnet', modelConfig.tiers, 'Should have sonnet tier');
     assertArrayHasKey('opus', modelConfig.tiers, 'Should have opus tier');
@@ -532,7 +532,8 @@ runTest('model_config.json has all eight tiers', () => {
     assertArrayHasKey('dsflash', modelConfig.tiers, 'Should have dsflash tier');
     assertArrayHasKey('dspro', modelConfig.tiers, 'Should have dspro tier');
     assertArrayHasKey('dsvision', modelConfig.tiers, 'Should have dsvision tier');
-    assertEquals(8, Object.keys(modelConfig.tiers).length, 'Should have exactly 8 tiers');
+    assertArrayHasKey('grok', modelConfig.tiers, 'Should have grok tier');
+    assertEquals(9, Object.keys(modelConfig.tiers).length, 'Should have exactly 9 tiers');
 });
 
 runTest('each tier has pricing information', () => {
@@ -569,6 +570,7 @@ runTest('all primary models use current generation IDs', () => {
     assertContains('deepseek-v4-flash', modelConfig.tiers.dsflash.primary, 'dsflash primary should be deepseek-v4-flash');
     assertContains('deepseek-v4-pro', modelConfig.tiers.dspro.primary, 'dspro primary should be deepseek-v4-pro');
     assertContains('deepseek-v4-flash-vision-exp', modelConfig.tiers.dsvision.primary, 'dsvision primary should be the vision-exp model');
+    assertContains('grok-4.6', modelConfig.tiers.grok.primary, 'grok primary should be grok-4.6');
 });
 
 runTest('glm tier is marked with the zai provider', () => {
@@ -585,16 +587,20 @@ runTest('dsflash, dspro, and dsvision tiers are marked with the deepseek provide
     assertEquals('deepseek', modelConfig.tiers.dsvision.provider, 'dsvision should declare provider=deepseek');
 });
 
+runTest('grok tier is marked with the xai provider', () => {
+    assertEquals('xai', modelConfig.tiers.grok.provider, 'Grok tier should declare provider=xai');
+});
+
 runTest('only dsvision declares supportsVision among the external providers', () => {
     assertTrue(!!modelConfig.tiers.dsvision.supportsVision, 'dsvision should declare supportsVision=true');
-    for (const tier of ['glm', 'kimi', 'dsflash', 'dspro']) {
+    for (const tier of ['glm', 'kimi', 'dsflash', 'dspro', 'grok']) {
         assertFalse(!!modelConfig.tiers[tier].supportsVision, `${tier} should not declare supportsVision`);
     }
 });
 
 runTest('fallbacks are non-empty for all tiers except the external providers', () => {
     // GLM/Kimi/DeepSeek are served by Z.AI/Moonshot/DeepSeek, not Anthropic — no auto-healing fallback chain applies.
-    const externalTiers = ['glm', 'kimi', 'dsflash', 'dspro', 'dsvision'];
+    const externalTiers = ['glm', 'kimi', 'dsflash', 'dspro', 'dsvision', 'grok'];
     for (const [tier, info] of Object.entries(modelConfig.tiers)) {
         if (externalTiers.includes(tier)) continue;
         assertTrue(info.fallbacks.length >= 1, `${tier} should have at least 1 fallback`);
@@ -640,6 +646,11 @@ runTest("calculateCostUsd matches DeepSeek Pro's higher rate vs dsflash/dsvision
     assertEquals(0.66 + 1.98, proCost, 'dspro cost should use $0.66 input + $1.98 output per MTok');
     assertEquals(flashCost, visionCost, "dsvision shares dsflash's rate card");
     assertTrue(proCost > flashCost, 'DeepSeek Pro should cost more than Flash for the same tokens');
+});
+
+runTest("calculateCostUsd uses xAI's short-prompt rate for grok", () => {
+    const grokCost = calculateCostUsd(modelConfig, 'grok', 1000000, 1000000);
+    assertEquals(2.00 + 6.00, grokCost, 'grok cost should use $2.00 input + $6.00 output per MTok');
 });
 
 // --- Input Size Cap Tests ---
@@ -708,7 +719,7 @@ runTest('glm is not downgraded by message count (no first-exchange restriction)'
 });
 
 runTest('kimi and deepseek tiers are not downgraded by message count', () => {
-    for (const tier of ['kimi', 'dsflash', 'dspro', 'dsvision']) {
+    for (const tier of ['kimi', 'dsflash', 'dspro', 'dsvision', 'grok']) {
         const model = tier;
         const messageCount = 25;
         assertEquals(tier, model, `${tier} should remain ${tier} regardless of message count`);
@@ -723,7 +734,7 @@ function supportsVisionForTier(config, tier) {
 }
 
 runTest('text-only external tiers reject image requests; dsvision does not', () => {
-    for (const tier of ['glm', 'kimi', 'dsflash', 'dspro']) {
+    for (const tier of ['glm', 'kimi', 'dsflash', 'dspro', 'grok']) {
         const rejected = !supportsVisionForTier(modelConfig, tier) && true /* requestHasImages */;
         assertTrue(rejected, `A ${tier} request containing images should be rejected`);
     }
@@ -887,6 +898,8 @@ const COSTS = {
     'deepseek-v4-flash':         { input: 0.22,  output: 0.66 },
     'deepseek-v4-pro':           { input: 0.66,  output: 1.98 },
     'deepseek-v4-flash-vision-exp': { input: 0.22, output: 0.66 },
+    // xAI (Grok tier) - short-prompt rate (<200k prompt tokens).
+    'grok-4.6':                  { input: 2.00,  output: 6.00 },
 };
 
 function estimateCost(model, inputTokens, outputTokens) {

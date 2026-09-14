@@ -355,6 +355,12 @@ function getDefaultConfig(): array
                 'supportsVision' => true,
                 'pricing' => ['input_per_mtok' => 0.22, 'output_per_mtok' => 0.66],
             ],
+            'grok' => [
+                'provider' => 'xai',
+                'primary' => 'grok-4.6',
+                'fallbacks' => [],
+                'pricing' => ['input_per_mtok' => 2.00, 'output_per_mtok' => 6.00],
+            ],
         ],
     ];
 }

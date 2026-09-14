@@ -84,6 +84,16 @@
         "output_per_mtok": 1.98
       }
     },
+    "grok": {
+      "_comment": "Grok 4.6 served by xAI, via its OpenAI-compatible /v1/chat/completions endpoint (xAI's docs now lead with the newer Responses API at /v1/responses, but chat/completions is still live and is what this proxy speaks). Text only: xAI's current model table lists no vision support for the 4.x text models, and this proxy would need the image_url translation anyway. Pricing is xAI's short-prompt rate ($2.00 in / $6.00 out per MTok for prompts under 200k tokens); prompts at or above 200k bill at double, which nothing here sends.",
+      "provider": "xai",
+      "primary": "grok-4.6",
+      "fallbacks": [],
+      "pricing": {
+        "input_per_mtok": 2.00,
+        "output_per_mtok": 6.00
+      }
+    },
     "dsvision": {
       "_comment": "DeepSeek V4 Flash Vision (experimental) — same text pricing/capability as dsflash, but supportsVision=true lets api-proxy.php translate Anthropic-style image blocks into OpenAI's image_url format instead of rejecting them. Images are billed at the input rate, up to 384 tokens each.",
       "provider": "deepseek",

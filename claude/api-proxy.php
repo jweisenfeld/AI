@@ -86,8 +86,8 @@ if (!$ANTHROPIC_API_KEY) {
 // a streaming rewrite.
 define('API_TIMEOUT_SECONDS', 240);
 
-// Non-Anthropic ("external") providers — Z.AI (GLM), Moonshot (Kimi), and
-// DeepSeek — are all OpenAI-compatible endpoints, each keyed by its own
+// Non-Anthropic ("external") providers — Z.AI (GLM), Moonshot (Kimi),
+// DeepSeek, and xAI (Grok) — are all OpenAI-compatible endpoints, each keyed by its own
 // secrets file. Keys are optional at boot; only required if a student
 // actually picks that tier, so a missing/unreadable file just means that
 // one tier is down.
@@ -106,6 +106,15 @@ $EXTERNAL_PROVIDERS = [
         'endpoint'    => 'https://api.deepseek.com/chat/completions',
         'secretsFile' => $secretsDir . '/deepseekkey.php',
         'secretKey'   => 'DEEPSEEK_API_KEY',
+    ],
+    // xAI's own docs now lead with the Responses API (POST /v1/responses), but
+    // the OpenAI-compatible /v1/chat/completions route is still live (verified:
+    // it answers 401 without a key, where an unknown route answers 404). This
+    // proxy speaks chat/completions, so that is the one to point at.
+    'xai' => [
+        'endpoint'    => 'https://api.x.ai/v1/chat/completions',
+        'secretsFile' => $secretsDir . '/grokkey.php',
+        'secretKey'   => 'GROK_API_KEY',
     ],
 ];
 
@@ -440,7 +449,7 @@ $isExternalProvider = $provider !== 'anthropic';
 // external providers, only tiers explicitly marked supportsVision (currently
 // just DeepSeek's vision-exp model) get their images translated to OpenAI's
 // image_url format in buildOpenAiCompatibleRequest() — everyone else (GLM,
-// Kimi K3, DeepSeek flash/pro) is text-only here, even where the underlying
+// Kimi K3, DeepSeek flash/pro, Grok) is text-only here, even where the underlying
 // model has vision (e.g. Kimi K3), because that translation isn't built yet.
 $supportsVision = !$isExternalProvider || !empty($config['tiers'][$requestedModel]['supportsVision']);
 
@@ -582,7 +591,7 @@ $onDelta = function (string $piece) use (&$streamStarted) {
     sendEvent('delta', ['text' => $piece]);
 };
 if ($isExternalProvider) {
-    // GLM/Kimi K3/DeepSeek: OpenAI-compatible endpoints, no auto-healing (single model, no fallbacks configured).
+    // GLM/Kimi K3/DeepSeek/Grok: OpenAI-compatible endpoints, no auto-healing (single model, no fallbacks configured).
     $fixedTemp = isset($config['tiers'][$requestedModel]['fixed_temperature'])
         ? (float)$config['tiers'][$requestedModel]['fixed_temperature']
         : null;
@@ -968,6 +977,14 @@ function loadModelConfig(string $configPath): array
                 // Same rate card as dsflash — images are billed at the input rate (up to 384 tok/image).
                 'pricing'        => ['input_per_mtok' => 0.22, 'output_per_mtok' => 0.66],
             ],
+            'grok'   => [
+                'provider'  => 'xai',
+                'primary'   => 'grok-4.6',
+                'fallbacks' => [],
+                // xAI's short-prompt rate (<200k prompt tokens). Long prompts bill
+                // at double; nothing this chatbot sends comes close to 200k.
+                'pricing'   => ['input_per_mtok' => 2.00, 'output_per_mtok' => 6.00],
+            ],
         ]
     ];
 }
@@ -1001,7 +1018,7 @@ function callAnthropicApi(array $apiRequest, string $apiKey): array
 
 /**
  * Convert an Anthropic-shaped request (built for callAnthropicApi) into the
- * OpenAI-compatible body Z.AI/Moonshot/DeepSeek's chat/completions endpoints
+ * OpenAI-compatible body Z.AI/Moonshot/DeepSeek/xAI's chat/completions endpoints
  * expect: a flat messages array (system prompt becomes a leading
  * {role: 'system'} message). When $supportsVision is false, message content
  * is flattened to plain text (images dropped — callers must reject image
@@ -1388,7 +1405,7 @@ function callAnthropicApiStreaming(
 }
 
 /**
- * Stream an OpenAI-compatible request (GLM / Kimi / DeepSeek), relaying text
+ * Stream an OpenAI-compatible request (GLM / Kimi / DeepSeek / Grok), relaying text
  * deltas through $onDelta. Same contract as callAnthropicApiStreaming().
  *
  * Token usage: streaming responses only report usage if asked, via

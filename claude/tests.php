@@ -110,7 +110,7 @@ function isValidTier(string $tier): bool
         }
     }
     // Fallback: check hardcoded tiers
-    return in_array($tier, ['haiku', 'sonnet', 'opus', 'glm', 'kimi', 'dsflash', 'dspro', 'dsvision'], true);
+    return in_array($tier, ['haiku', 'sonnet', 'opus', 'glm', 'kimi', 'dsflash', 'dspro', 'dsvision', 'grok'], true);
 }
 
 /**
@@ -173,6 +173,12 @@ function loadModelConfig(string $configPath): array
                 'fallbacks'      => [],
                 'supportsVision' => true,
                 'pricing'        => ['input_per_mtok' => 0.22, 'output_per_mtok' => 0.66],
+            ],
+            'grok'   => [
+                'provider'  => 'xai',
+                'primary'   => 'grok-4.6',
+                'fallbacks' => [],
+                'pricing'   => ['input_per_mtok' => 2.00, 'output_per_mtok' => 6.00],
             ],
         ]
     ];
@@ -324,6 +330,10 @@ runTest('accepts glm tier', function() {
 
 runTest('accepts kimi tier', function() {
     assertTrue(isValidTier('kimi'), 'Kimi should be a valid tier');
+});
+
+runTest('accepts the grok tier', function() {
+    assertTrue(isValidTier('grok'), 'Grok should be a valid tier');
 });
 
 runTest('accepts dsflash, dspro, and dsvision tiers', function() {
@@ -723,7 +733,7 @@ runTest('model_config.json exists and is valid JSON', function() {
     assertArrayHasKey('tiers', $config, 'Config should have tiers');
 });
 
-runTest('model_config.json has all eight tiers', function() {
+runTest('model_config.json has all nine tiers', function() {
     $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
     assertArrayHasKey('haiku', $config['tiers'], 'Should have haiku tier');
     assertArrayHasKey('sonnet', $config['tiers'], 'Should have sonnet tier');
@@ -733,7 +743,8 @@ runTest('model_config.json has all eight tiers', function() {
     assertArrayHasKey('dsflash', $config['tiers'], 'Should have dsflash tier');
     assertArrayHasKey('dspro', $config['tiers'], 'Should have dspro tier');
     assertArrayHasKey('dsvision', $config['tiers'], 'Should have dsvision tier');
-    assertEquals(8, count($config['tiers']), 'Should have exactly 8 tiers');
+    assertArrayHasKey('grok', $config['tiers'], 'Should have grok tier');
+    assertEquals(9, count($config['tiers']), 'Should have exactly 9 tiers');
 });
 
 runTest('each tier has pricing information', function() {
@@ -775,6 +786,7 @@ runTest('all primary models use current generation IDs', function() {
     $dsFlashPrimary = $config['tiers']['dsflash']['primary'];
     $dsProPrimary = $config['tiers']['dspro']['primary'];
     $dsVisionPrimary = $config['tiers']['dsvision']['primary'];
+    $grokPrimary = $config['tiers']['grok']['primary'];
     // Should be snapshot or alias IDs, not deprecated models
     assertContains('haiku-4-5', $haikuPrimary, 'Haiku primary should be 4.5 series');
     assertContains('sonnet-5', $sonnetPrimary, 'Sonnet primary should be 5');
@@ -784,6 +796,7 @@ runTest('all primary models use current generation IDs', function() {
     assertContains('deepseek-v4-flash', $dsFlashPrimary, 'DeepSeek Flash primary should be deepseek-v4-flash');
     assertContains('deepseek-v4-pro', $dsProPrimary, 'DeepSeek Pro primary should be deepseek-v4-pro');
     assertContains('deepseek-v4-flash-vision-exp', $dsVisionPrimary, 'DeepSeek Vision primary should be the vision-exp model');
+    assertContains('grok-4.6', $grokPrimary, 'Grok primary should be 4.6');
 });
 
 runTest('glm tier is marked with the zai provider', function() {
@@ -803,10 +816,15 @@ runTest('dsflash, dspro, and dsvision tiers are marked with the deepseek provide
     assertEquals('deepseek', $config['tiers']['dsvision']['provider'] ?? null, 'dsvision should declare provider=deepseek');
 });
 
+runTest('grok tier is marked with the xai provider', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    assertEquals('xai', $config['tiers']['grok']['provider'] ?? null, 'Grok tier should declare provider=xai');
+});
+
 runTest('only dsvision declares supportsVision among the external providers', function() {
     $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
     assertTrue(!empty($config['tiers']['dsvision']['supportsVision']), 'dsvision should declare supportsVision=true');
-    foreach (['glm', 'kimi', 'dsflash', 'dspro'] as $tier) {
+    foreach (['glm', 'kimi', 'dsflash', 'dspro', 'grok'] as $tier) {
         assertFalse(!empty($config['tiers'][$tier]['supportsVision'] ?? false), "{$tier} should not declare supportsVision");
     }
 });
@@ -816,7 +834,7 @@ runTest('fallbacks are non-empty for all tiers except the external providers', f
     // the Anthropic auto-healing fallback chain doesn't apply, so empty
     // fallback lists are intentional.
     $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
-    $externalTiers = ['glm', 'kimi', 'dsflash', 'dspro', 'dsvision'];
+    $externalTiers = ['glm', 'kimi', 'dsflash', 'dspro', 'dsvision', 'grok'];
     foreach ($config['tiers'] as $tier => $info) {
         if (in_array($tier, $externalTiers, true)) continue;
         assertTrue(count($info['fallbacks']) >= 1, "{$tier} should have at least 1 fallback");
@@ -837,7 +855,7 @@ runTest('hardcoded fallback matches model_config.json', function() {
     // Load hardcoded fallback (by passing a nonexistent path)
     $hardcoded = loadModelConfig('/nonexistent/path');
 
-    foreach (['haiku', 'sonnet', 'opus', 'glm', 'kimi', 'dsflash', 'dspro', 'dsvision'] as $tier) {
+    foreach (['haiku', 'sonnet', 'opus', 'glm', 'kimi', 'dsflash', 'dspro', 'dsvision', 'grok'] as $tier) {
         assertEquals(
             $fileConfig['tiers'][$tier]['primary'],
             $hardcoded['tiers'][$tier]['primary'],
@@ -873,6 +891,12 @@ runTest('calculateCostUsd matches DeepSeek Pro\'s higher rate vs dsflash/dsvisio
     assertEquals(0.66 + 1.98, $proCost, 'dspro cost should use $0.66 input + $1.98 output per MTok');
     assertEquals($flashCost, $visionCost, 'dsvision shares dsflash\'s rate card');
     assertTrue($proCost > $flashCost, 'DeepSeek Pro should cost more than Flash for the same tokens');
+});
+
+runTest('calculateCostUsd uses xAI\'s short-prompt rate for grok', function() {
+    $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
+    $grokCost = calculateCostUsd($config, 'grok', 1000000, 1000000);
+    assertEquals(2.00 + 6.00, $grokCost, 'grok cost should use $2.00 input + $6.00 output per MTok');
 });
 
 // --- Input Size Cap Tests ---
@@ -954,7 +978,7 @@ runTest('glm is not downgraded by message count (no first-exchange restriction)'
 });
 
 runTest('kimi and deepseek tiers are not downgraded by message count', function() {
-    foreach (['kimi', 'dsflash', 'dspro', 'dsvision'] as $tier) {
+    foreach (['kimi', 'dsflash', 'dspro', 'dsvision', 'grok'] as $tier) {
         $model = $tier;
         $messageCount = 25;
         assertEquals($tier, $model, "{$tier} should remain {$tier} regardless of message count");
@@ -973,7 +997,7 @@ function supportsVisionForTier(array $config, string $tier): bool
 
 runTest('text-only external tiers reject image requests; dsvision does not', function() {
     $config = json_decode(file_get_contents(__DIR__ . '/model_config.json'), true);
-    foreach (['glm', 'kimi', 'dsflash', 'dspro'] as $tier) {
+    foreach (['glm', 'kimi', 'dsflash', 'dspro', 'grok'] as $tier) {
         $rejected = (!supportsVisionForTier($config, $tier) && true /* requestHasImages */);
         assertTrue($rejected, "A {$tier} request containing images should be rejected");
     }

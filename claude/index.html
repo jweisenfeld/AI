@@ -1012,7 +1012,7 @@
                 </div>
                 <div class="feature-item" data-feature="models" onclick="selectFeature('models')">
                     <h3>Model Selection</h3>
-                    <p>Choose between Opus, Sonnet, Haiku, GLM 5.3, Kimi K3, and DeepSeek</p>
+                    <p>Choose between Opus, Sonnet, Haiku, GLM 5.3, Kimi K3, DeepSeek, and Grok</p>
                 </div>
                 <div class="feature-item" data-feature="temperature" onclick="selectFeature('temperature')">
                     <h3>Temperature Control</h3>
@@ -1106,6 +1106,10 @@
                             <span class="model-name">DeepSeek Vision</span>
                             <span class="model-desc">$ &#128247;</span>
                         </button>
+                        <button class="model-btn" data-model="grok" onclick="selectModel(this)" title="Grok 4.6 (xAI). Text only — no image support yet.">
+                            <span class="model-name">Grok 4.6</span>
+                            <span class="model-desc">$$</span>
+                        </button>
                     </div>
                 </div>
                 <div class="settings-row">
@@ -1139,7 +1143,7 @@
                         <ul>
                             <li><strong>Vision</strong> - Paste (Ctrl+V), drag & drop, or click the camera button to add images</li>
                             <li><strong>System Prompts</strong> - Click "System Prompts" to customize my behavior</li>
-                            <li><strong>Model Selection</strong> - Switch between Haiku, Sonnet, Opus, GLM 5.3, Kimi K3, and 3 DeepSeek models above</li>
+                            <li><strong>Model Selection</strong> - Switch between Haiku, Sonnet, Opus, GLM 5.3, Kimi K3, 3 DeepSeek models, and Grok 4.6 above</li>
                             <li><strong>Temperature</strong> - Adjust the slider to control creativity</li>
                         </ul>
                     </div>
@@ -1317,7 +1321,7 @@
             },
             models: {
                 title: 'Model Selection',
-                description: 'Choose the right model for your task: Haiku (fastest, cheapest), Sonnet (balanced), Opus (most capable), GLM 5.3 (Z.AI, default), Kimi K3 (Moonshot.ai), or DeepSeek Flash/Pro/Vision (DeepSeek Vision is the only non-Anthropic model that accepts images).',
+                description: 'Choose the right model for your task: Haiku (fastest, cheapest), Sonnet (balanced), Opus (most capable), GLM 5.3 (Z.AI, default), Kimi K3 (Moonshot.ai), Grok 4.6 (xAI), or DeepSeek Flash/Pro/Vision (DeepSeek Vision is the only non-Anthropic model that accepts images).',
                 prompt: 'Switch models above and ask the same question to compare responses.'
             },
             temperature: {

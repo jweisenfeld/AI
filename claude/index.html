@@ -354,6 +354,36 @@
             tab-size: 4;
         }
 
+        /* A streaming reply gets a blinking caret so it's obvious the answer is
+           still being written rather than finished and short. */
+        .message.streaming .message-content::after {
+            content: '';
+            display: inline-block;
+            width: 7px;
+            height: 1em;
+            margin-left: 2px;
+            background: currentColor;
+            opacity: 0.6;
+            vertical-align: text-bottom;
+            animation: caret-blink 1s steps(2, start) infinite;
+        }
+
+        @keyframes caret-blink { to { visibility: hidden; } }
+
+        /* While a reply is still arriving, its last code fence is legitimately
+           unclosed — the model hasn't written the closing fence yet. The
+           renderer's "cut off" warning is right for a finished answer and wrong
+           for one in progress, so hide it until the stream ends. */
+        .message.streaming .code-cutoff { display: none; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .message.streaming .message-content::after { animation: none; }
+        }
+
+        .send-btn.stopping {
+            background: #b91c1c;
+        }
+
         /* Restriction banner — what this account can and can't do right now. */
         .restriction-banner {
             display: flex;
@@ -1132,7 +1162,7 @@
                         </div>
                         <input type="file" id="file-input" accept="image/*" multiple onchange="handleFileSelect(event)">
                     </div>
-                    <button class="send-btn" id="send-btn" onclick="sendMessage()">
+                    <button class="send-btn" id="send-btn" onclick="handleSendClick()">
                         Send
                     </button>
                 </div>
@@ -1468,9 +1498,9 @@
             document.getElementById('image-preview').innerHTML = '';
             autoResize(input);
 
-            // Show loading
+            // Show loading. The button becomes Stop for the duration.
             isLoading = true;
-            document.getElementById('send-btn').disabled = true;
+            setSendingState(true);
             updateStatus('Thinking...');
 
             const loadingDiv = createLoadingMessage();
@@ -1499,16 +1529,42 @@
                     requestBody.system = systemPrompt;
                 }
 
+                // Ask for a streamed reply. The server opens the event stream only
+                // when the first text arrives, so an error raised before then still
+                // comes back as ordinary JSON and is handled exactly as before.
+                requestBody.stream = true;
+
+                streamAbort = new AbortController();
                 const response = await fetch('api-proxy.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestBody)
+                    body: JSON.stringify(requestBody),
+                    signal: streamAbort.signal
                 });
 
-                const data = await response.json();
+                const isStream = (response.headers.get('content-type') || '').includes('text/event-stream');
 
-                // Remove loading
-                loadingDiv.remove();
+                let data;
+                if (isStream) {
+                    data = await consumeAssistantStream(response, loadingDiv);
+                    if (data.aborted) {
+                        // Student pressed Stop. Keep what arrived: it is a real
+                        // partial answer, and for code that is often still useful.
+                        if (data.text.trim()) {
+                            messages.push({ role: 'assistant', content: data.text });
+                        } else {
+                            rollBackUserTurn(userTurn, text, sentImages);
+                        }
+                        finishStreamedMessage({ stopped: true });
+                        updateStatus('Stopped');
+                        isLoading = false;
+                        setSendingState(false);
+                        return;
+                    }
+                } else {
+                    data = await response.json();
+                    loadingDiv.remove();
+                }
 
                 if (data.error) {
                     // Show contextual tip for specific error types
@@ -1525,11 +1581,11 @@
                     throw Object.assign(new Error(data.error.message || JSON.stringify(data.error)), { known: knownTypes.includes(data.error.type) });
                 }
 
-                // Extract response
-                const assistantText = data.content
-                    .filter(c => c.type === 'text')
-                    .map(c => c.text)
-                    .join('\n');
+                // Extract response. A streamed reply was accumulated as it
+                // arrived; a JSON one still comes back as content blocks.
+                const assistantText = isStream
+                    ? data.text
+                    : data.content.filter(c => c.type === 'text').map(c => c.text).join(String.fromCharCode(10));
 
                 // Update token tracking
                 if (data.usage) {
@@ -1549,15 +1605,20 @@
                     appendMessage('assistant', 'That model returned an empty answer (it used its whole response budget without writing one). Try a smaller request, or switch models.\n\nYour message is back in the box — it was not added to the conversation.', [], data.usage, data.model);
                     updateStatus('Empty response');
                     isLoading = false;
-                    document.getElementById('send-btn').disabled = false;
+                    setSendingState(false);
                     return;
                 }
 
                 // Add to conversation
                 messages.push({ role: 'assistant', content: assistantText });
 
-                // Render with metadata
-                appendMessage('assistant', assistantText, [], data.usage, data.model);
+                // A streamed answer is already on screen — it just needs its
+                // token-count footer now that the totals are known.
+                if (isStream) {
+                    finishStreamedMessage(data);
+                } else {
+                    appendMessage('assistant', assistantText, [], data.usage, data.model);
+                }
 
                 // The reply hit the 8192-token output cap — still possible for very
                 // long code answers. Tell the student rather than leaving them with
@@ -1603,7 +1664,7 @@
             }
 
             isLoading = false;
-            document.getElementById('send-btn').disabled = false;
+            setSendingState(false);
         }
 
         function appendMessage(role, content, images = [], usage = null, modelId = null) {
@@ -1654,6 +1715,177 @@
                 </div>
             `;
             return div;
+        }
+
+        /**
+         * The Send button becomes Stop while a reply is streaming, so there is
+         * one obvious control rather than two competing ones.
+         */
+        function handleSendClick() {
+            if (isLoading) stopStreaming();
+            else sendMessage();
+        }
+
+        // ============================================
+        // STREAMING
+        // ============================================
+        // The proxy sends Server-Sent Events: `delta` carries text as the model
+        // writes it, `done` carries the totals afterwards, `error` reports a
+        // failure that happened after text was already on screen.
+
+        let streamAbort = null;      // AbortController for the in-flight reply
+        let streamingEl = null;      // the message element being written into
+
+        /**
+         * Create the assistant bubble that a streamed reply is written into,
+         * replacing the loading indicator.
+         */
+        function beginStreamingMessage(loadingDiv) {
+            if (loadingDiv) loadingDiv.remove();
+
+            const div = document.createElement('div');
+            div.className = 'message assistant streaming';
+            div.innerHTML =
+                '<div class="message-header"><span>Claude</span></div>' +
+                '<div class="message-content"></div>';
+            document.getElementById('chat-messages').appendChild(div);
+            streamingEl = div;
+            return div;
+        }
+
+        /**
+         * Read the event stream, painting text as it arrives.
+         *
+         * Rendering is throttled to animation frames rather than run per token:
+         * formatMessage() re-parses the whole answer each time, and at ~50
+         * tokens a second that would burn a Chromebook's CPU for no visible
+         * gain. Partial code blocks render correctly mid-stream because the
+         * renderer already treats an unclosed fence as a code block.
+         */
+        async function consumeAssistantStream(response, loadingDiv) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            let buffer = '';
+            let eventName = 'message';
+            let text = '';
+            let meta = null;
+            let failure = null;
+            let aborted = false;
+            let painting = false;
+
+            const contentEl = () => streamingEl && streamingEl.querySelector('.message-content');
+            const paint = () => {
+                if (painting) return;
+                painting = true;
+                requestAnimationFrame(() => {
+                    painting = false;
+                    const el = contentEl();
+                    if (el) {
+                        el.innerHTML = formatMessage(text);
+                        // Only follow the text down if the student hasn't scrolled
+                        // up to read something earlier.
+                        const box = document.getElementById('chat-messages');
+                        const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 120;
+                        if (atBottom) box.scrollTop = box.scrollHeight;
+                    }
+                });
+            };
+
+            try {
+                for (;;) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+
+                    let nl;
+                    while ((nl = buffer.indexOf('\n')) !== -1) {
+                        const line = buffer.slice(0, nl).replace(/\r$/, '');
+                        buffer = buffer.slice(nl + 1);
+
+                        if (line === '') { eventName = 'message'; continue; }
+                        if (line.startsWith(':')) continue;          // comment/padding
+                        if (line.startsWith('event:')) { eventName = line.slice(6).trim(); continue; }
+                        if (!line.startsWith('data:')) continue;
+
+                        let payload;
+                        try { payload = JSON.parse(line.slice(5).trim()); }
+                        catch (e) { continue; }
+
+                        if (eventName === 'delta') {
+                            if (!streamingEl) beginStreamingMessage(loadingDiv);
+                            text += payload.text || '';
+                            paint();
+                        } else if (eventName === 'done') {
+                            meta = payload;
+                        } else if (eventName === 'error') {
+                            failure = payload;
+                        }
+                    }
+                }
+            } catch (err) {
+                if (err.name === 'AbortError') aborted = true;
+                else throw err;
+            } finally {
+                streamAbort = null;
+            }
+
+            // Final repaint outside the animation frame, so the finished answer
+            // is definitely on screen before anything reads from the DOM.
+            const el = contentEl();
+            if (el) el.innerHTML = formatMessage(text);
+
+            if (failure) {
+                return { text, error: failure, aborted: false };
+            }
+            return Object.assign({ text, aborted }, meta || {});
+        }
+
+        /**
+         * Finish off a streamed message: drop the streaming marker and add the
+         * token footer, matching what appendMessage() renders for a whole reply.
+         */
+        function finishStreamedMessage(data) {
+            if (!streamingEl) return;
+            streamingEl.classList.remove('streaming');
+
+            const content = streamingEl.querySelector('.message-content');
+            const header = streamingEl.querySelector('.message-header span');
+            if (header && data && data.model) header.textContent = formatModelLabel(data.model);
+
+            if (content && data && data.usage) {
+                const estimated = data.usage_estimated ? ' (estimated)' : '';
+                const meta = document.createElement('div');
+                meta.className = 'message-meta';
+                meta.textContent =
+                    `Input: ${data.usage.input_tokens} tokens | Output: ${data.usage.output_tokens} tokens${estimated}`;
+                content.appendChild(meta);
+            }
+            if (content && data && data.stopped) {
+                const note = document.createElement('div');
+                note.className = 'message-meta';
+                note.textContent = 'Stopped — this answer is incomplete.';
+                content.appendChild(note);
+            }
+            streamingEl = null;
+        }
+
+        /**
+         * Swap the Send button between sending and stopping.
+         */
+        function setSendingState(sending) {
+            const btn = document.getElementById('send-btn');
+            if (!btn) return;
+            btn.disabled = false;
+            btn.textContent = sending ? 'Stop' : 'Send';
+            btn.classList.toggle('stopping', sending);
+        }
+
+        /**
+         * Abort the reply in flight. Whatever already arrived stays on screen.
+         */
+        function stopStreaming() {
+            if (streamAbort) streamAbort.abort();
         }
 
         /**

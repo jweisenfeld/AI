@@ -11,10 +11,15 @@ with its indentation. Exit code is 0 only if every tier passed.
 This tests the deployed site, not your working copy — upload your changes
 first, then run this to confirm students will get what you expect.
 
-    python smoke-test.py                 # all tiers, text only
+    python smoke-test.py                 # all tiers, streaming (what students get)
+    python smoke-test.py --no-stream     # the non-streaming path instead
     python smoke-test.py --tier dspro    # just one tier
     python smoke-test.py --with-image    # also send a test image to vision tiers
     python smoke-test.py --verbose       # print each answer in full
+
+STREAMING is on by default because index.html streams: testing the other path
+would be testing code no student runs. Each run also reports time-to-first-token,
+which is the number streaming exists to improve.
 
 CREDENTIALS — this script never stores or prints your password. Set them in
 the environment before running:
@@ -182,12 +187,37 @@ def test_tier(tier, tier_cfg, token, student_id, config, args):
         "student_id": student_id,
         "session_token": token,
     }
+    if not args.no_stream:
+        body["stream"] = True
 
     started = time.time()
     try:
-        resp = requests.post(PROXY_URL, headers=HEADERS, json=body, timeout=180)
+        resp = requests.post(PROXY_URL, headers=HEADERS, json=body,
+                             timeout=300, stream=not args.no_stream)
     except requests.RequestException as exc:
         return {"tier": tier, "ok": False, "note": f"request failed: {exc}", "seconds": time.time() - started}
+
+    # The proxy only opens an event stream once the first text arrives, so an
+    # error raised before then still comes back as ordinary JSON.
+    first_token = None
+    if "text/event-stream" in (resp.headers.get("Content-Type") or ""):
+        data, first_token = read_event_stream(resp, started)
+        elapsed = time.time() - started
+        result = {
+            "tier": tier, "http": resp.status_code, "seconds": elapsed,
+            "first_token": first_token, "streamed": True,
+            "model": data.get("model"), "stop_reason": data.get("stop_reason"),
+            "usage": data.get("usage"), "image": use_image,
+            "usage_estimated": data.get("usage_estimated"),
+        }
+        result["cost"] = estimate_cost(config, tier, data.get("usage"))
+        if data.get("error"):
+            err = data["error"]
+            result["ok"] = False
+            result["note"] = f"{err.get('type', 'error')}: {err.get('message', err)}"
+            return result
+        return finish_result(result, data.get("text", ""), use_image)
+
     elapsed = time.time() - started
 
     try:
@@ -221,6 +251,57 @@ def test_tier(tier, tier_cfg, token, student_id, config, args):
     text = "".join(
         block.get("text", "") for block in data.get("content", []) if block.get("type") == "text"
     )
+    return finish_result(result, text, use_image)
+
+
+def read_event_stream(resp, started):
+    """Read the proxy's SSE reply, returning (data, seconds-to-first-token).
+
+    Mirrors consumeAssistantStream() in index.html: `delta` events carry text,
+    `done` carries the totals, `error` reports a failure after text began.
+    """
+    text = ""
+    meta = {}
+    failure = None
+    first_token = None
+    event = "message"
+
+    for raw in resp.iter_lines(chunk_size=1, decode_unicode=True):
+        if raw is None:
+            continue
+        line = raw.rstrip("\r")
+        if line == "":
+            event = "message"
+            continue
+        if line.startswith(":"):
+            continue
+        if line.startswith("event:"):
+            event = line[6:].strip()
+            continue
+        if not line.startswith("data:"):
+            continue
+        try:
+            payload = json.loads(line[5:].strip())
+        except ValueError:
+            continue
+        if event == "delta":
+            if first_token is None:
+                first_token = time.time() - started
+            text += payload.get("text", "")
+        elif event == "done":
+            meta = payload
+        elif event == "error":
+            failure = payload
+
+    out = dict(meta)
+    out["text"] = text
+    if failure:
+        out["error"] = failure
+    return out, first_token
+
+
+def finish_result(result, text, use_image):
+    """Judge one answer the same way regardless of how it was transported."""
     result["text"] = text
     result["chars"] = len(text)
 
@@ -239,7 +320,7 @@ def test_tier(tier, tier_cfg, token, student_id, config, args):
     note, ok = check_code_block(text)
     result["ok"] = ok
     result["note"] = note
-    if result["stop_reason"] == "max_tokens":
+    if result.get("stop_reason") == "max_tokens":
         result["ok"] = False
         result["note"] += " + hit the token cap"
     return result
@@ -250,7 +331,15 @@ def main():
     parser.add_argument("--tier", help="test only this tier (e.g. dspro)")
     parser.add_argument("--with-image", action="store_true", help="send a test image to vision-capable tiers")
     parser.add_argument("--verbose", action="store_true", help="print each answer in full")
+    parser.add_argument("--no-stream", action="store_true",
+                        help="use the non-streaming path instead of streaming")
+    parser.add_argument("--url", default=None,
+                        help="proxy URL to test (defaults to the live site)")
     args = parser.parse_args()
+
+    if args.url:
+        global PROXY_URL
+        PROXY_URL = args.url
 
     config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
     tiers = config.get("tiers", {})
@@ -273,7 +362,8 @@ def main():
             f"force every tier to Haiku, so these results say nothing about the other\n"
             f"models. Run this Mon-Fri 7AM-5PM Pacific, or from an unlimited account.{RESET}"
         )
-    print(f"Testing {len(tiers)} tier(s)...\n")
+    transport = "non-streaming" if args.no_stream else "streaming"
+    print(f"Testing {len(tiers)} tier(s), {transport}...\n")
 
     results = []
     for tier, tier_cfg in tiers.items():
@@ -281,7 +371,12 @@ def main():
         result = test_tier(tier, tier_cfg, token, student_id, config, args)
         results.append(result)
         mark = f"{GREEN}PASS{RESET}" if result["ok"] else f"{RED}FAIL{RESET}"
-        print(f"{mark}  {result['seconds']:.1f}s  {result['note']}")
+        ttft = result.get("first_token")
+        timing = f"{result['seconds']:.1f}s" + (f" (first token {ttft:.1f}s)" if ttft else "")
+        print(f"{mark}  {timing}  {result['note']}")
+        if result.get("usage_estimated"):
+            print(f"            {YELLOW}token counts are ESTIMATED "
+                  f"(provider sent no usage on the stream){RESET}")
 
         expected = tier_cfg.get("primary")
         got = result.get("model")

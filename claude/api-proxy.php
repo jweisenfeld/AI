@@ -552,6 +552,21 @@ $logEntry['provider'] = $provider;
 // real timeout error the student can read rather than a truncated 500.
 @set_time_limit(API_TIMEOUT_SECONDS + 60);
 $modelHealed = false;
+
+// Streaming is opt-in per request. The SSE response is opened LAZILY, on the
+// first text delta — until then nothing has been written, so every error path
+// below can still answer with ordinary JSON and the frontend handles it
+// exactly as it always has. It also means auto-healing can still retry a
+// fallback model after a failure, because nothing reached the screen yet.
+$wantsStream   = !empty($requestData['stream']);
+$streamStarted = false;
+$onDelta = function (string $piece) use (&$streamStarted) {
+    if (!$streamStarted) {
+        beginEventStream();
+        $streamStarted = true;
+    }
+    sendEvent('delta', ['text' => $piece]);
+};
 if ($isExternalProvider) {
     // GLM/Kimi K3/DeepSeek: OpenAI-compatible endpoints, no auto-healing (single model, no fallbacks configured).
     $fixedTemp = isset($config['tiers'][$requestedModel]['fixed_temperature'])
@@ -560,32 +575,46 @@ if ($isExternalProvider) {
     $externalRequest = buildOpenAiCompatibleRequest($apiRequest, $resolvedModel, $supportsVision, $fixedTemp);
     $endpoint = $EXTERNAL_PROVIDERS[$provider]['endpoint'];
     $apiKey   = $EXTERNAL_API_KEYS[$provider];
-    list($httpCode, $rawResponse, $curlError) = callOpenAiCompatibleApi($endpoint, $externalRequest, $apiKey);
-
-    if ($curlError) {
-        http_response_code(504);
-        echo json_encode(['error' => describeConnectionFailure($curlError, $provider)]);
-        exit;
+    if ($wantsStream) {
+        list($httpCode, $responseData, $curlError) = callOpenAiCompatibleApiStreaming(
+            $endpoint, $externalRequest, $apiKey, $onDelta
+        );
+    } else {
+        list($httpCode, $rawResponse, $curlError) = callOpenAiCompatibleApi($endpoint, $externalRequest, $apiKey);
+        $responseData = normalizeOpenAiCompatibleResponse(json_decode($rawResponse, true), $resolvedModel);
     }
 
-    $responseData = normalizeOpenAiCompatibleResponse(json_decode($rawResponse, true), $resolvedModel);
+    if ($curlError) {
+        emitFailure($streamStarted, 504, describeConnectionFailure($curlError, $provider));
+    }
+
     if (isset($responseData['error']) && $httpCode < 400) {
         $httpCode = 502; // Provider returned 2xx but no usable content — treat as an upstream failure
     }
     $response = json_encode($responseData);
 } else {
     // Anthropic: auto-healing fallback across tier's configured backup models.
-    list($httpCode, $response, $curlError) = callAnthropicApi($apiRequest, $ANTHROPIC_API_KEY);
+    // The streaming and non-streaming calls are interchangeable here because
+    // the streaming one returns the same response shape, JSON-encoded.
+    $callAnthropic = function (array $req) use ($ANTHROPIC_API_KEY, $wantsStream, $onDelta, &$streamStarted) {
+        if ($wantsStream && !$streamStarted) {
+            list($code, $data, $err) = callAnthropicApiStreaming($req, $ANTHROPIC_API_KEY, $onDelta);
+            return [$code, json_encode($data), $err];
+        }
+        return callAnthropicApi($req, $ANTHROPIC_API_KEY);
+    };
+
+    list($httpCode, $response, $curlError) = $callAnthropic($apiRequest);
 
     if ($curlError) {
-        http_response_code(504);
-        echo json_encode(['error' => describeConnectionFailure($curlError, 'anthropic')]);
-        exit;
+        emitFailure($streamStarted, 504, describeConnectionFailure($curlError, 'anthropic'));
     }
 
     $responseData = json_decode($response, true);
 
-    if (isModelError($httpCode, $responseData)) {
+    // Never heal once text is on the student's screen — a retry would stream a
+    // second copy of the answer on top of the first, and bill for both.
+    if (!$streamStarted && isModelError($httpCode, $responseData)) {
         $tierConfig = $config['tiers'][$requestedModel] ?? null;
         $fallbacks  = $tierConfig['fallbacks'] ?? [];
 
@@ -598,7 +627,7 @@ if ($isExternalProvider) {
 
             foreach ($fallbacks as $fallbackModel) {
                 $apiRequest['model'] = $fallbackModel;
-                list($fbHttpCode, $fbResponse, $fbCurlError) = callAnthropicApi($apiRequest, $ANTHROPIC_API_KEY);
+                list($fbHttpCode, $fbResponse, $fbCurlError) = $callAnthropic($apiRequest);
 
                 if ($fbCurlError) continue;
 
@@ -621,6 +650,20 @@ if ($isExternalProvider) {
                 }
         }
     }
+    }
+}
+
+// Streaming responses only carry usage if the provider honoured
+// stream_options.include_usage. When one doesn't, estimate from the text
+// rather than logging a request that cost real money as free — and flag the
+// entry so the dashboard's numbers are never mistaken for measured ones.
+if ($wantsStream && is_array($responseData) && !isset($responseData['error'])) {
+    $reportedTokens = (int)($responseData['usage']['input_tokens'] ?? 0)
+                    + (int)($responseData['usage']['output_tokens'] ?? 0);
+    if ($reportedTokens === 0) {
+        $streamedText = $responseData['content'][0]['text'] ?? '';
+        $responseData['usage'] = estimateUsage($lastUserText, $streamedText);
+        $logEntry['usage_estimated'] = true;
     }
 }
 
@@ -683,11 +726,31 @@ if ($opusDowngraded && is_array($responseData)) {
 // runs before echo the browser receives an empty body and throws
 // "Unexpected end of JSON input".  Closing the connection first lets the
 // student's page load instantly while PHP finishes the alert in the background.
-http_response_code($httpCode);
-header('Content-Length: ' . strlen($response));
-header('Connection: close');
-echo $response;
-flush();
+if ($streamStarted) {
+    // The answer is already on screen; this final event carries the metadata
+    // the page needs afterwards — token counts, the model that actually
+    // replied, truncation, and the refreshed restriction banner.
+    if (is_array($responseData) && isset($responseData['error'])) {
+        sendEvent('error', $responseData['error']);
+    } else {
+        sendEvent('done', [
+            'usage'           => $responseData['usage'] ?? null,
+            'model'           => $responseData['model'] ?? $resolvedModel,
+            'stop_reason'     => $responseData['stop_reason'] ?? null,
+            'usage_estimated' => !empty($logEntry['usage_estimated']),
+            '_restrictions'   => $responseData['_restrictions'] ?? null,
+            '_notice'         => $responseData['_notice'] ?? null,
+            '_opus_limited'   => $responseData['_opus_limited'] ?? null,
+        ]);
+    }
+    flush();
+} else {
+    http_response_code($httpCode);
+    header('Content-Length: ' . strlen($response));
+    header('Connection: close');
+    echo $response;
+    flush();
+}
 if (function_exists('fastcgi_finish_request')) {
     fastcgi_finish_request();
 }
@@ -1104,6 +1167,331 @@ function normalizeOpenAiCompatibleResponse(?array $raw, string $fallbackModel): 
         'usage'   => $usage,
         'model' => $raw['model'] ?? $fallbackModel,
         'stop_reason' => $stopReason,
+    ];
+}
+
+/**
+ * ============================================
+ * STREAMING (Server-Sent Events)
+ * ============================================
+ * The client opts in with "stream": true. Everything downstream of the API
+ * call — logging, cost, safety alerts, the restriction banner — is unchanged:
+ * these functions relay text to the browser as it arrives AND accumulate the
+ * whole answer, then hand back the same response shape the non-streaming path
+ * builds. That way there is one pipeline, not two.
+ *
+ * Verified against psd1.net with stream-test.php: chunks arrive as written,
+ * with no buffering anywhere in the hosting stack.
+ */
+
+/**
+ * Open an SSE response: headers, plus every buffering layer PHP controls
+ * turned off. gzip is explicitly disabled — the spike measured it costing
+ * about half a second to first byte for no benefit on a text stream.
+ */
+function beginEventStream(): void
+{
+    @ini_set('zlib.output_compression', '0');
+    @ini_set('output_buffering', '0');
+    @ini_set('implicit_flush', '1');
+    while (ob_get_level() > 0) {
+        @ob_end_flush();
+    }
+    @ob_implicit_flush(true);
+
+    // Anything PHP prints mid-stream lands inside an SSE frame and corrupts it,
+    // so notices go to the error log only from here on.
+    @ini_set('display_errors', '0');
+
+    header('Content-Type: text/event-stream; charset=utf-8');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    header('X-Accel-Buffering: no');
+    header_remove('Content-Encoding');
+}
+
+/**
+ * Write one SSE event and push it out immediately.
+ */
+function sendEvent(string $event, array $data): void
+{
+    echo "event: {$event}\n";
+    echo 'data: ' . json_encode($data, JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE) . "\n\n";
+    @flush();
+}
+
+/**
+ * Build a cURL write callback that splits arbitrary network chunks into whole
+ * lines before handing them on.
+ *
+ * cURL hands over whatever arrived, which can cut an SSE line in half — a
+ * naive parser silently drops or corrupts those. Anything left over stays in
+ * $buffer until the rest of the line turns up.
+ *
+ * $buffer is the CALLER's variable so that whatever is still in it when the
+ * response ends can be flushed. Without that, a final line with no trailing
+ * newline is lost — which is precisely how an API error arrives: one line of
+ * JSON, no newline. Losing it turned a specific, actionable upstream message
+ * into a generic "the model API returned an error".
+ */
+function makeLineSplitter(callable $onLine, string &$buffer): callable
+{
+    $buffer = '';
+    return function ($ch, string $chunk) use (&$buffer, $onLine): int {
+        $buffer .= $chunk;
+        while (($pos = strpos($buffer, "\n")) !== false) {
+            $line = rtrim(substr($buffer, 0, $pos), "\r");
+            $buffer = substr($buffer, $pos + 1);
+            $onLine($line);
+        }
+        return strlen($chunk);
+    };
+}
+
+/**
+ * Stream an Anthropic Messages request, relaying text deltas through $onDelta.
+ *
+ * Returns [$httpCode, $responseData, $curlError] with $responseData in the
+ * same shape the non-streaming call produces, so callers can't tell which
+ * transport was used.
+ *
+ * If the API returns an error status, no deltas are emitted — the body is
+ * collected as JSON instead. That is what lets auto-healing still retry a
+ * fallback model: nothing has been written to the student's screen yet.
+ */
+function callAnthropicApiStreaming(
+    array $apiRequest,
+    string $apiKey,
+    callable $onDelta,
+    string $endpoint = 'https://api.anthropic.com/v1/messages'  // overridden by tests
+): array {
+    $apiRequest['stream'] = true;
+
+    $text = '';
+    $errorBody = '';
+    $model = $apiRequest['model'] ?? '';
+    $stopReason = null;
+    $inputTokens = 0;
+    $outputTokens = 0;
+    $httpCode = 0;
+    $tail = '';
+
+    $ch = curl_init($endpoint);
+
+    $onLine = function (string $line) use (
+        &$text, &$errorBody, &$model, &$stopReason, &$inputTokens, &$outputTokens, &$httpCode, $onDelta, &$ch
+    ) {
+        if ($httpCode === 0) {
+            $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        }
+        // An error response is JSON, not SSE — collect it verbatim.
+        if ($httpCode >= 400) {
+            $errorBody .= $line . "\n";
+            return;
+        }
+        if (strpos($line, 'data:') !== 0) {
+            return;
+        }
+        $payload = json_decode(trim(substr($line, 5)), true);
+        if (!is_array($payload)) {
+            return;
+        }
+        switch ($payload['type'] ?? '') {
+            case 'message_start':
+                $model = $payload['message']['model'] ?? $model;
+                $inputTokens = $payload['message']['usage']['input_tokens'] ?? 0;
+                break;
+            case 'content_block_delta':
+                $piece = $payload['delta']['text'] ?? '';
+                if ($piece !== '') {
+                    $text .= $piece;
+                    $onDelta($piece);
+                }
+                break;
+            case 'message_delta':
+                $stopReason = $payload['delta']['stop_reason'] ?? $stopReason;
+                $outputTokens = $payload['usage']['output_tokens'] ?? $outputTokens;
+                break;
+            case 'error':
+                $errorBody = json_encode($payload);
+                break;
+        }
+    };
+
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode($apiRequest),
+        CURLOPT_HTTPHEADER     => [
+            'Content-Type: application/json',
+            'x-api-key: ' . $apiKey,
+            'anthropic-version: 2023-06-01',
+            'Accept: text/event-stream',
+        ],
+        CURLOPT_TIMEOUT        => API_TIMEOUT_SECONDS,
+        CURLOPT_WRITEFUNCTION  => makeLineSplitter($onLine, $tail),
+    ]);
+    curl_exec($ch);
+    if ($tail !== '') {          // final line, no trailing newline
+        $onLine(rtrim($tail, ""));
+        $tail = '';
+    }
+    if ($httpCode === 0) {
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    }
+    // No curl_close() here: it's a deprecated no-op since PHP 8.0, and on 8.5 it
+    // emits a notice that would be written straight into the event stream.
+    $curlError = curl_error($ch);
+
+    if ($httpCode >= 400 || ($text === '' && $errorBody !== '')) {
+        $decoded = json_decode(trim($errorBody), true);
+        return [$httpCode ?: 502, is_array($decoded) ? $decoded : [
+            'error' => ['type' => 'api_error', 'message' => 'The model API returned an error.'],
+        ], $curlError];
+    }
+
+    return [$httpCode ?: 200, [
+        'content'     => [['type' => 'text', 'text' => $text]],
+        'usage'       => ['input_tokens' => $inputTokens, 'output_tokens' => $outputTokens],
+        'model'       => $model,
+        'stop_reason' => $stopReason,
+    ], $curlError];
+}
+
+/**
+ * Stream an OpenAI-compatible request (GLM / Kimi / DeepSeek), relaying text
+ * deltas through $onDelta. Same contract as callAnthropicApiStreaming().
+ *
+ * Token usage: streaming responses only report usage if asked, via
+ * stream_options.include_usage, which every provider here supports today. If
+ * a provider ever stops accepting it, usage comes back empty rather than
+ * wrong — the caller estimates and flags the log entry instead of silently
+ * recording a free request.
+ */
+function callOpenAiCompatibleApiStreaming(string $endpoint, array $body, string $apiKey, callable $onDelta): array
+{
+    $body['stream'] = true;
+    $body['stream_options'] = ['include_usage' => true];
+
+    $text = '';
+    $errorBody = '';
+    $model = $body['model'] ?? '';
+    $finish = null;
+    $inputTokens = 0;
+    $outputTokens = 0;
+    $httpCode = 0;
+    $tail = '';
+
+    $ch = curl_init($endpoint);
+
+    $onLine = function (string $line) use (
+        &$text, &$errorBody, &$model, &$finish, &$inputTokens, &$outputTokens, &$httpCode, $onDelta, &$ch
+    ) {
+        if ($httpCode === 0) {
+            $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        }
+        if ($httpCode >= 400) {
+            $errorBody .= $line . "\n";
+            return;
+        }
+        if (strpos($line, 'data:') !== 0) {
+            return;
+        }
+        $raw = trim(substr($line, 5));
+        if ($raw === '' || $raw === '[DONE]') {
+            return;
+        }
+        $payload = json_decode($raw, true);
+        if (!is_array($payload)) {
+            return;
+        }
+        if (isset($payload['error'])) {
+            $errorBody = $raw;
+            return;
+        }
+        $model = $payload['model'] ?? $model;
+        $piece = $payload['choices'][0]['delta']['content'] ?? '';
+        if (is_string($piece) && $piece !== '') {
+            $text .= $piece;
+            $onDelta($piece);
+        }
+        $finish = $payload['choices'][0]['finish_reason'] ?? $finish;
+        if (isset($payload['usage']['prompt_tokens'])) {
+            $inputTokens = $payload['usage']['prompt_tokens'];
+            $outputTokens = $payload['usage']['completion_tokens'] ?? $outputTokens;
+        }
+    };
+
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode($body),
+        CURLOPT_HTTPHEADER     => [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $apiKey,
+            'Accept: text/event-stream',
+        ],
+        CURLOPT_TIMEOUT        => API_TIMEOUT_SECONDS,
+        CURLOPT_WRITEFUNCTION  => makeLineSplitter($onLine, $tail),
+    ]);
+    curl_exec($ch);
+    if ($tail !== '') {          // final line, no trailing newline
+        $onLine(rtrim($tail, ""));
+        $tail = '';
+    }
+    if ($httpCode === 0) {
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    }
+    // No curl_close() here: it's a deprecated no-op since PHP 8.0, and on 8.5 it
+    // emits a notice that would be written straight into the event stream.
+    $curlError = curl_error($ch);
+
+    if ($httpCode >= 400 || ($text === '' && $errorBody !== '')) {
+        $decoded = json_decode(trim($errorBody), true);
+        return [$httpCode ?: 502, is_array($decoded) ? $decoded : [
+            'error' => ['type' => 'api_error', 'message' => 'The model API returned an error.'],
+        ], $curlError];
+    }
+
+    // Reuse the non-streaming normalizer so empty answers, stop_reason mapping
+    // and the reasoning-budget diagnosis behave identically on both transports.
+    return [$httpCode ?: 200, normalizeOpenAiCompatibleResponse([
+        'model'   => $model,
+        'choices' => [['message' => ['content' => $text], 'finish_reason' => $finish]],
+        'usage'   => ['prompt_tokens' => $inputTokens, 'completion_tokens' => $outputTokens],
+    ], $model), $curlError];
+}
+
+/**
+ * Report a fatal request failure and stop, on whichever transport is live.
+ *
+ * Before the first delta nothing has been written, so an ordinary JSON error
+ * is still possible and the frontend's existing handling applies. Once text
+ * is on screen the response is already an event stream, and the only honest
+ * thing left is an `error` event the client can append to what it has.
+ */
+function emitFailure(bool $streamStarted, int $status, array $error): void
+{
+    if ($streamStarted) {
+        sendEvent('error', $error);
+        @flush();
+    } else {
+        http_response_code($status);
+        echo json_encode(['error' => $error]);
+    }
+    exit;
+}
+
+/**
+ * Estimate token counts when a streaming provider didn't report usage.
+ *
+ * Better than logging zero: a request that cost real money would otherwise
+ * look free on the dashboard. Entries built this way are flagged
+ * `usage_estimated` so the numbers are never mistaken for measured ones.
+ * Roughly four characters per token, which is the usual English ballpark.
+ */
+function estimateUsage(string $promptText, string $responseText): array
+{
+    return [
+        'input_tokens'  => (int)ceil(mb_strlen($promptText) / 4),
+        'output_tokens' => (int)ceil(mb_strlen($responseText) / 4),
     ];
 }
 

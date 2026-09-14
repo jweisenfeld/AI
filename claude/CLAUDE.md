@@ -77,6 +77,44 @@ a second model with the same constraint is a config edit, not a code change. Sam
 fences, token-cap truncation, empty answers, unpaired user turns) was shared across providers
 and got one shared fix.
 
+## Streaming
+Replies stream to the browser as the model writes them. index.html sends `"stream": true`;
+api-proxy.php relays Server-Sent Events while **also accumulating the whole answer**, then hands
+the same `$responseData` shape to the existing pipeline — logging, cost, safety alerts and the
+restriction banner are untouched. One pipeline, two transports.
+
+The event stream is opened **lazily, on the first text delta** (`$onDelta` in api-proxy.php). Until
+then nothing has been written, which buys two things: an error raised before any text still comes
+back as ordinary JSON and the frontend's existing error handling applies unchanged, and Anthropic
+auto-healing can still retry a fallback model because nothing has reached the screen. Once text is
+on screen, healing is explicitly skipped — a retry would stream a second copy of the answer and
+bill for both.
+
+Events: `delta` (text), `done` (usage, model, stop_reason, restrictions, notices), `error`.
+`beginEventStream()` also sets `display_errors=0` — a PHP notice printed mid-stream lands inside an
+SSE frame and corrupts it. The streaming paths deliberately don't call `curl_close()`: it's a
+deprecated no-op since PHP 8.0 and on 8.5 it emits exactly such a notice.
+
+`makeLineSplitter()` takes the caller's buffer **by reference** so a final line with no trailing
+newline can be flushed. That isn't hypothetical: an API error body arrives as one line of JSON with
+no newline, and dropping it turned a specific upstream message ("temperature is deprecated for this
+model") into a generic "the model API returned an error".
+
+Token usage on a stream only arrives if asked, via `stream_options.include_usage`. When a provider
+sends none, `estimateUsage()` approximates from text length (~4 chars/token) and the log entry is
+flagged `usage_estimated` — a paid request must never be logged as free, and an estimate must never
+be mistaken for a measurement.
+
+Client side: `consumeAssistantStream()` repaints on animation frames rather than per token
+(formatMessage re-parses the whole answer each time; per-token would burn a Chromebook's CPU).
+Partial code renders correctly mid-stream because the renderer already treats an unclosed fence as
+a code block — the fix made for truncation is exactly what streaming needed. `.message.streaming`
+hides the "cut off" warning while text is still arriving, since a fence that isn't closed *yet* is
+not the same as one that never will be. The Send button becomes Stop (AbortController); stopping
+keeps the partial answer, which for code is often still useful.
+
+BlueHost delivers SSE without buffering — measured, not assumed (see the Spike section).
+
 ## Timeouts
 `API_TIMEOUT_SECONDS` (240) caps both cURL calls; PHP gets that plus 60s via `set_time_limit()`.
 The old 120s ceiling was too tight once `max_tokens` went to 8192 — GLM timed out mid-program
@@ -85,10 +123,24 @@ any byte returns; that wait is inherent without a streaming rewrite. `describeCo
 reports timeouts as `model_timeout` with advice to ask for one piece at a time, rather than the
 misleading "check your API configuration".
 
+## Tests
+| Suite | Runs | Covers |
+|-------|------|--------|
+| `tests.php` | `php tests.php` | proxy request building, config, restrictions, normalization |
+| `tests.js` | `node tests.js` | request validation and caps |
+| `tests-frontend.js` | `node tests-frontend.js` | formatMessage, rollBackUserTurn, consumeAssistantStream |
+| `tests-streaming.php` | start `tests-streaming-server.py`, then `php tests-streaming.php` | the real streaming functions against a fake model API — no keys, no cost |
+
+All four lift functions out of the source rather than copying them; a copied function drifts and
+proves nothing about what ships. The CLI php here needs `-d extension=php_curl.dll -d
+extension=php_mbstring.dll` for the streaming suite.
+
 ## Smoke Test
 `smoke-test.py` sends one short code prompt per tier through the **deployed** proxy and reports
 which model answered, `stop_reason`, empty answers, whether a fenced code block survived intact,
-tokens and estimated cost. Tiers are read from model_config.json, so new ones are covered
+tokens, estimated cost, and **time to first token**. It streams by default, because that is what
+index.html does — testing the other path would be testing code no student runs (`--no-stream` for
+that, `--url` to point at a local fake). Tiers are read from model_config.json, so new ones are covered
 automatically. Credentials come from `CHATBOT_USER`/`CHATBOT_PASS` or the gitignored
 `.smoke-test-credentials.json` — never committed. Requests need a browser User-Agent or
 psd1.net's ModSecurity returns 406. Run it after deploying, and remember that outside school
